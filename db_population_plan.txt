@@ -1694,3 +1694,704 @@ If you want, next I can turn this into a **load-ready seed plan** with:
 1. `instrument_template.csv` schema rows for the static catalog,  
 2. a **generation spec** for the 41 FII / 94 fund / 19 COE rows, and  
 3. an `issuer.csv` normalization checklist for the upstream team.
+
+SECTION 4: ALICE'S FINAL REVIEW
+========================================
+
+
+================================================================================
+SECTION 5: AMENDMENT — DEDICATED EQUITY & BDR TEMPLATES (+54)
+================================================================================
+
+DECISION: Based on analysis of real positions and the principle that listed 
+equities are a finite, manageable set (unlike fixed income issuers), we are 
+OVERRIDING Alice's recommendation to use generic equity/BDR templates.
+
+RATIONALE:
+- Only 53 unique BR equity tickers + 3 BDR tickers in the real portfolios
+- We are already adding ~94 funds and ~41 FIIs as dedicated templates
+- 56 more templates is modest incremental cost
+- Each stock gets its own issuer baked in → no CSV row override needed
+- Each stock can carry tailored instructions_* text for downstream AI
+- allocation_by_instrument_template becomes meaningful for equities
+- B3 has ~400 liquid stocks but clients hold only 53 — manageable catalog
+
+TEMPLATE PATTERN for BR equities:
+  equity_<ticker> | listed | <Company Name> | eq_br | taxable_no_come_cotas
+  b3_listed=True, is_bdr=False, issuer=<company_issuer_code>
+  requires_expiry_date=False, requires_issuer_or_issuer_type=False
+
+TEMPLATE PATTERN for BDRs:
+  bdr_<ticker> | listed | <Company Name> BDR | eq_international | taxable_no_come_cotas
+  b3_listed=True, is_bdr=True, issuer=<company_issuer_code>
+  requires_expiry_date=False, requires_issuer_or_issuer_type=False
+
+SPECIFIC TEMPLATES NEEDED (53 BR equities):
+  equity_vale3, equity_b3sa3, equity_mbrf3, equity_prio3, equity_tots3,
+  equity_cyre99, equity_azul53, equity_movi1, equity_brav3, equity_bhia3,
+  equity_bbse3, equity_odpv3, equity_bbas3, equity_petr4, equity_bbdc4,
+  equity_azul12, equity_azul14, equity_azul16, equity_fesa4, equity_mglu3,
+  equity_amer3, equity_flry3, equity_movi3, equity_vbbr3, equity_klbn4,
+  equity_cyre3, equity_azza3, equity_bmgb10, equity_bmgb4, equity_brkm5,
+  equity_cmig4, equity_csan3, equity_hapv3, equity_jall3, equity_recv3,
+  equity_sbfg3, equity_usim5, equity_vveo3, equity_beef3, equity_kepl3,
+  equity_itsa4, equity_petr3, equity_leve3, equity_alos3, equity_anim3,
+  equity_asai3, equity_eter3, equity_goll54, equity_irbr3, equity_mrve3,
+  equity_radl3, equity_smto3, equity_wege3
+
+SPECIFIC TEMPLATES NEEDED (3 BDRs):
+  bdr_tsla34, bdr_aura33, bdr_xpbr31
+
+REVISED TOTAL TEMPLATE COUNT:
+  Previous ideal:  200
+  + 53 BR equities: +53
+  + 3 BDRs:         +3
+  - 2 generic:      -2  (remove equity_br_listed_generic, bdr_equity_listed_generic)
+  NEW TOTAL:         254 templates
+
+================================================================================
+SECTION 6: ALICE'S SECOND REVIEW (additional insights)
+================================================================================
+
+Bottom line:
+
+- **Use hybrid granularity.**
+- **Cloe is right on funds.**
+- **Diana is right on plain listed equities/BDRs.**
+- **Neither is fully right on FIIs/COEs**: FIIs should be **per ticker** in the ideal set; COEs should be **per product code/name** in the ideal set.
+
+Also: your category counts add to **1,217**, not **1,231**. There is a **14-row gap** to reconcile before freezing the seed set.
+
+## Final conflict resolutions
+
+1. **Funds: individual templates or grouped?**  
+   **Individual templates per fund CNPJ.**  
+   Reason: fee, tax regime, mandate, and exposure vary too much. Grouping by “strategy” loses exactly the information your template table is meant to preserve.
+
+2. **Listed equities: individual ticker templates or generic?**  
+   **Generic for plain BR equities and plain BDRs.**  
+   Use:
+   - `equity_br_listed_generic` + row-level `issuer_code`
+   - `bdr_equity_listed_generic` + row-level `issuer_code`  
+   **Do not** create one template per common stock ticker.
+
+3. **How many templates total?**  
+   From the summary you gave, the **ideal target** is **200 templates**:
+   - 31 shared generic templates
+   - 7 ETF templates
+   - 41 FII templates
+   - 94 fund templates
+   - 19 COE templates
+   - 8 crypto templates
+
+   **Recommended MVP**: **148 templates**
+   - 31 shared generic templates
+   - 7 ETF templates
+   - 94 fund templates
+   - 8 crypto templates
+   - 4 FII archetype templates
+   - 4 COE family templates
+
+   **Absolute bare-minimum loader**: **142**  
+   I do **not** recommend going that low.
+
+4. **Minimum viable vs ideal**
+   - **Recommended MVP (148)**: good enough to launch without major distortion.
+   - **Ideal/final (200)**: what you should target for a production-quality X-Ray.
+
+---
+
+## Reference-data changes
+
+### Missing `economic_exposure` rows
+**Required addition**
+- `commodity_global`
+
+Why:
+- `GOLD11`
+- commodity-linked COEs
+
+**Optional / likely useful**
+- `fx_global`
+
+Add this **only if** `KDOL11` or some COEs are genuinely currency-linked rather than equity/fixed-income wrappers.
+
+### Missing `issuer_type` rows
+**No required additions.**
+
+Optional only:
+- `br_securitizer` if you later want **legal issuer** analysis for CRA/CRI instead of **economic obligor** analysis.
+
+For the current X-Ray goal, your 6 issuer types are enough.
+
+---
+
+## Required issuer population
+
+Diana’s “only top issuers” idea is too weak for concentration analysis.  
+For all categories mapped with generic templates, you should load **all distinct issuers that actually appear in rows** whenever the issuer is known.
+
+### Must exist for sure
+- `tesouro_nacional` — `br_government`
+
+### Must exist if COE templates bake issuer
+- `banco_btg_pactual` — `br_bank`
+- `banco_xp` — `br_bank`
+
+### Must exist from generic row-level mapping
+All distinct issuers from:
+- CDB / LCA / LCI / Compromissada banks
+- CRA / CRI / CDCA / Debênture economic obligors
+- Plain BR equities
+- BDR underlying companies
+
+### Issuers definitely visible from your summary
+Suggested codes / types:
+- `banco_btg_pactual` — `br_bank`
+- `banco_bradesco` — `br_bank`
+- `banco_master` — `br_bank`
+- `banco_xp` — `br_bank`
+- `fs_bio` — `br_other`
+- `raizen` — `br_other`
+- `cofco` — `br_other`
+- `minerva` — `br_other`
+- `jbs` — `br_other`
+- `vale_sa` — `br_other`
+- `b3_sa` — `br_other`
+- `marfrig` — `br_other`
+- `prio` — `br_other`
+- `totvs` — `br_other`
+- `tesla_inc` — `nonbr_other`
+- `aura_minerals` — `nonbr_other`
+- `xp_inc` — `nonbr_other`
+
+---
+
+## Exclude from load
+Do **not** create templates for:
+- `CONTA CORRENTE`
+- `DIVIDENDOS/JUROS`
+
+And do **not** create separate templates for:
+- `NTN-B secondary market` vs `Tesouro Direto`
+
+Purchase channel is **not** a template dimension.
+
+---
+
+# FINAL TEMPLATE CATALOG
+
+## A. Shared generic templates — final production set (31)
+
+Format:
+`kind | short_name | exp | exp_w | tax | issuer_type | issuer_type_w | issuer | expiry | req_issuer | fees | b3_listed | is_bdr | has_fgc`
+
+### Tesouro (4)
+
+**tesouro_selic_generic**  
+`fixed_income | Tesouro Selic | fi_cdi_br | null | general | br_government | null | tesouro_nacional | true | false | {yearly:null, perf:null} | false | false | false`
+
+**tesouro_ipca_principal_generic**  
+`fixed_income | Tesouro IPCA+ Principal | fi_ipca_br | null | general | br_government | null | tesouro_nacional | true | false | {yearly:null, perf:null} | false | false | false`
+
+**tesouro_ipca_juros_generic**  
+`fixed_income | Tesouro IPCA+ com Juros | fi_ipca_br | null | general | br_government | null | tesouro_nacional | true | false | {yearly:null, perf:null} | false | false | false`
+
+**tesouro_prefixado_generic**  
+`fixed_income | Tesouro Prefixado | fi_prefixado_br | null | general | br_government | null | tesouro_nacional | true | false | {yearly:null, perf:null} | false | false | false`
+
+### Bank deposits / repo (10)
+
+**cdb_cdi_generic**  
+`fixed_income | CDB CDI | fi_cdi_br | null | general | br_bank | null | null | true | true | {yearly:null, perf:null} | false | false | true`
+
+**cdb_ipca_generic**  
+`fixed_income | CDB IPCA+ | fi_ipca_br | null | general | br_bank | null | null | true | true | {yearly:null, perf:null} | false | false | true`
+
+**cdb_prefixado_generic**  
+`fixed_income | CDB Prefixado | fi_prefixado_br | null | general | br_bank | null | null | true | true | {yearly:null, perf:null} | false | false | true`
+
+**lca_cdi_generic**  
+`fixed_income | LCA CDI | fi_cdi_br | null | tax_exempt | br_bank | null | null | true | true | {yearly:null, perf:null} | false | false | true`
+
+**lca_ipca_generic**  
+`fixed_income | LCA IPCA+ | fi_ipca_br | null | tax_exempt | br_bank | null | null | true | true | {yearly:null, perf:null} | false | false | true`
+
+**lca_prefixado_generic**  
+`fixed_income | LCA Prefixado | fi_prefixado_br | null | tax_exempt | br_bank | null | null | true | true | {yearly:null, perf:null} | false | false | true`
+
+**lci_cdi_generic**  
+`fixed_income | LCI CDI | fi_cdi_br | null | tax_exempt | br_bank | null | null | true | true | {yearly:null, perf:null} | false | false | true`
+
+**lci_ipca_generic**  
+`fixed_income | LCI IPCA+ | fi_ipca_br | null | tax_exempt | br_bank | null | null | true | true | {yearly:null, perf:null} | false | false | true`
+
+**lci_prefixado_generic**  
+`fixed_income | LCI Prefixado | fi_prefixado_br | null | tax_exempt | br_bank | null | null | true | true | {yearly:null, perf:null} | false | false | true`
+
+**compromissada_cdi_generic**  
+`fixed_income | Operação Compromissada | fi_cdi_br | null | general | br_bank | null | null | true | true | {yearly:null, perf:null} | false | false | false`
+
+### CRA / CRI / CDCA (9)
+
+**cra_cdi_generic**  
+`fixed_income | CRA CDI | fi_cdi_br | null | tax_exempt | br_other | null | null | true | true | {yearly:null, perf:null} | false | false | false`
+
+**cra_ipca_generic**  
+`fixed_income | CRA IPCA+ | fi_ipca_br | null | tax_exempt | br_other | null | null | true | true | {yearly:null, perf:null} | false | false | false`
+
+**cra_prefixado_generic**  
+`fixed_income | CRA Prefixado | fi_prefixado_br | null | tax_exempt | br_other | null | null | true | true | {yearly:null, perf:null} | false | false | false`
+
+**cri_cdi_generic**  
+`fixed_income | CRI CDI | fi_cdi_br | null | tax_exempt | br_other | null | null | true | true | {yearly:null, perf:null} | false | false | false`
+
+**cri_ipca_generic**  
+`fixed_income | CRI IPCA+ | fi_ipca_br | null | tax_exempt | br_other | null | null | true | true | {yearly:null, perf:null} | false | false | false`
+
+**cri_prefixado_generic**  
+`fixed_income | CRI Prefixado | fi_prefixado_br | null | tax_exempt | br_other | null | null | true | true | {yearly:null, perf:null} | false | false | false`
+
+**cdca_cdi_generic**  
+`fixed_income | CDCA CDI | fi_cdi_br | null | tax_exempt | br_other | null | null | true | true | {yearly:null, perf:null} | false | false | false`
+
+**cdca_ipca_generic**  
+`fixed_income | CDCA IPCA+ | fi_ipca_br | null | tax_exempt | br_other | null | null | true | true | {yearly:null, perf:null} | false | false | false`
+
+**cdca_prefixado_generic**  
+`fixed_income | CDCA Prefixado | fi_prefixado_br | null | tax_exempt | br_other | null | null | true | true | {yearly:null, perf:null} | false | false | false`
+
+### Debêntures (6)
+
+**debenture_incentivada_cdi_generic**  
+`fixed_income | Debênture Incentivada CDI | fi_cdi_br | null | tax_exempt | br_infrastructure | null | null | true | true | {yearly:null, perf:null} | false | false | false`
+
+**debenture_incentivada_ipca_generic**  
+`fixed_income | Debênture Incentivada IPCA+ | fi_ipca_br | null | tax_exempt | br_infrastructure | null | null | true | true | {yearly:null, perf:null} | false | false | false`
+
+**debenture_incentivada_prefixado_generic**  
+`fixed_income | Debênture Incentivada Prefixada | fi_prefixado_br | null | tax_exempt | br_infrastructure | null | null | true | true | {yearly:null, perf:null} | false | false | false`
+
+**debenture_regular_cdi_generic**  
+`fixed_income | Debênture CDI | fi_cdi_br | null | general | br_other | null | null | true | true | {yearly:null, perf:null} | false | false | false`
+
+**debenture_regular_ipca_generic**  
+`fixed_income | Debênture IPCA+ | fi_ipca_br | null | general | br_other | null | null | true | true | {yearly:null, perf:null} | false | false | false`
+
+**debenture_regular_prefixado_generic**  
+`fixed_income | Debênture Prefixada | fi_prefixado_br | null | general | br_other | null | null | true | true | {yearly:null, perf:null} | false | false | false`
+
+### Plain listed equity / BDR generics (2)
+
+**equity_br_listed_generic**  
+`listed | Ação Brasileira Listada | eq_br | null | taxable_no_come_cotas | null | null | null | false | true | {yearly:null, perf:null} | true | false | false`
+
+**bdr_equity_listed_generic**  
+`listed | BDR de Ação Internacional | eq_international | null | taxable_no_come_cotas | null | null | null | false | true | {yearly:null, perf:null} | true | true | false`
+
+---
+
+## B. ETF templates — dedicated per ticker (ideal and MVP) (7)
+
+**etf_bova11**  
+`listed | BOVA11 | eq_br | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null_or_backfill, perf:null} | true | false | false`
+
+**etf_ivvb11**  
+`listed | IVVB11 | eq_international | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null_or_backfill, perf:null} | true | false | false`
+
+**etf_kdol11**  
+`listed | KDOL11 | fi_international_or_fx_global_if_added | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null_or_backfill, perf:null} | true | false | false`
+
+**etf_ustk11**  
+`listed | USTK11 | eq_international | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null_or_backfill, perf:null} | true | false | false`
+
+**etf_gold11**  
+`listed | GOLD11 | commodity_global | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null_or_backfill, perf:null} | true | false | false`
+
+**etf_b5p211**  
+`listed | B5P211 | fi_ipca_br | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null_or_backfill, perf:null} | true | false | false`
+
+**etf_debb11**  
+`listed | DEBB11 | fi_ipca_br | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null_or_backfill, perf:null} | true | false | false`
+
+---
+
+## C. FII templates — dedicated per ticker (ideal)
+
+You should create **41** of these.
+
+### Named FIIs visible in your summary
+
+**fii_btlg11**  
+`listed | BTLG11 | re_br | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null_or_backfill, perf:null_or_backfill} | true | false | false`
+
+**fii_hsml11**  
+`listed | HSML11 | re_br | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null_or_backfill, perf:null_or_backfill} | true | false | false`
+
+**fii_hglg11**  
+`listed | HGLG11 | re_br | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null_or_backfill, perf:null_or_backfill} | true | false | false`
+
+**fii_kncr11**  
+`listed | KNCR11 | fi_cdi_br | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null_or_backfill, perf:null_or_backfill} | true | false | false`
+
+**fii_knip11**  
+`listed | KNIP11 | fi_ipca_br | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null_or_backfill, perf:null_or_backfill} | true | false | false`
+
+**fii_mcci11**  
+`listed | MCCI11 | fi_ipca_br | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null_or_backfill, perf:null_or_backfill} | true | false | false`
+
+**fii_xpml11**  
+`listed | XPML11 | re_br | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null_or_backfill, perf:null_or_backfill} | true | false | false`
+
+### Pattern for the remaining 34 FIIs
+
+**fii_<ticker>**  
+`listed | <ticker> | one_of(re_br, fi_cdi_br, fi_ipca_br, weighted_mix) | <optional_weights> | taxable_no_come_cotas | null | null | null | false | false | {yearly:<backfill>, perf:<backfill_or_null>} | true | false | false`
+
+Rule:
+- brick / malls / logistics / offices / residential / most hybrids → `re_br`
+- paper FII CDI / CDI+ → `fi_cdi_br`
+- paper FII IPCA / CRI inflation → `fi_ipca_br`
+- only use weights if the FII is genuinely mixed
+
+---
+
+## D. Investment funds — dedicated per fund CNPJ (ideal and MVP) (94)
+
+This is the big one.  
+**Cloe is right here.** Use **one template per fund CNPJ**, not grouped by strategy.
+
+### Final pattern
+
+**fund_<cnpj>**  
+`fund | <official_fund_short_name> | <fund_specific_primary_exposure> | <fund_specific_weights_or_null> | one_of(general, taxable_no_come_cotas, previdencia) | null | null | null | false | false | {yearly:<management_fee>, perf:<performance_fee_or_null>} | false | false | false`
+
+### Tax rules for funds
+- `previdencia` → previdência/PGBL/VGBL funds
+- `taxable_no_come_cotas` → equity-style funds with no come-cotas
+- `general` → most FIRF / FIM / DI / crédito / macro / multimercado funds
+
+### Example mappings from your summary
+Use these as examples; actual `template_code` should be CNPJ-based if possible.
+
+**fund_<cnpj_of_btg_cdb_plus_firf_crpr>**  
+`fund | BTG CDB Plus FIRF CrPr | fi_cdi_br | null | general | null | null | null | false | false | {yearly:<backfill>, perf:<backfill_or_null>} | false | false | false`
+
+**fund_<cnpj_of_btg_tesouro_selic_firfrefdi>**  
+`fund | BTG Tesouro Selic FIRF Ref DI | fi_cdi_br | null | general | null | null | null | false | false | {yearly:<backfill>, perf:<backfill_or_null>} | false | false | false`
+
+**fund_<cnpj_of_porto_di_crpr_firef>**  
+`fund | Porto DI CrPr FIRef | fi_cdi_br | null | general | null | null | null | false | false | {yearly:<backfill>, perf:<backfill_or_null>} | false | false | false`
+
+---
+
+## E. COEs — dedicated per product code / ISIN / exact marketed product (ideal) (19)
+
+Do **not** use a single `coe_unresolved` as the final design.
+
+### Final pattern
+
+**coe_<isin_or_product_code>**  
+`other | <official_coe_name> | one_of(eq_br, eq_international, commodity_global, weighted_mix) | <product_specific_weights_or_null> | general | br_bank | null | <issuer_if_unique_else_null> | true | <false_if_issuer_baked_in_else_true> | {yearly:null, perf:null} | false | false | false`
+
+Rules:
+- if same payoff family appears from **two different issuers**, split into **two templates**
+- preferred code source:
+  1. ISIN
+  2. broker product code
+  3. normalized marketed name
+
+---
+
+## F. Crypto templates — dedicated per token (ideal and MVP) (8)
+
+**crypto_bitcoin**  
+`crypto | Bitcoin | crypto | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null, perf:null} | false | false | false`
+
+**crypto_ethereum**  
+`crypto | Ethereum | crypto | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null, perf:null} | false | false | false`
+
+**crypto_solana**  
+`crypto | Solana | crypto | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null, perf:null} | false | false | false`
+
+**crypto_aave**  
+`crypto | AAVE | crypto | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null, perf:null} | false | false | false`
+
+**crypto_chainlink**  
+`crypto | Chainlink | crypto | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null, perf:null} | false | false | false`
+
+**crypto_polygon**  
+`crypto | Polygon | crypto | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null, perf:null} | false | false | false`
+
+**crypto_uniswap**  
+`crypto | Uniswap | crypto | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null, perf:null} | false | false | false`
+
+**crypto_render**  
+`crypto | Render | crypto | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null, perf:null} | false | false | false`
+
+---
+
+# Recommended MVP-only fallback templates
+
+If you need to go live before all 41 FII and 19 COE dedicated templates are built, use these **temporary** families.
+
+## FII MVP archetypes (4)
+
+**fii_tijolo_generic_mvp**  
+`listed | FII Tijolo | re_br | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null, perf:null} | true | false | false`
+
+**fii_papel_cdi_generic_mvp**  
+`listed | FII Papel CDI | fi_cdi_br | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null, perf:null} | true | false | false`
+
+**fii_papel_ipca_generic_mvp**  
+`listed | FII Papel IPCA | fi_ipca_br | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null, perf:null} | true | false | false`
+
+**fii_hibrido_generic_mvp**  
+`listed | FII Híbrido | re_br | null | taxable_no_come_cotas | null | null | null | false | false | {yearly:null, perf:null} | true | false | false`
+
+## COE MVP families (4)
+
+**coe_eq_br_generic_mvp**  
+`other | COE Ações BR | eq_br | null | general | br_bank | null | null | true | true | {yearly:null, perf:null} | false | false | false`
+
+**coe_eq_international_generic_mvp**  
+`other | COE Ações Internacionais | eq_international | null | general | br_bank | null | null | true | true | {yearly:null, perf:null} | false | false | false`
+
+**coe_commodity_generic_mvp**  
+`other | COE Commodities | commodity_global | null | general | br_bank | null | null | true | true | {yearly:null, perf:null} | false | false | false`
+
+**coe_multiasset_generic_mvp**  
+`other | COE Multiasset | eq_international | null | general | br_bank | null | null | true | true | {yearly:null, perf:null} | false | false | false`
+
+---
+
+# Final answers, plainly
+
+## 1. Funds: Cloe or Diana?
+**Cloe.**  
+Use **one template per fund CNPJ**. Grouping funds by strategy is too lossy.
+
+## 2. Listed equities: individual ticker templates or generic?
+**Generic for plain BR equities and plain BDRs.**  
+Use row-level issuer.  
+But **ETFs and FIIs are dedicated templates per ticker**.
+
+## 3. How many templates total?
+- **Ideal/final:** **200**
+- **Recommended MVP:** **148**
+- **Absolute bare minimum:** **142**, not recommended
+
+## 4. Minimum viable vs ideal
+- **MVP** = 31 generic + 7 ETF + 94 funds + 8 crypto + 4 FII archetypes + 4 COE families
+- **Ideal** = 31 generic + 7 ETF + 41 FII + 94 funds + 19 COE + 8 crypto
+
+If you want, next I can turn this into:
+1. a **CSV seed file layout**,  
+2. a **Django fixture**, or  
+3. a **mapping matrix from each brokerage label to template_code**.
+
+================================================================================
+SECTION 7: ADDITIONAL CORRECTIONS FROM ALICE'S SECOND REVIEW
+================================================================================
+
+1. ADD economic_exposure: commodity_global (for GOLD11, commodity COEs)
+2. Paper FIIs (KNCR11, KNIP11, MCCI11, etc.) map to fi_cdi_br or fi_ipca_br, NOT re_br
+3. NTN-F needs a template: tesouro_ntnf_generic (fi_prefixado_br, general)
+4. LFT secondary market = same template as tesouro_selic_generic
+5. LFSN needs investigation (1 position)
+6. 14-row gap between 1,217 classified and 1,231 total — reconcile before seeding
+
+REVISED FINAL TEMPLATE COUNT WITH ALL CORRECTIONS: ~256 templates
+
+
+================================================================================
+SECTION 8: ALICE'S FINAL REVIEW OF AMENDED PLAN (with +54 equities)
+================================================================================
+
+Yes — **the dedicated-per-ticker override is fine for true recurring listed shares/BDRs**. The main problems I see are **instrument subtype mistakes**, not the extra granularity. In your current plan, some names sitting in the “equity/ETF” buckets are actually **rights, receipts, units, or a FIAGRO**: MOVI1 is a subscription right; AZUL12/AZUL14/AZUL16 appear on B3 under “Direitos e Recibos”; BMGB10 is a subscription receipt; CYRE99 is a unit; KLBN11 is a unit; and KDOL11 is a FIAGRO, not an ETF. ([bvmf.bmfbovespa.com.br](https://bvmf.bmfbovespa.com.br/cias-listadas/Titulos-Negociaveis/DetalheTitulosNegociaveis.aspx?cb=MOVI&idioma=pt-BR&or=res&tip=I))
+
+Also, **AZUL53 and GOLL54 are valid listed share tickers**, but they are not “plain vanilla” share codes anymore: B3 assigned them nonstandard quotation factors / round lots after corporate actions. If your master doesn’t store that metadata, imports and price normalization can break. ([b3.com.br](https://www.b3.com.br/data/files/7B/B7/4A/91/6B8BB9109B5E99B9AC094EA8/CL%20004-2026-VNC%20AZUL_Conversao%20PN%20ON_090126_EN.pdf))
+
+## 1. Problems with the decision?
+
+**For stable recurring names:** no major problem. With only ~53 BR tickers + 3 BDRs actually held, dedicated templates are operationally acceptable.
+
+**But I would not implement the override blindly across all 56 as plain `equity_*` / `bdr_*` share templates.** My corrections would be:
+
+- Keep dedicated templates for **true shares/PNs/ONs/BDRs/ETFs/FIIs/funds**.
+- Reclassify **rights / receipts / units / FIAGROs** into their own subtypes.
+- Keep a **generic fallback** template for any future unseen listed ticker, so ingestion never fails just because a client buys the 54th stock.
+
+### Names I would **not** keep as plain equity-share templates
+- `MOVI1` → subscription right, not common equity. ([bvmf.bmfbovespa.com.br](https://bvmf.bmfbovespa.com.br/cias-listadas/Titulos-Negociaveis/DetalheTitulosNegociaveis.aspx?cb=MOVI&idioma=pt-BR&or=res&tip=I))
+- `AZUL12`, `AZUL14`, `AZUL16` → rights/receipts bucket, not ordinary shares. ([bvmf.bmfbovespa.com.br](https://bvmf.bmfbovespa.com.br/cias-listadas/titulos-negociaveis/DetalheTitulosNegociaveis.aspx?cb=AZUL&idioma=pt-BR&or=res&tip=I))
+- `BMGB10` → subscription receipt, not ordinary/preferred equity. ([bvmf.bmfbovespa.com.br](https://bvmf.bmfbovespa.com.br/cias-listadas/Titulos-Negociaveis/DetalheTitulosNegociaveis.aspx?cb=BMGB&idioma=en-US&or=res&tip=I))
+
+### Names that can stay dedicated, but need a different subtype
+- `CYRE99` → **unit** template, not plain equity share. ([bvmf.bmfbovespa.com.br](https://bvmf.bmfbovespa.com.br/cias-listadas/Titulos-Negociaveis/DetalheTitulosNegociaveis.aspx?cb=CYRE&idioma=pt-BR&or=res&tip=I))
+- `KLBN11` (if present in portfolios) → **unit** template, not ETF. ([bvmf.bmfbovespa.com.br](https://bvmf.bmfbovespa.com.br/cias-listadas/Titulos-Negociaveis/DetalheTitulosNegociaveis.aspx?cb=KLBN&idioma=pt-BR&or=res&tip=I))
+
+### Names that can stay dedicated share templates, but need metadata
+- `AZUL53` → valid share template, but store quote/lot factor metadata. ([b3.com.br](https://www.b3.com.br/hyperlink.jsp?lumParams=S06yrNb-u19iaHiXN9aQmHF-Vfs2RE_M403vTZ9D-WLZ9njHGYAO6ckGmLXot9nkXnXlwoegBUtbVNdvbBm3IzfYKO_QuU6THANdYtGeetSWPS46e-Eju68655WMnE_YHjaUBigl4h-wpqbyhIsz_nz8KRWlWoVaznA9_ikCyMwD04IWBu2uVaE8gpVcsqFhc2vZC6Jitf_n9yPfYh3gHcQTrIlSZmo77WKxgrCLqo4))
+- `GOLL54` → valid share template, but store quote/lot factor metadata. ([b3.com.br](https://www.b3.com.br/data/files/D6/40/57/34/457479106B8BCB69AC094EA8/CL%20005-2025-VPE%20TRATAMENTO%20EM%20DECORRENCIA%20DA%20SUBSCRICAO%20DA%20GOL%20LINHAS%20AEREAS%20INTELIGENTES%20SA_ING.pdf))
+
+## 2. The unusual tickers: separate template or map to parent?
+
+My recommendation:
+
+- **CYRE99** — keep **separate**, but as `unit_cyre99`, not `equity_cyre99`. Do **not** collapse into `CYRE3`; a unit is a distinct traded instrument. ([bvmf.bmfbovespa.com.br](https://bvmf.bmfbovespa.com.br/cias-listadas/Titulos-Negociaveis/DetalheTitulosNegociaveis.aspx?cb=CYRE&idioma=pt-BR&or=res&tip=I))
+- **AZUL53** — keep **separate** as a listed share template. It is the current Azul share code, not just a temporary alias; but store `share_class=on`, `quote_factor=1000000`, `round_lot=1000000`, `odd_lot_min=10000`. ([b3.com.br](https://www.b3.com.br/hyperlink.jsp?lumParams=S06yrNb-u19iaHiXN9aQmHF-Vfs2RE_M403vTZ9D-WLZ9njHGYAO6ckGmLXot9nkXnXlwoegBUtbVNdvbBm3IzfYKO_QuU6THANdYtGeetSWPS46e-Eju68655WMnE_YHjaUBigl4h-wpqbyhIsz_nz8KRWlWoVaznA9_ikCyMwD04IWBu2uVaE8gpVcsqFhc2vZC6Jitf_n9yPfYh3gHcQTrIlSZmo77WKxgrCLqo4))
+- **AZUL12 / AZUL14 / AZUL16** — do **not** map to parent equity in the instrument master. They are rights/receipts instruments; use either dedicated temporary templates (`right_azul12`, etc.) or one generic rights family with ticker-level aliases. They can still report economic look-through to Azul if needed. ([bvmf.bmfbovespa.com.br](https://bvmf.bmfbovespa.com.br/cias-listadas/titulos-negociaveis/DetalheTitulosNegociaveis.aspx?cb=AZUL&idioma=pt-BR&or=res&tip=I))
+- **BMGB10** — do **not** map to `BMGB4`; keep separate as `receipt_bmgb10` (temporary/event-driven). ([bvmf.bmfbovespa.com.br](https://bvmf.bmfbovespa.com.br/cias-listadas/Titulos-Negociaveis/DetalheTitulosNegociaveis.aspx?cb=BMGB&idioma=en-US&or=res&tip=I))
+- **GOLL54** — keep **separate** as listed preferred share template; store `share_class=pn`, `quote_factor=1000`, `round_lot=1000`. ([b3.com.br](https://www.b3.com.br/data/files/D6/40/57/34/457479106B8BCB69AC094EA8/CL%20005-2025-VPE%20TRATAMENTO%20EM%20DECORRENCIA%20DA%20SUBSCRICAO%20DA%20GOL%20LINHAS%20AEREAS%20INTELIGENTES%20SA_ING.pdf))
+
+**Two additional exceptions you should add to your checklist:**
+- **MOVI1** is also a right, so it should be `right_movi1`, not `equity_movi1`. ([bvmf.bmfbovespa.com.br](https://bvmf.bmfbovespa.com.br/cias-listadas/Titulos-Negociaveis/DetalheTitulosNegociaveis.aspx?cb=MOVI&idioma=pt-BR&or=res&tip=I))
+- **KLBN11** is a Klabin unit, so if it exists in the files it should be `unit_klbn11`, not ETF. ([bvmf.bmfbovespa.com.br](https://bvmf.bmfbovespa.com.br/cias-listadas/Titulos-Negociaveis/DetalheTitulosNegociaveis.aspx?cb=KLBN&idioma=pt-BR&or=res&tip=I))
+
+## 3. Issuer type: `br_bank`, `br_infrastructure`, `br_other`, `nonbr_other`
+
+My **preferred** mapping rule is:
+
+- **`br_bank`**: only legal-bank issuers  
+  - `BBAS3`, `BBDC4`, `BMGB4`, `BMGB10`
+- **`nonbr_other`**: all 3 BDRs  
+  - `TSLA34` (Tesla, Inc.), `AURA33` (Aura Minerals Inc.), `XPBR31` (XP Inc.) ([bvmf.bmfbovespa.com.br](https://bvmf.bmfbovespa.com.br/cias-listadas/titulos-negociaveis/DetalheTitulosNegociaveis.aspx?cb=TSLA&idioma=pt-BR&or=res&tip=I))
+- **`br_other`**: all remaining Brazilian listed shares / units / rights / receipts
+- **`br_infrastructure`**: **I would avoid using this for equity templates** unless your schema explicitly intends it as a sector flag.
+
+Why I’d avoid `br_infrastructure` here: for equities it becomes ambiguous fast — is Petrobras infrastructure or natural resources? Is B3SA3 “financial infrastructure”? Is CSAN3 infrastructure or a holding company? Is VBBR3 infrastructure or downstream retail? That field is too coarse for sectoral equity analysis.
+
+### So the practical recommendation is:
+- `br_bank`: **BBAS3, BBDC4, BMGB4, BMGB10**
+- `nonbr_other`: **TSLA34, AURA33, XPBR31**
+- `br_other`: **everything else Brazilian**, including `ITSA4`, `BBSE3`, `B3SA3`, `CYRE99`, `MOVI1`, `AZUL53`, `AZUL12/14/16`, `GOLL54`, etc.
+
+If you **must** force some names into `br_infrastructure`, the cleanest candidate is **CMIG4**; **PETR3/PETR4, CSAN3, and maybe B3SA3** are arguable, but I would still rather leave them in `br_other` and use a separate `sector` field.
+
+## 4. BOVA11, IVVB11, USTK11: ETF or equity?
+
+Yes — **they should remain ETF templates**, not equity templates.
+
+- **BOVA11** is an iShares **Ibovespa Fundo de Índice**. ([bvmf.bmfbovespa.com.br](https://bvmf.bmfbovespa.com.br/etf/FundosListadosDetalhe.aspx?Sigla=BOVA&aba=abaDocumento&idioma=pt-br&tipoFundo=Acao))
+- **IVVB11** is an iShares **S&P 500 Fundo de Índice** / fund-of-index vehicle tied to the S&P 500. ([bvmf.bmfbovespa.com.br](https://bvmf.bmfbovespa.com.br/etf/FundosListadosDetalhe.aspx?Sigla=IVVB&aba=abaApresentacao&idioma=pt-br&tipoFundo=RendaVariavel))
+- **USTK11** is an **Investo ETF MSCI US Technology Fundo de Índice**. ([b3.com.br](https://www.b3.com.br/pt_br/noticias/fundos-de-investimento-8AE490CA7AE58072017AEB1CC052774A.htm))
+
+Two extra corrections in that same neighborhood:
+
+- **DEBB11** should stay an ETF template, but specifically a **fixed-income / credit ETF**, not equity. ([b3.com.br](https://www.b3.com.br/pt_br/noticias/cotas-do-btg-deb-di-passam-a-ser-negociadas-na-b3-8AE490C980A9EE1E0181AC1E35BB412F.htm))
+- **B5P211** should stay an ETF template, but specifically a **fixed-income inflation ETF**, not equity. ([borainvestir.b3.com.br](https://borainvestir.b3.com.br/cotacoes/etfs/B5P211/))
+- **KDOL11 should not be in the ETF bucket**; it is a **FIAGRO**. ([b3.com.br](https://www.b3.com.br/data/files/84/C1/C0/09/990E09105FE89209AC094EA8/Comunicado%20ao%20Mercado%20-%20Kinea%20Agro%20Income%20USD%20FIAGRO%20-%201%20Emissao%20-%2014.02.2024.pdf))
+- **KLBN11 should not be in the ETF bucket**; it is a **unit**. ([bvmf.bmfbovespa.com.br](https://bvmf.bmfbovespa.com.br/cias-listadas/Titulos-Negociaveis/DetalheTitulosNegociaveis.aspx?cb=KLBN&idioma=pt-BR&or=res&tip=I))
+
+## 5. Economic exposure mapping
+
+My recommended mapping is:
+
+- **True BR listed shares / units / rights / receipts on Brazilian issuers** → `eq_br`
+  - This includes `VALE3`, `B3SA3`, `CYRE99`, `AZUL53`, `GOLL54`, `MOVI1`, `BMGB10`, `AZUL12/14/16`, etc.
+  - For rights/receipts, keep subtype metadata so you don’t lose event-driven behavior.
+
+- **BDRs** → `eq_international`
+  - `TSLA34`, `AURA33`, `XPBR31` are BDRs on foreign issuers. ([bvmf.bmfbovespa.com.br](https://bvmf.bmfbovespa.com.br/cias-listadas/titulos-negociaveis/DetalheTitulosNegociaveis.aspx?cb=TSLA&idioma=pt-BR&or=res&tip=I))
+
+- **BOVA11** → `eq_br`  
+- **IVVB11** → `eq_international`  
+- **USTK11** → `eq_international` ([bvmf.bmfbovespa.com.br](https://bvmf.bmfbovespa.com.br/etf/FundosListadosDetalhe.aspx?Sigla=BOVA&aba=abaDocumento&idioma=pt-br&tipoFundo=Acao))
+
+- **GOLD11** → `commodity_global`  
+  B3 explicitly describes it as a gold ETF / product tied to gold. ([b3.com.br](https://www.b3.com.br/pt_br/noticias/investimentos-em-ativos-ligados-ao-ouro-avancam-na-b3-em-2025.htm))
+
+- **B5P211** → `fi_ipca_br`  
+  It is an inflation-linked fixed-income ETF. ([borainvestir.b3.com.br](https://borainvestir.b3.com.br/cotacoes/etfs/B5P211/))
+
+- **DEBB11** → `fi_cdi_br` or `credit_br`  
+  It is a debenture / credit-private ETF, not equity. ([b3.com.br](https://www.b3.com.br/pt_br/noticias/cotas-do-btg-deb-di-passam-a-ser-negociadas-na-b3-8AE490C980A9EE1E0181AC1E35BB412F.htm))
+
+- **KDOL11** → **not** pure `fx`  
+  KDOL11 is a FIAGRO investing predominantly in USD-referenced agro assets / Fiagro-FIDC / CPR-F chains, so `fx` by itself would overstate currency exposure and understate credit/agro risk. Better: `agro_credit_br_usd_linked`, `credit_br_usd_linked`, or at minimum a fund/FIAGRO bucket plus a separate USD-link flag. ([kinea.com.br](https://www.kinea.com.br/fundos/kinea-agro-income-kdol11/))
+
+## 6. Final comments before execution
+
+My final recommendation is:
+
+### Execute the amended plan, **but with corrected subtypes**
+I would keep the dedicated-template philosophy, but I would not keep everything under just `equity_` and `etf_`.
+
+### I would rename / re-bucket these templates
+- `equity_movi1` → `right_movi1`
+- `equity_azul12` → `right_azul12`
+- `equity_azul14` → `right_azul14`
+- `equity_azul16` → `right_azul16`
+- `equity_bmgb10` → `receipt_bmgb10`
+- `equity_cyre99` → `unit_cyre99`
+- `etf_kdol11` → `fiagro_kdol11`
+- `etf_klbn11` → `unit_klbn11`
+
+### Add these fields before go-live
+- `security_subtype` = share / unit / right / receipt / bdr / etf / fii / fiagro / fund / crypto / coe
+- `share_class` = on / pn / unit / bdr / etc.
+- `quote_factor`
+- `round_lot`
+- `odd_lot_min`
+- `underlying_ticker`
+- `expiry_date` / `conversion_date`
+- `temporary_instrument` boolean
+- `status` = active / expired / converted
+- `alias_of` or `historical_ticker_map`
+
+### Maintain ticker alias history
+You already have examples where historical mapping matters:
+- **MRFG3 → MBRF3** from September 23, 2025. ([b3.com.br](https://www.b3.com.br/data/files/F1/E5/43/0D/B18599100A29E189AC094EA8/CL%20035-2025-VNC%20TRATAMENTO%20DAS%20CARTEIRAS%20DE%20%C3%8DNDICES%20DA%20B3%20E%20DAS%20OPCOES%20FLEXIVEIS%20DE%20BALCAO_EN.pdf))
+- **GOLL3/GOLL4 → GOLL53/GOLL54** in 2025. ([b3.com.br](https://www.b3.com.br/data/files/D6/40/57/34/457479106B8BCB69AC094EA8/CL%20005-2025-VPE%20TRATAMENTO%20EM%20DECORRENCIA%20DA%20SUBSCRICAO%20DA%20GOL%20LINHAS%20AEREAS%20INTELIGENTES%20SA_ING.pdf))
+- **AZUL3/AZUL4 → AZUL53/AZUL54**, with AZUL53 continuing after the 2026 conversion. ([b3.com.br](https://www.b3.com.br/data/files/E2/26/2F/77/CE84B9105B12E5A9AC094EA8/CL%20024-2025-VPE%20OFERTA%20DE%20DISTRIBUI%C3%87%C3%83O%20DE%20A%C3%87%C3%95ES%20DA%20AZUL%20S.A._EN.pdf))
+
+### Net/net
+Your **~257 total is still directionally fine**, but I would treat the final plan as:
+
+- dedicated templates for true recurring shares / BDRs / ETFs / FIIs / funds / crypto / COEs
+- generic templates for most fixed income
+- **separate subtype handling** for units, rights, receipts, and FIAGROs
+
+If you want, I can turn this into a **final corrected template inventory** with exact IDs and recommended names/subtypes for every listed ticker in your amended plan.
+
+================================================================================
+SECTION 9: CORRECTIONS ACCEPTED FROM ALICE'S FINAL REVIEW
+================================================================================
+
+RECLASSIFICATIONS (from equity_* to correct subtype):
+  equity_movi1    → right_movi1      (subscription right, not common equity)
+  equity_azul12   → right_azul12     (rights/receipts)
+  equity_azul14   → right_azul14     (rights/receipts)
+  equity_azul16   → right_azul16     (rights/receipts)
+  equity_bmgb10   → receipt_bmgb10   (subscription receipt)
+  equity_cyre99   → unit_cyre99      (unit, not plain equity)
+  etf_kdol11      → fiagro_kdol11    (FIAGRO, not ETF)
+  etf_klbn11      → unit_klbn11      (unit, not ETF)
+
+ETF EXPOSURE CORRECTIONS:
+  etf_debb11  → fi_cdi_br      (credit/debenture ETF, not equity)
+  etf_b5p211  → fi_ipca_br     (inflation-linked FI ETF, not equity)
+  etf_gold11  → commodity_global (gold ETF)
+
+NEW economic_exposure NEEDED:
+  commodity_global — for GOLD11 and commodity-linked COEs
+
+KEEP AS GENERIC FALLBACK:
+  equity_br_listed_generic — for any future unseen ticker (belt-and-suspenders)
+  bdr_equity_listed_generic — same for BDRs
+
+FINAL REVISED TEMPLATE COUNT:
+  31 generic fixed income/repo
+  6 ETF templates (BOVA11, IVVB11, USTK11, GOLD11, B5P211, DEBB11)
+  2 unit templates (CYRE99, KLBN11)
+  4 rights/receipt templates (MOVI1, AZUL12, AZUL14, AZUL16, BMGB10)
+  1 FIAGRO template (KDOL11)
+  41 FII templates
+  94 fund templates
+  19 COE templates
+  8 crypto templates
+  47 BR equity templates (53 minus 6 reclassified)
+  3 BDR templates
+  2 generic fallbacks (equity + BDR)
+  TOTAL: ~258 templates
