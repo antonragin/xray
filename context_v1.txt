@@ -1,0 +1,3685 @@
+================================================================================
+SECTION 1: ORIGINAL SPECIFICATION (from portfolio_xray_mvp_mechanical_spec.docx)
+================================================================================
+
+Portfolio X-Ray MVPMechanical precursor system
+Detailed implementation specification
+This document is intentionally simpler than the previous draft and follows the exact boundary agreed in the conversation.
+Non-negotiable MVP boundary
+Exactly 5 reference tables: economic_exposure, tax_profile, issuer_type, issuer, instrument_template.
+No instrument_alias table in this system. Alias resolution belongs to the upstream parsing team.
+No portfolio_position table in this system. The portfolio arrives as a resolved CSV input.
+No separate COE instrument kind. COEs live inside instrument_kind = other via one or more explicit templates.
+No extra benchmark_proxy, liquidity_class, or risk_bucket columns. Those hints live inside the angle-specific instruction fields.
+No cash exposure bucket and no alternatives / structured exposure bucket in the reference taxonomy.
+No detailed previdencia split into PGBL / VGBL / progressive / regressive in the MVP. The tax profile is simply previdencia.
+Date: 2026-04-06
+
+1. System purpose and exact scope
+Purpose. Build an internal mechanical service that accepts an already resolved portfolio CSV, expands each row through the reference hierarchy, and emits a deterministic precursor bundle for downstream AI report generators. The system itself contains no AI logic, no raw-statement parsing, and no free-text asset matching.
+Input: a CSV produced by another team after they map each client position to instrument_template_code and optional issuer / expiry overrides.
+Core job: resolve every row against the 5 reference tables, derive portfolio allocations, and attach instructions for each report angle.
+Output: HTML for humans plus structured CSV / JSON artifacts for downstream report-generating agents.
+Administration: operators maintain the 5 reference tables through an internal back-end portal optimized for speed and accuracy.
+What this system does not do
+It does not parse broker exports, PDFs, or messy spreadsheets.
+It does not store long-lived client portfolio positions as part of the reference model.
+It does not infer aliases or guess mappings.
+It does not calculate final narrative conclusions. It only builds the structured precursor.
+2. Recommended implementation architecture
+Recommendation. Implement the MVP as a single Django monolith with PostgreSQL. This is intentionally simpler than a React + FastAPI split and is a better fit for an internal, CRUD-heavy, administration-focused system.
+Django Admin gives usable reference-data CRUD almost immediately, which fits the stated goal of easy database administration.
+The upload and processing workflow can be added as a custom admin page. No separate front-end application is required.
+The generated artifacts can be written to the filesystem or object storage and returned as a ZIP bundle.
+Optional internal automation can be exposed via Django management commands and, later, a small private API if needed.
+
+Layer
+Implementation choice
+Reason
+Web app
+Django
+Simplest path to internal admin + upload tooling
+Database
+PostgreSQL
+Reliable relational model with JSON support for weighted lists
+Admin UI
+Django Admin + custom pages
+Fast CRUD, searchable relations, minimal front-end work
+Processing
+Python service code inside the Django project
+Mechanical logic, deterministic, easy to test
+Charts
+Matplotlib or Plotly to SVG
+Deterministic chart files for HTML and machine bundle
+Artifacts
+ZIP bundle on disk / object storage
+No extra portfolio tables needed for the MVP
+3. Reference database model
+The reference database contains only five tables. That boundary is intentional and should not be expanded in the MVP.
+Table
+Purpose
+Key point
+economic_exposure
+Economic substance taxonomy
+Also carries performance / risk / liquidity hints through instructions
+tax_profile
+Tax treatment taxonomy
+MVP values: general, tax_exempt, taxable_no_come_cotas, previdencia
+issuer_type
+Issuer family taxonomy
+BR / non-BR categories used in diversification logic
+issuer
+Specific issuer reference
+Used when a concrete issuer is known and relevant
+instrument_template
+Canonical resolved asset template
+The upstream CSV maps into this table before entering the system
+Common columns shared by all 5 tables
+Each record should have an immutable code field used in the CSV / machine outputs.
+Each record should have active, created_at, and updated_at fields.
+Each record should expose 6 angle-specific instruction fields: instructions_diversification, instructions_liquidity, instructions_fees, instructions_tax, instructions_risk, instructions_performance.
+Hard delete should be avoided in the admin. Use active = false instead.
+3.1 economic_exposure
+Purpose: represent the underlying economic exposure used for diversification, risk framing, and performance proxy hints.
+Allowed values for exposure_group: fixed_income, equity, real_estate, crypto.
+Seed rows for MVP: fi_cdi_br, fi_ipca_br, fi_prefixado_br, fi_international, eq_br, eq_international, re_br, re_international, crypto.
+No extra cash bucket and no alternatives / structured bucket in this MVP.
+Columns- exposure_code (unique, required)- name (required)- exposure_group (required)- description (optional)- instructions_diversification- instructions_liquidity- instructions_fees- instructions_tax- instructions_risk- instructions_performance- active, created_at, updated_at
+3.2 tax_profile
+Purpose: represent the simplified tax treatment agreed for the MVP.
+Seed rows: general, tax_exempt, taxable_no_come_cotas, previdencia.
+This deliberately avoids the more detailed previdencia branches such as PGBL / VGBL or regressive / progressive.
+Columns- tax_profile_code (unique, required)- name (required)- description (optional)- instructions_diversification- instructions_liquidity- instructions_fees- instructions_tax- instructions_risk- instructions_performance- active, created_at, updated_at
+3.3 issuer_type
+Purpose: represent issuer families for concentration and diversification logic.
+Seed rows: br_government, br_bank, br_infrastructure, br_other, nonbr_government, nonbr_other.
+Columns- issuer_type_code (unique, required)- name (required)- description (optional)- instructions_diversification- instructions_liquidity- instructions_fees- instructions_tax- instructions_risk- instructions_performance- active, created_at, updated_at
+3.4 issuer
+Purpose: represent a concrete issuer when the system or the upstream CSV knows it.
+Each issuer belongs to exactly one issuer_type.
+issuer_code is the machine key used in CSV uploads and machine outputs.
+Columns- issuer_code (unique, required)- name (required)- issuer_type_id (required foreign key)- description (optional)- instructions_diversification- instructions_liquidity- instructions_fees- instructions_tax- instructions_risk- instructions_performance- active, created_at, updated_at
+3.5 instrument_template
+This is the core table. The upstream parsing team maps raw holdings into instrument_template_code before the portfolio enters this system. For fixed income, maturity and sometimes issuer are still supplied per uploaded row, not baked into the template.
+Columns- template_code (unique, required)- instrument_kind (required: listed | fixed_income | fund | crypto | other)- short_name (required)- long_name (optional)- cnpj (optional)- b3_listed (optional boolean)- is_bdr (optional boolean)- yearly_fee_pct (optional decimal)- performance_fee_pct (optional decimal)- has_fgc (optional boolean)- requires_expiry_date (required boolean)- requires_issuer_or_issuer_type (required boolean)- primary_economic_exposure_id (optional foreign key)- economic_exposure_weights_json (optional JSON object)- tax_profile_id (required foreign key)- primary_issuer_type_id (optional foreign key)- issuer_type_weights_json (optional JSON object)- issuer_id (optional foreign key)- instructions_diversification- instructions_liquidity- instructions_fees- instructions_tax- instructions_risk- instructions_performance- active, created_at, updated_at
+Exactly one of primary_economic_exposure_id or economic_exposure_weights_json must be present.
+Use economic_exposure_weights_json only when the template truly needs mixed exposure, for example a mixed fund.
+Use issuer_type_weights_json only when a template truly represents a weighted mix of issuer types.
+COEs should appear as instrument_kind = other, using one or more specific templates such as coe_unresolved.
+Recommended JSON format for weighted fieldseconomic_exposure_weights_json{  "eq_international": 0.60,  "fi_cdi_br": 0.40}issuer_type_weights_json{  "br_bank": 0.70,  "br_other": 0.30}
+4. Data governance and admin conventions
+All codes should be lowercase snake_case and treated as stable identifiers.
+Once a code is used in uploaded portfolios, do not rename it. If a concept materially changes, deactivate the old record and create a new code.
+The admin portal should block hard deletion for records that are referenced by other tables.
+The admin portal should show foreign keys as searchable dropdowns, not raw numeric ids.
+Instruction fields should be large textareas grouped by report angle so that the operator can edit one angle at a time.
+Weighted JSON fields should be edited via a custom row-based widget, not as raw JSON text.
+Reference-data health checks that should exist in the portal
+Templates with no economic exposure.
+Templates whose weighted exposure total is not exactly 1.0 within tolerance.
+Templates whose weighted issuer-type total is not exactly 1.0 within tolerance.
+Templates marked active but missing tax profile.
+Issuers marked active but pointing to inactive issuer types.
+Templates that require expiry_date but are missing the corresponding operator guidance in instructions_performance or instructions_risk.
+5. Input CSV contract
+The upload contract should remain generic, not fixed-income-only. That keeps the interface stable even if other instrument kinds later need the same override fields.
+Required CSV columnsinstrument_template_code,weight,expiry_date,issuer_code,issuer_type_code
+instrument_template_code: required; must exist in instrument_template.template_code.
+weight: required decimal; all row weights must sum to 1.0 within a small tolerance.
+expiry_date: optional in the file but mandatory for rows whose template requires_expiry_date = true.
+issuer_code: optional; if present, it must exist in issuer.issuer_code.
+issuer_type_code: optional fallback; used only when issuer_code is absent.
+Example inputinstrument_template_code,weight,expiry_date,issuer_code,issuer_type_codecdb_cdi_generic,0.25,2029-06-15,banco_btg,fii_xpml11,0.10,,,ivvb11,0.15,,,mixed_global_fund,0.20,,,tesouro_ipca_generic,0.30,2035-05-15,,
+5.1 Input validation rules
+1. Reject the file if any instrument_template_code is unknown or inactive.
+2. Reject the file if any weight is non-numeric or not strictly positive.
+3. Reject the file if the total weight is outside the allowed tolerance around 1.0.
+4. Reject a row if its template requires_expiry_date = true and expiry_date is missing or invalid.
+5. If issuer_code is supplied, resolve issuer from that code and ignore issuer_type_code for resolution; emit a warning if the fallback field was also provided.
+6. If issuer_code is absent and issuer_type_code is supplied, use issuer_type_code as the effective issuer-type override.
+7. If both issuer fields are absent, rely on template defaults.
+8. Reject a row if the template requires issuer or issuer_type and neither the row nor the template provides one.
+Recommended tolerance
+Use an absolute tolerance of 0.0005 for the total portfolio weight.
+Do not auto-normalise weights in the MVP. A bad input file should fail validation rather than be silently repaired.
+6. Mechanical processing pipeline
+The pipeline is strictly deterministic. Given the same reference DB state and the same CSV file, it must always produce the same outputs.
+For each uploaded row:1. Load instrument_template by instrument_template_code.2. Validate active status and required overrides.3. Resolve the effective issuer:   - row.issuer_code if present   - else template.issuer_id if present   - else null4. Resolve the effective issuer type:   - issuer.issuer_type if issuer resolved   - else row.issuer_type_code if present   - else template.primary_issuer_type_id if present   - else template.issuer_type_weights_json if present   - else null5. Resolve economic exposure:   - template.primary_economic_exposure_id   - or template.economic_exposure_weights_json6. Resolve tax profile from template.tax_profile_id.7. If expiry_date exists, derive days_to_expiry, years_to_expiry, maturity_bucket.8. Collect all instruction texts for each report angle from:   instrument_template -> issuer -> issuer_type -> economic_exposure -> tax_profile.9. Emit the unrolled row object.10. Contribute row weight into the allocation tables.
+6.1 Derived fields
+days_to_expiry: integer day difference between upload date and expiry_date.
+years_to_expiry: decimal years_to_expiry using days_to_expiry / 365.25.
+maturity_bucket: one of <1y, 1-3y, 3-5y, 5-10y, 10y+.
+country_bucket for aggregated outputs: derive this mechanically from exposure or issuer type as Brazil or non-Brazil; do not add a new table for it.
+6.2 Instruction unrolling format
+Each angle-specific instruction payload should be preserved in two forms: a structured list for JSON outputs and a flattened text block for CSV outputs.
+Flattened CSV instruction format[INSTRUMENT_TEMPLATE]...[ISSUER]...[ISSUER_TYPE]...[ECONOMIC_EXPOSURE]...[TAX_PROFILE]...
+If a source does not contribute text for a given angle, omit that block.
+For weighted exposures or weighted issuer types, include one block per component, in descending weight order.
+Do not merge or paraphrase instruction text in this system. The unroller only concatenates or structures it.
+6.3 Angle-specific preprocessing outputs
+Diversification: include issuer, issuer type, exposure split, country bucket, and diversification instructions.
+Liquidity: include expiry, has_fgc, relevant template metadata, and liquidity instructions.
+Fees: include yearly_fee_pct, performance_fee_pct, tax profile, and fee instructions.
+Tax: include tax_profile, instrument kind, template metadata, and tax instructions.
+Risk: include exposure split, maturity metrics, issuer context, and risk instructions.
+Performance: include exposure split, maturity metrics, and performance instructions. In this MVP the system does not fetch market data or compute return series; it only prepares the structured precursor for downstream processing.
+7. Output bundle
+The processing result should be one downloadable ZIP bundle. This avoids adding portfolio storage tables to the reference database while still keeping the artifact set organized and repeatable.
+Recommended ZIP structurerun_<timestamp>_<shortid>/  input/    original.csv  machine/    unrolled_positions.csv    unrolled_positions.json    allocation_by_instrument_template.csv    allocation_by_economic_exposure.csv    allocation_by_exposure_group.csv    allocation_by_issuer_type.csv    allocation_by_issuer.csv    allocation_by_tax_profile.csv    allocation_by_instrument_kind.csv    allocation_by_maturity_bucket.csv    angle_diversification.csv    angle_liquidity.csv    angle_fees.csv    angle_tax.csv    angle_risk.csv    angle_performance.csv    report_input_bundle.json    coverage_summary.json  html/    preview.html  charts/    economic_exposure_bar.svg    issuer_type_bar.svg    issuer_bar_top10.svg    instrument_kind_bar.svg    maturity_bucket_bar.svg  meta/    run_metadata.json    validation.json
+7.1 Required machine-readable outputs
+Artifact
+Purpose
+Must be present in MVP
+unrolled_positions.csv
+Flat row-level export with flattened instruction blocks
+Yes
+unrolled_positions.json
+Rich row-level export with structured sources
+Yes
+allocation_by_economic_exposure.csv
+Portfolio split by exposure
+Yes
+allocation_by_issuer_type.csv
+Portfolio split by issuer family
+Yes
+allocation_by_issuer.csv
+Specific-issuer allocation where available
+Yes
+report_input_bundle.json
+Single canonical machine bundle for downstream agents
+Yes
+angle_*.csv
+Angle-specific preprocessed inputs
+Yes
+coverage_summary.json
+Coverage and unresolved percentages for downstream transparency
+Yes
+7.2 Coverage summary
+economic_exposure_coverage: expected to be 100% for a valid run.
+tax_profile_coverage: expected to be 100% for a valid run.
+issuer_type_coverage: may be less than 100% if a template deliberately has no issuer-family context.
+issuer_coverage: may be materially below 100% because many rows resolve only to issuer_type, not a specific issuer.
+maturity_coverage: share of portfolio for which expiry_date was available and relevant.
+7.3 Human-readable HTML preview
+Validation summary at the top.
+Portfolio summary cards: total rows, total weight, unique templates, unique issuers, coverage metrics.
+Allocation tables with percentages and totals.
+Embedded SVG charts for the major allocations.
+Detailed unrolled row table with expandable instruction payloads.
+Links to download the raw machine-readable files from the same run bundle.
+7.4 Charts
+Prefer horizontal bar charts, not pie charts. They are easier to read, easier to label, and more usable by both humans and downstream systems when paired with the underlying CSVs.
+allocation by economic exposure
+allocation by issuer type
+top specific issuers by weight
+allocation by instrument kind
+maturity bucket distribution
+8. Admin portal requirements
+The portal exists first to make reference-data administration easy. The upload page is important, but the majority of operator time will be spent maintaining templates, issuers, and instructions.
+Use Django Admin as the base portal.
+Add one custom admin section called Portfolio processing for CSV upload and artifact download.
+Add one custom admin section called Reference data health for consistency checks and missing-instruction reports.
+Implement list filters, search, and clone actions on instrument_template, because this table will be edited most often.
+Do not expose raw JSON editing for weighted fields; provide a simple UI with rows, dropdowns, and numeric weights.
+Admin screen
+Main functions
+Economic exposures
+List, search, create, deactivate, edit instructions
+Tax profiles
+List, search, create, deactivate, edit instructions
+Issuer types
+List, search, create, deactivate, edit instructions
+Issuers
+List, search, filter by issuer type, deactivate, edit instructions
+Instrument templates
+List, search, filter by kind / active, clone, validate, edit weighted links and instructions
+Portfolio processing
+Upload CSV, validate, process, preview outputs, download ZIP
+Reference data health
+Show inconsistent weights, missing required links, and sparse instruction coverage
+8.1 Admin UX requirements
+No hard deletes from the main UI for active reference records.
+All code fields must display uniqueness errors clearly before save.
+Large textareas for instruction fields, grouped into tabs or collapsible panels by report angle.
+The template edit page must clearly distinguish between default issuer, default issuer type, and weighted issuer-type JSON.
+The template edit page must clearly distinguish between primary economic exposure and weighted exposure JSON.
+Provide a one-click Duplicate template action that copies all instruction fields and linkage fields but requires a new template_code before save.
+9. Internal commands and web entry points
+A public API is not required in the MVP. The simplest usable interface is the admin portal plus two management commands for automation and testing.
+Recommended management commandspython manage.py validate_portfolio <csv_path>python manage.py process_portfolio <csv_path> --output-dir <dir>
+validate_portfolio should parse the file, resolve templates, and emit validation.json without creating the full bundle.
+process_portfolio should create the full output directory or ZIP bundle.
+The admin upload page can call the same service layer as the management commands.
+10. Exact SQL DDL
+The DDL below follows the agreed model and deliberately avoids any extra reference tables.
+create table economic_exposure (    id bigserial primary key,    exposure_code varchar(64) not null unique,    name varchar(255) not null,    exposure_group varchar(32) not null,    description text,    instructions_diversification text,    instructions_liquidity text,    instructions_fees text,    instructions_tax text,    instructions_risk text,    instructions_performance text,    active boolean not null default true,    created_at timestamptz not null default now(),    updated_at timestamptz not null default now(),    constraint chk_exposure_group check (        exposure_group in ('fixed_income', 'equity', 'real_estate', 'crypto')    ));
+create table tax_profile (    id bigserial primary key,    tax_profile_code varchar(64) not null unique,    name varchar(255) not null,    description text,    instructions_diversification text,    instructions_liquidity text,    instructions_fees text,    instructions_tax text,    instructions_risk text,    instructions_performance text,    active boolean not null default true,    created_at timestamptz not null default now(),    updated_at timestamptz not null default now());
+create table issuer_type (    id bigserial primary key,    issuer_type_code varchar(64) not null unique,    name varchar(255) not null,    description text,    instructions_diversification text,    instructions_liquidity text,    instructions_fees text,    instructions_tax text,    instructions_risk text,    instructions_performance text,    active boolean not null default true,    created_at timestamptz not null default now(),    updated_at timestamptz not null default now());
+create table issuer (    id bigserial primary key,    issuer_code varchar(64) not null unique,    name varchar(255) not null,    issuer_type_id bigint not null references issuer_type(id),    description text,    instructions_diversification text,    instructions_liquidity text,    instructions_fees text,    instructions_tax text,    instructions_risk text,    instructions_performance text,    active boolean not null default true,    created_at timestamptz not null default now(),    updated_at timestamptz not null default now());create index idx_issuer_issuer_type_id on issuer(issuer_type_id);
+create table instrument_template (    id bigserial primary key,    template_code varchar(64) not null unique,    instrument_kind varchar(32) not null,    short_name varchar(255) not null,    long_name varchar(512),    cnpj varchar(32),    b3_listed boolean,    is_bdr boolean,    yearly_fee_pct numeric(8,4),    performance_fee_pct numeric(8,4),    has_fgc boolean,    requires_expiry_date boolean not null default false,    requires_issuer_or_issuer_type boolean not null default false,    primary_economic_exposure_id bigint references economic_exposure(id),    economic_exposure_weights_json jsonb,    tax_profile_id bigint not null references tax_profile(id),    primary_issuer_type_id bigint references issuer_type(id),    issuer_type_weights_json jsonb,    issuer_id bigint references issuer(id),    instructions_diversification text,    instructions_liquidity text,    instructions_fees text,    instructions_tax text,    instructions_risk text,    instructions_performance text,    active boolean not null default true,    created_at timestamptz not null default now(),    updated_at timestamptz not null default now(),    constraint chk_instrument_kind check (        instrument_kind in ('listed', 'fixed_income', 'fund', 'crypto', 'other')    ),    constraint chk_exposure_source check (        (primary_economic_exposure_id is not null and economic_exposure_weights_json is null)        or        (primary_economic_exposure_id is null and economic_exposure_weights_json is not null)    ),    constraint chk_yearly_fee_non_negative check (        yearly_fee_pct is null or yearly_fee_pct >= 0    ),    constraint chk_performance_fee_non_negative check (        performance_fee_pct is null or performance_fee_pct >= 0    ));create index idx_instrument_template_tax_profile_id    on instrument_template(tax_profile_id);create index idx_instrument_template_primary_economic_exposure_id    on instrument_template(primary_economic_exposure_id);create index idx_instrument_template_primary_issuer_type_id    on instrument_template(primary_issuer_type_id);create index idx_instrument_template_issuer_id    on instrument_template(issuer_id);
+Validation that weighted JSON sums to 1.0 should be implemented in application code, not as a database check in the MVP.
+Validation that the JSON keys point to real exposure codes or issuer_type codes should also be implemented in application code.
+11. Example machine-readable bundle payload
+{  "schema_version": "1.0",  "system_type": "mechanical_precursor",  "input_contract": "instrument_template_code,weight,expiry_date,issuer_code,issuer_type_code",  "portfolio_summary": {    "total_weight": 1.0,    "row_count": 5,    "unique_templates": 5,    "issuer_coverage": 0.55,    "issuer_type_coverage": 1.0,    "economic_exposure_coverage": 1.0  },  "allocations": {    "economic_exposure": [      {"code": "fi_ipca_br", "weight": 0.30},      {"code": "fi_cdi_br", "weight": 0.25},      {"code": "eq_international", "weight": 0.35},      {"code": "re_br", "weight": 0.10}    ],    "issuer_type": [      {"code": "br_government", "weight": 0.30},      {"code": "br_bank", "weight": 0.25},      {"code": "nonbr_other", "weight": 0.35},      {"code": "br_other", "weight": 0.10}    ]  },  "positions": [    {      "row_number": 1,      "input": {        "instrument_template_code": "tesouro_ipca_generic",        "weight": 0.30,        "expiry_date": "2035-05-15",        "issuer_code": null,        "issuer_type_code": null      },      "resolved": {        "instrument_kind": "fixed_income",        "tax_profile_code": "general",        "issuer_code": "tesouro_nacional",        "issuer_type_code": "br_government",        "economic_exposures": [{"code": "fi_ipca_br", "weight": 1.0}]      },      "derived": {        "maturity_bucket": "5-10y"      },      "instructions": {        "performance": [          {"source": "instrument_template", "code": "tesouro_ipca_generic", "text": "..."},          {"source": "economic_exposure", "code": "fi_ipca_br", "text": "..."}        ]      }    }  ]}
+12. Acceptance criteria for the MVP
+1. An operator can create and edit all 5 reference tables from the internal portal without touching SQL manually.
+2. An operator can clone an instrument_template and save it under a new template_code.
+3. The portal validates weighted exposure and weighted issuer-type totals before save.
+4. A valid CSV upload produces a ZIP bundle containing the required machine, HTML, chart, and metadata files.
+5. The same input file and same reference DB state produce byte-for-byte equivalent CSV / JSON content aside from timestamps and run ids.
+6. The angle-specific outputs contain only the relevant instruction payload for that angle and do not paraphrase it.
+7. No extra portfolio storage tables are required for the MVP to function.
+8. No AI model calls are made anywhere in the processing path.
+13. Suggested implementation sequence
+Phase 1: create the PostgreSQL schema, Django models, migrations, and admin CRUD.
+Phase 2: implement weighted-field widgets, reference-data health checks, and clone action for instrument_template.
+Phase 3: implement CSV validation and row-level resolver service.
+Phase 4: implement allocation-table generation, HTML preview, and chart rendering.
+Phase 5: implement ZIP bundling, management commands, and regression tests.
+Implementation caution. Avoid scope growth in version 1: no alias management, no client portfolio storage, no extra tax granularity, no extra exposure buckets, and no extra analytics columns. Those can be layered on later without changing the CSV-in / unrolled-portfolio-out architecture.
+
+================================================================================
+SECTION 2: PROJECT IMPLEMENTATION DESCRIPTION
+================================================================================
+
+# Portfolio X-Ray MVP — Implementation Description
+
+## What It Is
+Portfolio X-Ray is a deterministic mechanical service built as a Django + PostgreSQL monolith. It accepts a resolved portfolio CSV, expands each row through 5 reference tables, and emits a structured precursor bundle (ZIP) for downstream AI report generators. The system itself contains NO AI logic.
+
+## Architecture
+- **Framework:** Django 6.0 with PostgreSQL (deployed on Render at xray-oryx.onrender.com)
+- **3 Django apps:**
+  - `refdata` — 5 reference data models + Django Admin
+  - `api` — DRF REST API for AI agents to explore/populate the DB
+  - `processing` — CSV validation, row resolver, output generation, ZIP bundler
+
+## The 5 Reference Tables
+All tables share: code field (immutable), active flag, timestamps, and 6 angle-specific instruction text fields (diversification, liquidity, fees, tax, risk, performance).
+
+1. **economic_exposure** — Economic substance taxonomy. Groups: fixed_income, equity, real_estate, crypto. 9 seed rows.
+2. **tax_profile** — Tax treatment. 4 rows: general, tax_exempt, taxable_no_come_cotas, previdencia.
+3. **issuer_type** — Issuer families. 6 rows: br_government, br_bank, br_infrastructure, br_other, nonbr_government, nonbr_other.
+4. **issuer** — Specific issuers, each belonging to one issuer_type.
+5. **instrument_template** — Core table. Maps resolved assets with: instrument_kind (listed/fixed_income/fund/crypto/other), fees, FGC, expiry requirements, economic exposure (primary or weighted JSON), tax profile, issuer type (primary or weighted JSON), issuer.
+
+## How It Works
+1. Upstream team maps raw holdings to instrument_template_code
+2. CSV upload: instrument_template_code, weight, expiry_date, issuer_code, issuer_type_code
+3. System validates, resolves each row against reference tables, computes allocations
+4. Outputs: ZIP bundle with unrolled positions (CSV+JSON), 8 allocation tables, 6 angle-specific CSVs, HTML preview with SVG charts, report_input_bundle.json, coverage_summary.json
+
+## AI-Agent REST API
+- All CRUD at /api/v1/ with code-based lookup (not numeric IDs)
+- Schema discovery at /api/v1/schema/
+- Batch instruction updates at /api/v1/batch/instructions/
+- Health checks at /api/v1/health/references/
+- Idempotent POST (409 on duplicate), immutable code fields, deactivation guards
+
+## Key Constraints
+- Deterministic: same CSV + same DB = identical output
+- No AI in processing pipeline
+- No auto-normalization of weights
+- Soft-delete only (active=false)
+- Weighted JSON fields must sum to 1.0 (tolerance 0.0005)
+
+
+================================================================================
+SECTION 3: COMPLETE SOURCE CODE
+================================================================================
+
+================================================================================
+# FILE: api/admin.py
+================================================================================
+from django.contrib import admin
+
+# Register your models here.
+
+
+================================================================================
+# FILE: api/apps.py
+================================================================================
+from django.apps import AppConfig
+
+
+class ApiConfig(AppConfig):
+    name = 'api'
+
+
+================================================================================
+# FILE: api/exceptions.py
+================================================================================
+from rest_framework.views import exception_handler
+from rest_framework.exceptions import ValidationError
+
+
+def custom_exception_handler(exc, context):
+    response = exception_handler(exc, context)
+    if response is None:
+        return response
+
+    if isinstance(exc, ValidationError):
+        custom_data = {
+            'error': 'validation_error',
+            'message': 'Request data failed validation.',
+        }
+        if isinstance(response.data, dict):
+            non_field = response.data.pop('non_field_errors', None)
+            if non_field:
+                custom_data['non_field_errors'] = non_field
+            if response.data:
+                custom_data['field_errors'] = response.data
+        elif isinstance(response.data, list):
+            custom_data['non_field_errors'] = response.data
+        response.data = custom_data
+    elif response.status_code == 404:
+        response.data = {
+            'error': 'not_found',
+            'message': str(exc.detail) if hasattr(exc, 'detail') else 'Not found.',
+        }
+    elif response.status_code == 405:
+        response.data = {
+            'error': 'method_not_allowed',
+            'message': 'DELETE is not allowed. Use PATCH with {"active": false} to deactivate.',
+        }
+
+    return response
+
+
+================================================================================
+# FILE: api/filters.py
+================================================================================
+import django_filters
+from refdata.models import (
+    EconomicExposure, TaxProfile, IssuerType, Issuer, InstrumentTemplate
+)
+
+
+class EconomicExposureFilter(django_filters.FilterSet):
+    class Meta:
+        model = EconomicExposure
+        fields = {
+            'active': ['exact'],
+            'exposure_group': ['exact'],
+        }
+
+
+class TaxProfileFilter(django_filters.FilterSet):
+    class Meta:
+        model = TaxProfile
+        fields = {'active': ['exact']}
+
+
+class IssuerTypeFilter(django_filters.FilterSet):
+    class Meta:
+        model = IssuerType
+        fields = {'active': ['exact']}
+
+
+class IssuerFilter(django_filters.FilterSet):
+    issuer_type_code = django_filters.CharFilter(
+        field_name='issuer_type__issuer_type_code',
+    )
+
+    class Meta:
+        model = Issuer
+        fields = {'active': ['exact']}
+
+
+class InstrumentTemplateFilter(django_filters.FilterSet):
+    tax_profile_code = django_filters.CharFilter(
+        field_name='tax_profile__tax_profile_code',
+    )
+    primary_economic_exposure_code = django_filters.CharFilter(
+        field_name='primary_economic_exposure__exposure_code',
+    )
+    issuer_code = django_filters.CharFilter(
+        field_name='issuer__issuer_code',
+    )
+
+    class Meta:
+        model = InstrumentTemplate
+        fields = {
+            'active': ['exact'],
+            'instrument_kind': ['exact'],
+            'b3_listed': ['exact'],
+            'is_bdr': ['exact'],
+            'has_fgc': ['exact'],
+            'requires_expiry_date': ['exact'],
+        }
+
+
+================================================================================
+# FILE: api/models.py
+================================================================================
+from django.db import models
+
+# Create your models here.
+
+
+================================================================================
+# FILE: api/pagination.py
+================================================================================
+from rest_framework.pagination import PageNumberPagination
+
+
+class StandardPagination(PageNumberPagination):
+    page_size = 50
+    page_size_query_param = 'page_size'
+    max_page_size = 200
+
+
+================================================================================
+# FILE: api/schema_definition.py
+================================================================================
+SCHEMA = {
+    'api_version': 'v1',
+    'description': (
+        'Portfolio X-Ray reference data API. This API manages 5 reference tables '
+        'used by a deterministic mechanical service that expands portfolio positions '
+        'into structured precursors for downstream AI report generators.'
+    ),
+    'tables': {
+        'economic_exposure': {
+            'endpoint': '/api/v1/economic-exposures/',
+            'lookup_field': 'exposure_code',
+            'description': 'Economic substance taxonomy for diversification, risk, and performance.',
+            'fields': {
+                'exposure_code': {'type': 'string', 'max_length': 64, 'required': True, 'immutable': True,
+                                  'description': 'Unique snake_case identifier. Cannot be changed after creation.'},
+                'name': {'type': 'string', 'max_length': 255, 'required': True},
+                'exposure_group': {'type': 'choice', 'required': True,
+                                   'choices': ['fixed_income', 'equity', 'real_estate', 'crypto']},
+                'description': {'type': 'text', 'required': False},
+                'instructions_diversification': {'type': 'text', 'required': False, 'angle': 'diversification'},
+                'instructions_liquidity': {'type': 'text', 'required': False, 'angle': 'liquidity'},
+                'instructions_fees': {'type': 'text', 'required': False, 'angle': 'fees'},
+                'instructions_tax': {'type': 'text', 'required': False, 'angle': 'tax'},
+                'instructions_risk': {'type': 'text', 'required': False, 'angle': 'risk'},
+                'instructions_performance': {'type': 'text', 'required': False, 'angle': 'performance'},
+                'active': {'type': 'boolean', 'default': True},
+                'created_at': {'type': 'datetime', 'read_only': True},
+                'updated_at': {'type': 'datetime', 'read_only': True},
+            },
+            'filters': ['search', 'active', 'exposure_group', 'ordering'],
+        },
+        'tax_profile': {
+            'endpoint': '/api/v1/tax-profiles/',
+            'lookup_field': 'tax_profile_code',
+            'description': 'Simplified tax treatment taxonomy.',
+            'fields': {
+                'tax_profile_code': {'type': 'string', 'max_length': 64, 'required': True, 'immutable': True},
+                'name': {'type': 'string', 'max_length': 255, 'required': True},
+                'description': {'type': 'text', 'required': False},
+                'instructions_diversification': {'type': 'text', 'required': False, 'angle': 'diversification'},
+                'instructions_liquidity': {'type': 'text', 'required': False, 'angle': 'liquidity'},
+                'instructions_fees': {'type': 'text', 'required': False, 'angle': 'fees'},
+                'instructions_tax': {'type': 'text', 'required': False, 'angle': 'tax'},
+                'instructions_risk': {'type': 'text', 'required': False, 'angle': 'risk'},
+                'instructions_performance': {'type': 'text', 'required': False, 'angle': 'performance'},
+                'active': {'type': 'boolean', 'default': True},
+                'created_at': {'type': 'datetime', 'read_only': True},
+                'updated_at': {'type': 'datetime', 'read_only': True},
+            },
+            'filters': ['search', 'active', 'ordering'],
+        },
+        'issuer_type': {
+            'endpoint': '/api/v1/issuer-types/',
+            'lookup_field': 'issuer_type_code',
+            'description': 'Issuer family taxonomy for concentration and diversification.',
+            'fields': {
+                'issuer_type_code': {'type': 'string', 'max_length': 64, 'required': True, 'immutable': True},
+                'name': {'type': 'string', 'max_length': 255, 'required': True},
+                'description': {'type': 'text', 'required': False},
+                'instructions_diversification': {'type': 'text', 'required': False, 'angle': 'diversification'},
+                'instructions_liquidity': {'type': 'text', 'required': False, 'angle': 'liquidity'},
+                'instructions_fees': {'type': 'text', 'required': False, 'angle': 'fees'},
+                'instructions_tax': {'type': 'text', 'required': False, 'angle': 'tax'},
+                'instructions_risk': {'type': 'text', 'required': False, 'angle': 'risk'},
+                'instructions_performance': {'type': 'text', 'required': False, 'angle': 'performance'},
+                'active': {'type': 'boolean', 'default': True},
+                'created_at': {'type': 'datetime', 'read_only': True},
+                'updated_at': {'type': 'datetime', 'read_only': True},
+            },
+            'filters': ['search', 'active', 'ordering'],
+        },
+        'issuer': {
+            'endpoint': '/api/v1/issuers/',
+            'lookup_field': 'issuer_code',
+            'description': 'Concrete issuer reference. Each belongs to one issuer_type.',
+            'fields': {
+                'issuer_code': {'type': 'string', 'max_length': 64, 'required': True, 'immutable': True},
+                'name': {'type': 'string', 'max_length': 255, 'required': True},
+                'issuer_type_code': {'type': 'foreign_key', 'required': True, 'references': 'issuer_type',
+                                     'accept': 'issuer_type_code string',
+                                     'returns': {'issuer_type_code': 'string', 'name': 'string'}},
+                'description': {'type': 'text', 'required': False},
+                'instructions_diversification': {'type': 'text', 'required': False, 'angle': 'diversification'},
+                'instructions_liquidity': {'type': 'text', 'required': False, 'angle': 'liquidity'},
+                'instructions_fees': {'type': 'text', 'required': False, 'angle': 'fees'},
+                'instructions_tax': {'type': 'text', 'required': False, 'angle': 'tax'},
+                'instructions_risk': {'type': 'text', 'required': False, 'angle': 'risk'},
+                'instructions_performance': {'type': 'text', 'required': False, 'angle': 'performance'},
+                'active': {'type': 'boolean', 'default': True},
+                'created_at': {'type': 'datetime', 'read_only': True},
+                'updated_at': {'type': 'datetime', 'read_only': True},
+            },
+            'filters': ['search', 'active', 'issuer_type_code', 'ordering'],
+        },
+        'instrument_template': {
+            'endpoint': '/api/v1/instrument-templates/',
+            'lookup_field': 'template_code',
+            'description': 'Canonical resolved asset template. Core table of the system.',
+            'fields': {
+                'template_code': {'type': 'string', 'max_length': 64, 'required': True, 'immutable': True},
+                'instrument_kind': {'type': 'choice', 'required': True,
+                                    'choices': ['listed', 'fixed_income', 'fund', 'crypto', 'other']},
+                'short_name': {'type': 'string', 'max_length': 255, 'required': True},
+                'long_name': {'type': 'string', 'max_length': 512, 'required': False},
+                'cnpj': {'type': 'string', 'max_length': 32, 'required': False},
+                'b3_listed': {'type': 'boolean', 'required': False, 'nullable': True},
+                'is_bdr': {'type': 'boolean', 'required': False, 'nullable': True},
+                'yearly_fee_pct': {'type': 'decimal', 'required': False, 'nullable': True,
+                                   'description': 'Non-negative decimal, 4 decimal places.'},
+                'performance_fee_pct': {'type': 'decimal', 'required': False, 'nullable': True},
+                'has_fgc': {'type': 'boolean', 'required': False, 'nullable': True},
+                'requires_expiry_date': {'type': 'boolean', 'required': True, 'default': False},
+                'requires_issuer_or_issuer_type': {'type': 'boolean', 'required': True, 'default': False},
+                'primary_economic_exposure_code': {
+                    'type': 'foreign_key', 'required': False, 'nullable': True,
+                    'references': 'economic_exposure', 'accept': 'exposure_code string',
+                    'description': 'Mutually exclusive with economic_exposure_weights_json.',
+                },
+                'economic_exposure_weights_json': {
+                    'type': 'json_object', 'required': False, 'nullable': True,
+                    'description': 'Map of exposure_code -> weight. Keys must be valid active codes. Weights must sum to 1.0. Mutually exclusive with primary_economic_exposure_code.',
+                },
+                'tax_profile_code': {'type': 'foreign_key', 'required': True,
+                                     'references': 'tax_profile', 'accept': 'tax_profile_code string'},
+                'primary_issuer_type_code': {
+                    'type': 'foreign_key', 'required': False, 'nullable': True,
+                    'references': 'issuer_type', 'accept': 'issuer_type_code string',
+                },
+                'issuer_type_weights_json': {
+                    'type': 'json_object', 'required': False, 'nullable': True,
+                    'description': 'Map of issuer_type_code -> weight. Same rules as exposure weights.',
+                },
+                'issuer_code': {
+                    'type': 'foreign_key', 'required': False, 'nullable': True,
+                    'references': 'issuer', 'accept': 'issuer_code string',
+                },
+                'instructions_diversification': {'type': 'text', 'required': False, 'angle': 'diversification'},
+                'instructions_liquidity': {'type': 'text', 'required': False, 'angle': 'liquidity'},
+                'instructions_fees': {'type': 'text', 'required': False, 'angle': 'fees'},
+                'instructions_tax': {'type': 'text', 'required': False, 'angle': 'tax'},
+                'instructions_risk': {'type': 'text', 'required': False, 'angle': 'risk'},
+                'instructions_performance': {'type': 'text', 'required': False, 'angle': 'performance'},
+                'active': {'type': 'boolean', 'default': True},
+                'created_at': {'type': 'datetime', 'read_only': True},
+                'updated_at': {'type': 'datetime', 'read_only': True},
+            },
+            'constraints': [
+                'Exactly one of primary_economic_exposure_code or economic_exposure_weights_json must be present.',
+                'Weighted JSON keys must be valid active codes and weights must sum to 1.0 (tolerance 0.0005).',
+                'yearly_fee_pct and performance_fee_pct must be non-negative if present.',
+            ],
+            'filters': ['search', 'active', 'instrument_kind', 'tax_profile_code',
+                        'primary_economic_exposure_code', 'issuer_code',
+                        'b3_listed', 'is_bdr', 'has_fgc', 'requires_expiry_date', 'ordering'],
+        },
+    },
+    'angles': ['diversification', 'liquidity', 'fees', 'tax', 'risk', 'performance'],
+    'batch_endpoints': {
+        'instructions': {
+            'endpoint': '/api/v1/batch/instructions/',
+            'method': 'PATCH',
+            'description': 'Atomically update instruction text for one angle across multiple records.',
+            'request_format': {
+                'angle': 'one of the 6 angles',
+                'updates': [{'table': 'table_name', 'code': 'record_code', 'text': 'instruction text or null'}],
+            },
+        },
+    },
+    'special_endpoints': {
+        'schema': {'endpoint': '/api/v1/schema/', 'method': 'GET', 'description': 'This endpoint.'},
+        'health': {'endpoint': '/api/v1/health/references/', 'method': 'GET',
+                   'description': 'Reference data consistency checks.'},
+    },
+    'conventions': {
+        'codes': 'All codes are lowercase snake_case, immutable after creation.',
+        'deletion': 'No DELETE endpoints. Use PATCH {"active": false} to deactivate.',
+        'idempotent_post': 'POST with an existing code returns 409 with the existing record.',
+        'fk_on_write': 'Foreign keys are submitted as code strings (e.g., "tax_profile_code": "general").',
+        'fk_on_read': 'Foreign keys are returned as nested objects with code and name.',
+        'pagination': 'All list endpoints are paginated. Use page and page_size query params.',
+    },
+}
+
+
+================================================================================
+# FILE: api/serializers.py
+================================================================================
+from rest_framework import serializers
+from refdata.models import (
+    EconomicExposure, TaxProfile, IssuerType, Issuer, InstrumentTemplate,
+    _validate_weights_json,
+)
+from django.core.exceptions import ValidationError as DjangoValidationError
+
+
+class EconomicExposureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EconomicExposure
+        fields = [
+            'exposure_code', 'name', 'exposure_group', 'description',
+            'instructions_diversification', 'instructions_liquidity',
+            'instructions_fees', 'instructions_tax',
+            'instructions_risk', 'instructions_performance',
+            'active', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+    def validate_exposure_code(self, value):
+        if self.instance and self.instance.exposure_code != value:
+            raise serializers.ValidationError('This field is immutable after creation.')
+        return value
+
+
+class TaxProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TaxProfile
+        fields = [
+            'tax_profile_code', 'name', 'description',
+            'instructions_diversification', 'instructions_liquidity',
+            'instructions_fees', 'instructions_tax',
+            'instructions_risk', 'instructions_performance',
+            'active', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+    def validate_tax_profile_code(self, value):
+        if self.instance and self.instance.tax_profile_code != value:
+            raise serializers.ValidationError('This field is immutable after creation.')
+        return value
+
+
+class IssuerTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IssuerType
+        fields = [
+            'issuer_type_code', 'name', 'description',
+            'instructions_diversification', 'instructions_liquidity',
+            'instructions_fees', 'instructions_tax',
+            'instructions_risk', 'instructions_performance',
+            'active', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+    def validate_issuer_type_code(self, value):
+        if self.instance and self.instance.issuer_type_code != value:
+            raise serializers.ValidationError('This field is immutable after creation.')
+        return value
+
+
+class IssuerSerializer(serializers.ModelSerializer):
+    issuer_type_code = serializers.SlugRelatedField(
+        source='issuer_type',
+        slug_field='issuer_type_code',
+        queryset=IssuerType.objects.filter(active=True),
+    )
+
+    class Meta:
+        model = Issuer
+        fields = [
+            'issuer_code', 'name', 'issuer_type_code', 'description',
+            'instructions_diversification', 'instructions_liquidity',
+            'instructions_fees', 'instructions_tax',
+            'instructions_risk', 'instructions_performance',
+            'active', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+    def validate_issuer_code(self, value):
+        if self.instance and self.instance.issuer_code != value:
+            raise serializers.ValidationError('This field is immutable after creation.')
+        return value
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['issuer_type'] = {
+            'issuer_type_code': instance.issuer_type.issuer_type_code,
+            'name': instance.issuer_type.name,
+        }
+        return data
+
+
+class InstrumentTemplateSerializer(serializers.ModelSerializer):
+    tax_profile_code = serializers.SlugRelatedField(
+        source='tax_profile',
+        slug_field='tax_profile_code',
+        queryset=TaxProfile.objects.filter(active=True),
+    )
+    primary_economic_exposure_code = serializers.SlugRelatedField(
+        source='primary_economic_exposure',
+        slug_field='exposure_code',
+        queryset=EconomicExposure.objects.filter(active=True),
+        required=False, allow_null=True,
+    )
+    primary_issuer_type_code = serializers.SlugRelatedField(
+        source='primary_issuer_type',
+        slug_field='issuer_type_code',
+        queryset=IssuerType.objects.filter(active=True),
+        required=False, allow_null=True,
+    )
+    issuer_code = serializers.SlugRelatedField(
+        source='issuer',
+        slug_field='issuer_code',
+        queryset=Issuer.objects.filter(active=True),
+        required=False, allow_null=True,
+    )
+
+    class Meta:
+        model = InstrumentTemplate
+        fields = [
+            'template_code', 'instrument_kind', 'short_name', 'long_name',
+            'cnpj', 'b3_listed', 'is_bdr',
+            'yearly_fee_pct', 'performance_fee_pct', 'has_fgc',
+            'requires_expiry_date', 'requires_issuer_or_issuer_type',
+            'primary_economic_exposure_code', 'economic_exposure_weights_json',
+            'tax_profile_code',
+            'primary_issuer_type_code', 'issuer_type_weights_json',
+            'issuer_code',
+            'instructions_diversification', 'instructions_liquidity',
+            'instructions_fees', 'instructions_tax',
+            'instructions_risk', 'instructions_performance',
+            'active', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+    def validate_template_code(self, value):
+        if self.instance and self.instance.template_code != value:
+            raise serializers.ValidationError('This field is immutable after creation.')
+        return value
+
+    def validate(self, attrs):
+        primary_exp = attrs.get(
+            'primary_economic_exposure',
+            getattr(self.instance, 'primary_economic_exposure', None) if self.instance else None,
+        )
+        weights_exp = attrs.get(
+            'economic_exposure_weights_json',
+            getattr(self.instance, 'economic_exposure_weights_json', None) if self.instance else None,
+        )
+        has_primary = primary_exp is not None
+        has_weights = weights_exp is not None
+        # For partial updates, only validate if either field is being changed
+        if not self.partial or 'primary_economic_exposure' in attrs or 'economic_exposure_weights_json' in attrs:
+            if has_primary == has_weights:
+                raise serializers.ValidationError(
+                    'Exactly one of primary_economic_exposure_code or '
+                    'economic_exposure_weights_json must be provided.'
+                )
+        if has_weights and weights_exp:
+            try:
+                _validate_weights_json(
+                    weights_exp, EconomicExposure, 'exposure_code',
+                    'economic_exposure_weights_json',
+                )
+            except DjangoValidationError as e:
+                raise serializers.ValidationError(e.message_dict if hasattr(e, 'message_dict') else str(e))
+
+        issuer_type_wj = attrs.get(
+            'issuer_type_weights_json',
+            getattr(self.instance, 'issuer_type_weights_json', None) if self.instance else None,
+        )
+        if issuer_type_wj:
+            try:
+                _validate_weights_json(
+                    issuer_type_wj, IssuerType, 'issuer_type_code',
+                    'issuer_type_weights_json',
+                )
+            except DjangoValidationError as e:
+                raise serializers.ValidationError(e.message_dict if hasattr(e, 'message_dict') else str(e))
+
+        return attrs
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.tax_profile:
+            data['tax_profile'] = {
+                'tax_profile_code': instance.tax_profile.tax_profile_code,
+                'name': instance.tax_profile.name,
+            }
+        if instance.primary_economic_exposure:
+            data['primary_economic_exposure'] = {
+                'exposure_code': instance.primary_economic_exposure.exposure_code,
+                'name': instance.primary_economic_exposure.name,
+            }
+        if instance.primary_issuer_type:
+            data['primary_issuer_type'] = {
+                'issuer_type_code': instance.primary_issuer_type.issuer_type_code,
+                'name': instance.primary_issuer_type.name,
+            }
+        if instance.issuer:
+            data['issuer'] = {
+                'issuer_code': instance.issuer.issuer_code,
+                'name': instance.issuer.name,
+            }
+        return data
+
+
+================================================================================
+# FILE: api/tests.py
+================================================================================
+from django.test import TestCase
+
+# Create your tests here.
+
+
+================================================================================
+# FILE: api/urls.py
+================================================================================
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import (
+    EconomicExposureViewSet, TaxProfileViewSet, IssuerTypeViewSet,
+    IssuerViewSet, InstrumentTemplateViewSet,
+    SchemaView, BatchInstructionView, ReferenceHealthView,
+)
+
+router = DefaultRouter()
+router.register(r'economic-exposures', EconomicExposureViewSet, basename='economic-exposure')
+router.register(r'tax-profiles', TaxProfileViewSet, basename='tax-profile')
+router.register(r'issuer-types', IssuerTypeViewSet, basename='issuer-type')
+router.register(r'issuers', IssuerViewSet, basename='issuer')
+router.register(r'instrument-templates', InstrumentTemplateViewSet, basename='instrument-template')
+
+urlpatterns = [
+    path('schema/', SchemaView.as_view(), name='api-schema'),
+    path('batch/instructions/', BatchInstructionView.as_view(), name='batch-instructions'),
+    path('health/references/', ReferenceHealthView.as_view(), name='reference-health'),
+] + router.urls
+
+
+================================================================================
+# FILE: api/views.py
+================================================================================
+from rest_framework import viewsets, status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from django.db import transaction
+
+from refdata.models import (
+    EconomicExposure, TaxProfile, IssuerType, Issuer, InstrumentTemplate,
+)
+from refdata.health import run_all_checks
+from .serializers import (
+    EconomicExposureSerializer, TaxProfileSerializer,
+    IssuerTypeSerializer, IssuerSerializer, InstrumentTemplateSerializer,
+)
+from .filters import (
+    EconomicExposureFilter, TaxProfileFilter, IssuerTypeFilter,
+    IssuerFilter, InstrumentTemplateFilter,
+)
+from .schema_definition import SCHEMA
+
+
+class ReferenceViewSetMixin:
+    """Shared: idempotent POST, no DELETE, deactivation guard."""
+    http_method_names = ['get', 'post', 'put', 'patch', 'head', 'options']
+
+    def create(self, request, *args, **kwargs):
+        code_field = self.lookup_field
+        code = request.data.get(code_field)
+        if code:
+            existing = self.get_queryset().filter(**{code_field: code}).first()
+            if existing:
+                serializer = self.get_serializer(existing)
+                return Response(
+                    {
+                        'error': 'conflict',
+                        'message': f'A record with {code_field}={code!r} already exists.',
+                        'existing': serializer.data,
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+        return super().create(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if 'active' in request.data and request.data['active'] is False and instance.active:
+            refs = self._check_references(instance)
+            if refs:
+                return Response(
+                    {
+                        'error': 'deactivation_blocked',
+                        'message': f'Cannot deactivate: referenced by {len(refs)} active record(s).',
+                        'references': refs,
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+        return super().partial_update(request, *args, **kwargs)
+
+    def _check_references(self, instance):
+        return []
+
+
+class EconomicExposureViewSet(ReferenceViewSetMixin, viewsets.ModelViewSet):
+    queryset = EconomicExposure.objects.all()
+    serializer_class = EconomicExposureSerializer
+    lookup_field = 'exposure_code'
+    filterset_class = EconomicExposureFilter
+    search_fields = ['exposure_code', 'name', 'description']
+    ordering_fields = ['exposure_code', 'name', 'created_at', 'updated_at']
+    ordering = ['exposure_code']
+
+    def _check_references(self, instance):
+        refs = []
+        for t in InstrumentTemplate.objects.filter(active=True, primary_economic_exposure=instance):
+            refs.append({'table': 'instrument_template', 'code': t.template_code, 'field': 'primary_economic_exposure'})
+        for t in InstrumentTemplate.objects.filter(active=True, economic_exposure_weights_json__isnull=False):
+            if instance.exposure_code in (t.economic_exposure_weights_json or {}):
+                refs.append({'table': 'instrument_template', 'code': t.template_code, 'field': 'economic_exposure_weights_json'})
+        return refs
+
+
+class TaxProfileViewSet(ReferenceViewSetMixin, viewsets.ModelViewSet):
+    queryset = TaxProfile.objects.all()
+    serializer_class = TaxProfileSerializer
+    lookup_field = 'tax_profile_code'
+    filterset_class = TaxProfileFilter
+    search_fields = ['tax_profile_code', 'name', 'description']
+    ordering_fields = ['tax_profile_code', 'name', 'created_at', 'updated_at']
+    ordering = ['tax_profile_code']
+
+    def _check_references(self, instance):
+        refs = []
+        for t in InstrumentTemplate.objects.filter(active=True, tax_profile=instance):
+            refs.append({'table': 'instrument_template', 'code': t.template_code, 'field': 'tax_profile'})
+        return refs
+
+
+class IssuerTypeViewSet(ReferenceViewSetMixin, viewsets.ModelViewSet):
+    queryset = IssuerType.objects.all()
+    serializer_class = IssuerTypeSerializer
+    lookup_field = 'issuer_type_code'
+    filterset_class = IssuerTypeFilter
+    search_fields = ['issuer_type_code', 'name', 'description']
+    ordering_fields = ['issuer_type_code', 'name', 'created_at', 'updated_at']
+    ordering = ['issuer_type_code']
+
+    def _check_references(self, instance):
+        refs = []
+        for i in Issuer.objects.filter(active=True, issuer_type=instance):
+            refs.append({'table': 'issuer', 'code': i.issuer_code, 'field': 'issuer_type'})
+        for t in InstrumentTemplate.objects.filter(active=True, primary_issuer_type=instance):
+            refs.append({'table': 'instrument_template', 'code': t.template_code, 'field': 'primary_issuer_type'})
+        for t in InstrumentTemplate.objects.filter(active=True, issuer_type_weights_json__isnull=False):
+            if instance.issuer_type_code in (t.issuer_type_weights_json or {}):
+                refs.append({'table': 'instrument_template', 'code': t.template_code, 'field': 'issuer_type_weights_json'})
+        return refs
+
+
+class IssuerViewSet(ReferenceViewSetMixin, viewsets.ModelViewSet):
+    queryset = Issuer.objects.select_related('issuer_type').all()
+    serializer_class = IssuerSerializer
+    lookup_field = 'issuer_code'
+    filterset_class = IssuerFilter
+    search_fields = ['issuer_code', 'name', 'description']
+    ordering_fields = ['issuer_code', 'name', 'created_at', 'updated_at']
+    ordering = ['issuer_code']
+
+    def _check_references(self, instance):
+        refs = []
+        for t in InstrumentTemplate.objects.filter(active=True, issuer=instance):
+            refs.append({'table': 'instrument_template', 'code': t.template_code, 'field': 'issuer'})
+        return refs
+
+
+class InstrumentTemplateViewSet(ReferenceViewSetMixin, viewsets.ModelViewSet):
+    queryset = InstrumentTemplate.objects.select_related(
+        'primary_economic_exposure', 'tax_profile', 'primary_issuer_type', 'issuer',
+    ).all()
+    serializer_class = InstrumentTemplateSerializer
+    lookup_field = 'template_code'
+    filterset_class = InstrumentTemplateFilter
+    search_fields = ['template_code', 'short_name', 'long_name', 'cnpj']
+    ordering_fields = ['template_code', 'short_name', 'created_at', 'updated_at']
+    ordering = ['template_code']
+
+
+class SchemaView(APIView):
+    def get(self, request):
+        return Response(SCHEMA)
+
+
+VALID_ANGLES = ['diversification', 'liquidity', 'fees', 'tax', 'risk', 'performance']
+TABLE_MAP = {
+    'economic_exposure': (EconomicExposure, 'exposure_code'),
+    'tax_profile': (TaxProfile, 'tax_profile_code'),
+    'issuer_type': (IssuerType, 'issuer_type_code'),
+    'issuer': (Issuer, 'issuer_code'),
+    'instrument_template': (InstrumentTemplate, 'template_code'),
+}
+
+
+class BatchInstructionView(APIView):
+    def patch(self, request):
+        angle = request.data.get('angle')
+        updates = request.data.get('updates', [])
+
+        if angle not in VALID_ANGLES:
+            return Response(
+                {'error': 'validation_error', 'message': f'Invalid angle. Must be one of: {VALID_ANGLES}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not updates:
+            return Response(
+                {'error': 'validation_error', 'message': 'No updates provided.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        field_name = f'instructions_{angle}'
+        errors = []
+        resolved = []
+
+        for i, entry in enumerate(updates):
+            table_name = entry.get('table')
+            code = entry.get('code')
+            text = entry.get('text')
+
+            if table_name not in TABLE_MAP:
+                errors.append({'index': i, 'table': table_name, 'code': code,
+                               'error': f'Invalid table. Valid: {list(TABLE_MAP.keys())}'})
+                continue
+
+            model_class, code_field = TABLE_MAP[table_name]
+            obj = model_class.objects.filter(**{code_field: code}).first()
+            if not obj:
+                errors.append({'index': i, 'table': table_name, 'code': code,
+                               'error': f'No {table_name} with code {code!r}.'})
+                continue
+
+            resolved.append((obj, field_name, text if text is not None else ''))
+
+        if errors:
+            return Response(
+                {'error': 'validation_error',
+                 'message': f'{len(errors)} of {len(updates)} failed. No changes applied.',
+                 'details': errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            results = []
+            for obj, fn, text in resolved:
+                setattr(obj, fn, text)
+                obj.save(update_fields=[fn, 'updated_at'])
+                code_field = TABLE_MAP[obj._meta.db_table][1]
+                results.append({'table': obj._meta.db_table, 'code': getattr(obj, code_field), 'status': 'updated'})
+
+        return Response({'angle': angle, 'updated': len(results), 'results': results})
+
+
+class ReferenceHealthView(APIView):
+    def get(self, request):
+        checks = run_all_checks()
+        overall = 'pass'
+        for c in checks:
+            if c.get('severity') == 'error' and c.get('items'):
+                overall = 'fail'
+                break
+        return Response({'checks': checks, 'overall': overall})
+
+
+================================================================================
+# FILE: manage.py
+================================================================================
+#!/usr/bin/env python
+"""Django's command-line utility for administrative tasks."""
+import os
+import sys
+
+
+def main():
+    """Run administrative tasks."""
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'xray.settings')
+    try:
+        from django.core.management import execute_from_command_line
+    except ImportError as exc:
+        raise ImportError(
+            "Couldn't import Django. Are you sure it's installed and "
+            "available on your PYTHONPATH environment variable? Did you "
+            "forget to activate a virtual environment?"
+        ) from exc
+    execute_from_command_line(sys.argv)
+
+
+if __name__ == '__main__':
+    main()
+
+
+================================================================================
+# FILE: processing/admin.py
+================================================================================
+from django.contrib import admin
+from django.urls import path
+from django.template.response import TemplateResponse
+from django.http import FileResponse, HttpResponseRedirect
+from django.contrib import messages
+
+from refdata.health import run_all_checks
+
+
+def get_processing_urls(admin_site):
+    """Return custom admin URLs for processing and health."""
+    return [
+        path(
+            'processing/upload/',
+            admin_site.admin_view(upload_csv_view),
+            name='processing_upload',
+        ),
+        path(
+            'processing/download/<str:run_id>/',
+            admin_site.admin_view(download_bundle_view),
+            name='processing_download',
+        ),
+        path(
+            'refdata-health/',
+            admin_site.admin_view(health_dashboard_view),
+            name='refdata_health',
+        ),
+    ]
+
+
+def upload_csv_view(request):
+    result = None
+    errors = None
+    if request.method == 'POST' and request.FILES.get('csv_file'):
+        try:
+            from processing.service import process_portfolio_from_upload
+            result = process_portfolio_from_upload(request.FILES['csv_file'])
+        except Exception as e:
+            errors = [str(e)]
+    context = {
+        **admin.site.each_context(request),
+        'title': 'Portfolio Processing',
+        'result': result,
+        'errors': errors,
+    }
+    return TemplateResponse(request, 'processing/upload.html', context)
+
+
+def download_bundle_view(request, run_id):
+    import os
+    from django.conf import settings
+    bundle_path = os.path.join(settings.XRAY_OUTPUT_DIR, f'{run_id}.zip')
+    if os.path.exists(bundle_path):
+        return FileResponse(
+            open(bundle_path, 'rb'),
+            as_attachment=True,
+            filename=f'{run_id}.zip',
+        )
+    messages.error(request, f'Bundle {run_id} not found.')
+    return HttpResponseRedirect('/admin/processing/upload/')
+
+
+def health_dashboard_view(request):
+    checks = run_all_checks()
+    context = {
+        **admin.site.each_context(request),
+        'title': 'Reference Data Health',
+        'checks': checks,
+    }
+    return TemplateResponse(request, 'processing/health_dashboard.html', context)
+
+
+# Inject custom URLs into the default admin site
+_original_get_urls = admin.AdminSite.get_urls
+
+
+def _patched_get_urls(self):
+    custom = get_processing_urls(self)
+    return custom + _original_get_urls(self)
+
+
+admin.AdminSite.get_urls = _patched_get_urls
+
+
+================================================================================
+# FILE: processing/allocations.py
+================================================================================
+from collections import defaultdict
+from decimal import Decimal
+
+
+def compute_allocations(positions):
+    """Compute all allocation tables from resolved positions.
+    Returns a dict of allocation_name -> sorted list of {code, weight} dicts.
+    """
+    acc = {
+        'by_instrument_template': defaultdict(float),
+        'by_economic_exposure': defaultdict(float),
+        'by_exposure_group': defaultdict(float),
+        'by_issuer_type': defaultdict(float),
+        'by_issuer': defaultdict(float),
+        'by_tax_profile': defaultdict(float),
+        'by_instrument_kind': defaultdict(float),
+        'by_maturity_bucket': defaultdict(float),
+    }
+
+    # Pre-load exposure group mapping
+    from refdata.models import EconomicExposure
+    exp_group_map = dict(
+        EconomicExposure.objects.filter(active=True)
+        .values_list('exposure_code', 'exposure_group')
+    )
+
+    for pos in positions:
+        w = float(pos.weight)
+
+        acc['by_instrument_template'][pos.template_code] += w
+        acc['by_tax_profile'][pos.tax_profile_code] += w
+        acc['by_instrument_kind'][pos.instrument_kind] += w
+
+        # Economic exposure (split proportionally for weighted)
+        for ew in pos.economic_exposures:
+            portion = w * ew['weight']
+            acc['by_economic_exposure'][ew['code']] += portion
+            group = exp_group_map.get(ew['code'], 'unknown')
+            acc['by_exposure_group'][group] += portion
+
+        # Issuer type (split proportionally for weighted)
+        for itw in pos.issuer_type_weights:
+            acc['by_issuer_type'][itw['code']] += w * itw['weight']
+
+        # Specific issuer
+        if pos.issuer_code:
+            acc['by_issuer'][pos.issuer_code] += w
+
+        # Maturity bucket
+        if pos.maturity_bucket:
+            acc['by_maturity_bucket'][pos.maturity_bucket] += w
+
+    # Sort each allocation by descending weight
+    result = {}
+    for key, data in acc.items():
+        result[key] = sorted(
+            [{'code': k, 'weight': round(v, 6)} for k, v in data.items()],
+            key=lambda x: -x['weight'],
+        )
+    return result
+
+
+def compute_coverage(positions):
+    """Compute coverage summary."""
+    total_weight = sum(float(p.weight) for p in positions)
+    if total_weight == 0:
+        return {}
+
+    exp_covered = sum(float(p.weight) for p in positions if p.economic_exposures)
+    tp_covered = sum(float(p.weight) for p in positions if p.tax_profile_code)
+    it_covered = sum(float(p.weight) for p in positions if p.issuer_type_code or p.issuer_type_weights)
+    iss_covered = sum(float(p.weight) for p in positions if p.issuer_code)
+    mat_covered = sum(float(p.weight) for p in positions if p.maturity_bucket)
+
+    return {
+        'economic_exposure_coverage': round(exp_covered / total_weight, 4),
+        'tax_profile_coverage': round(tp_covered / total_weight, 4),
+        'issuer_type_coverage': round(it_covered / total_weight, 4),
+        'issuer_coverage': round(iss_covered / total_weight, 4),
+        'maturity_coverage': round(mat_covered / total_weight, 4),
+    }
+
+
+================================================================================
+# FILE: processing/apps.py
+================================================================================
+from django.apps import AppConfig
+
+
+class ProcessingConfig(AppConfig):
+    name = 'processing'
+
+
+================================================================================
+# FILE: processing/bundler.py
+================================================================================
+import csv
+import io
+import json
+import os
+import zipfile
+from datetime import date, datetime
+from uuid import uuid4
+
+from .resolver import flatten_instructions
+
+
+def build_bundle(run_id, upload_date, original_csv_content, validation_result,
+                 positions, allocations, coverage, charts_dir, html_content):
+    """Assemble the output bundle as a dict of {relative_path: content_bytes}."""
+    files = {}
+
+    # input/original.csv
+    files[f'{run_id}/input/original.csv'] = _to_bytes(original_csv_content)
+
+    # machine/unrolled_positions.csv
+    files[f'{run_id}/machine/unrolled_positions.csv'] = _to_bytes(
+        _unrolled_csv(positions)
+    )
+
+    # machine/unrolled_positions.json
+    files[f'{run_id}/machine/unrolled_positions.json'] = _to_bytes(
+        json.dumps(_unrolled_json(positions), indent=2, ensure_ascii=False, sort_keys=True)
+    )
+
+    # machine/allocation CSVs
+    for alloc_name, alloc_data in allocations.items():
+        csv_name = f'allocation_{alloc_name}.csv'
+        files[f'{run_id}/machine/{csv_name}'] = _to_bytes(_allocation_csv(alloc_data))
+
+    # machine/angle CSVs
+    for angle in ['diversification', 'liquidity', 'fees', 'tax', 'risk', 'performance']:
+        files[f'{run_id}/machine/angle_{angle}.csv'] = _to_bytes(
+            _angle_csv(positions, angle)
+        )
+
+    # machine/report_input_bundle.json
+    bundle = _report_input_bundle(run_id, upload_date, positions, allocations, coverage)
+    files[f'{run_id}/machine/report_input_bundle.json'] = _to_bytes(
+        json.dumps(bundle, indent=2, ensure_ascii=False, sort_keys=True)
+    )
+
+    # machine/coverage_summary.json
+    files[f'{run_id}/machine/coverage_summary.json'] = _to_bytes(
+        json.dumps(coverage, indent=2, sort_keys=True)
+    )
+
+    # html/preview.html
+    files[f'{run_id}/html/preview.html'] = _to_bytes(html_content)
+
+    # charts/*.svg
+    if os.path.isdir(charts_dir):
+        for fname in os.listdir(charts_dir):
+            if fname.endswith('.svg'):
+                with open(os.path.join(charts_dir, fname), 'rb') as f:
+                    files[f'{run_id}/charts/{fname}'] = f.read()
+
+    # meta/run_metadata.json
+    meta = {
+        'run_id': run_id,
+        'upload_date': str(upload_date),
+        'generated_at': datetime.utcnow().isoformat() + 'Z',
+        'row_count': len(positions),
+        'total_weight': sum(float(p.weight) for p in positions),
+    }
+    files[f'{run_id}/meta/run_metadata.json'] = _to_bytes(
+        json.dumps(meta, indent=2, sort_keys=True)
+    )
+
+    # meta/validation.json
+    val = {
+        'is_valid': validation_result.is_valid,
+        'errors': validation_result.errors,
+        'warnings': validation_result.warnings,
+        'row_count': validation_result.row_count,
+        'total_weight': validation_result.total_weight,
+    }
+    files[f'{run_id}/meta/validation.json'] = _to_bytes(
+        json.dumps(val, indent=2, sort_keys=True)
+    )
+
+    return files
+
+
+def write_zip(files, output_path):
+    """Write a dict of {path: bytes} to a ZIP file."""
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for path, data in sorted(files.items()):
+            zf.writestr(path, data)
+    return output_path
+
+
+def generate_run_id():
+    ts = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+    short = uuid4().hex[:6]
+    return f'run_{ts}_{short}'
+
+
+def _to_bytes(text):
+    return text.encode('utf-8') if isinstance(text, str) else text
+
+
+def _unrolled_csv(positions):
+    out = io.StringIO()
+    writer = csv.writer(out)
+    header = [
+        'row_number', 'template_code', 'weight', 'instrument_kind',
+        'tax_profile_code', 'issuer_code', 'issuer_type_code',
+        'economic_exposures', 'expiry_date', 'days_to_expiry',
+        'years_to_expiry', 'maturity_bucket', 'country_bucket',
+        'instructions_diversification', 'instructions_liquidity',
+        'instructions_fees', 'instructions_tax',
+        'instructions_risk', 'instructions_performance',
+    ]
+    writer.writerow(header)
+    for p in positions:
+        exp_str = '; '.join(f"{e['code']}:{e['weight']}" for e in p.economic_exposures)
+        writer.writerow([
+            p.row_number, p.template_code, f"{float(p.weight):.6f}", p.instrument_kind,
+            p.tax_profile_code, p.issuer_code or '', p.issuer_type_code or '',
+            exp_str, p.expiry_date or '', p.days_to_expiry or '',
+            p.years_to_expiry or '', p.maturity_bucket or '', p.country_bucket or '',
+            flatten_instructions(p.instructions.get('diversification', [])),
+            flatten_instructions(p.instructions.get('liquidity', [])),
+            flatten_instructions(p.instructions.get('fees', [])),
+            flatten_instructions(p.instructions.get('tax', [])),
+            flatten_instructions(p.instructions.get('risk', [])),
+            flatten_instructions(p.instructions.get('performance', [])),
+        ])
+    return out.getvalue()
+
+
+def _unrolled_json(positions):
+    result = []
+    for p in positions:
+        result.append({
+            'row_number': p.row_number,
+            'input': {
+                'instrument_template_code': p.template_code,
+                'weight': float(p.weight),
+            },
+            'resolved': {
+                'instrument_kind': p.instrument_kind,
+                'short_name': p.short_name,
+                'tax_profile_code': p.tax_profile_code,
+                'issuer_code': p.issuer_code,
+                'issuer_type_code': p.issuer_type_code,
+                'economic_exposures': p.economic_exposures,
+                'issuer_type_weights': p.issuer_type_weights,
+            },
+            'derived': {
+                'expiry_date': str(p.expiry_date) if p.expiry_date else None,
+                'days_to_expiry': p.days_to_expiry,
+                'years_to_expiry': p.years_to_expiry,
+                'maturity_bucket': p.maturity_bucket,
+                'country_bucket': p.country_bucket,
+            },
+            'template_metadata': p.template_metadata,
+            'instructions': p.instructions,
+        })
+    return result
+
+
+def _allocation_csv(alloc_data):
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow(['code', 'weight', 'pct'])
+    for d in alloc_data:
+        writer.writerow([d['code'], f"{d['weight']:.6f}", f"{d['weight'] * 100:.2f}"])
+    return out.getvalue()
+
+
+def _angle_csv(positions, angle):
+    """Generate angle-specific CSV with relevant columns."""
+    out = io.StringIO()
+    writer = csv.writer(out)
+
+    base_cols = ['row_number', 'template_code', 'weight', 'instrument_kind']
+
+    if angle == 'diversification':
+        extra_cols = ['issuer_code', 'issuer_type_code', 'economic_exposures', 'country_bucket']
+    elif angle == 'liquidity':
+        extra_cols = ['expiry_date', 'days_to_expiry', 'maturity_bucket', 'has_fgc']
+    elif angle == 'fees':
+        extra_cols = ['yearly_fee_pct', 'performance_fee_pct', 'tax_profile_code']
+    elif angle == 'tax':
+        extra_cols = ['tax_profile_code', 'expiry_date', 'days_to_expiry']
+    elif angle == 'risk':
+        extra_cols = ['economic_exposures', 'maturity_bucket', 'issuer_code', 'issuer_type_code', 'country_bucket']
+    elif angle == 'performance':
+        extra_cols = ['economic_exposures', 'maturity_bucket', 'years_to_expiry']
+    else:
+        extra_cols = []
+
+    header = base_cols + extra_cols + [f'instructions_{angle}']
+    writer.writerow(header)
+
+    for p in positions:
+        row = [p.row_number, p.template_code, f"{float(p.weight):.6f}", p.instrument_kind]
+
+        for col in extra_cols:
+            if col == 'economic_exposures':
+                row.append('; '.join(f"{e['code']}:{e['weight']}" for e in p.economic_exposures))
+            elif col == 'has_fgc':
+                row.append(p.template_metadata.get('has_fgc', ''))
+            elif col in ('yearly_fee_pct', 'performance_fee_pct'):
+                val = p.template_metadata.get(col)
+                row.append(f"{val:.4f}" if val is not None else '')
+            else:
+                row.append(getattr(p, col, '') or '')
+
+        row.append(flatten_instructions(p.instructions.get(angle, [])))
+        writer.writerow(row)
+
+    return out.getvalue()
+
+
+def _report_input_bundle(run_id, upload_date, positions, allocations, coverage):
+    return {
+        'schema_version': '1.0',
+        'system_type': 'mechanical_precursor',
+        'run_id': run_id,
+        'upload_date': str(upload_date),
+        'input_contract': 'instrument_template_code,weight,expiry_date,issuer_code,issuer_type_code',
+        'portfolio_summary': {
+            'total_weight': round(sum(float(p.weight) for p in positions), 6),
+            'row_count': len(positions),
+            'unique_templates': len(set(p.template_code for p in positions)),
+            **coverage,
+        },
+        'allocations': {
+            k.replace('by_', ''): v for k, v in allocations.items()
+        },
+        'positions': _unrolled_json(positions),
+    }
+
+
+================================================================================
+# FILE: processing/charts.py
+================================================================================
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import os
+
+
+def render_horizontal_bar(data, title, output_path):
+    """Render a horizontal bar chart to SVG.
+    data: list of {code, weight} dicts, already sorted by weight descending.
+    """
+    if not data:
+        return
+
+    labels = [d['code'] for d in data]
+    values = [d['weight'] * 100 for d in data]  # percentages
+
+    fig, ax = plt.subplots(figsize=(10, max(2.5, len(labels) * 0.45)))
+    bars = ax.barh(range(len(labels)), values, color='#4A90D9', edgecolor='#2C5F8A')
+    ax.set_yticks(range(len(labels)))
+    ax.set_yticklabels(labels, fontsize=9)
+    ax.set_xlabel('Allocation (%)', fontsize=10)
+    ax.set_title(title, fontsize=12, fontweight='bold')
+    ax.invert_yaxis()
+
+    for bar, val in zip(bars, values):
+        ax.text(bar.get_width() + 0.3, bar.get_y() + bar.get_height() / 2,
+                f'{val:.1f}%', va='center', fontsize=8)
+
+    ax.set_xlim(0, max(values) * 1.15 if values else 100)
+    fig.tight_layout()
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.savefig(output_path, format='svg', bbox_inches='tight')
+    plt.close(fig)
+
+
+def generate_all_charts(allocations, charts_dir):
+    """Generate all 5 required SVG charts."""
+    charts = [
+        ('by_economic_exposure', 'Allocation by Economic Exposure', 'economic_exposure_bar.svg'),
+        ('by_issuer_type', 'Allocation by Issuer Type', 'issuer_type_bar.svg'),
+        ('by_instrument_kind', 'Allocation by Instrument Kind', 'instrument_kind_bar.svg'),
+        ('by_maturity_bucket', 'Allocation by Maturity Bucket', 'maturity_bucket_bar.svg'),
+    ]
+    for alloc_key, title, filename in charts:
+        data = allocations.get(alloc_key, [])
+        render_horizontal_bar(data, title, os.path.join(charts_dir, filename))
+
+    # Top 10 issuers
+    issuer_data = allocations.get('by_issuer', [])[:10]
+    render_horizontal_bar(
+        issuer_data, 'Top Issuers by Weight',
+        os.path.join(charts_dir, 'issuer_bar_top10.svg'),
+    )
+
+
+================================================================================
+# FILE: processing/html_preview.py
+================================================================================
+import os
+from django.template import Template, Context
+
+
+HTML_TEMPLATE = """<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Portfolio X-Ray — {{ run_id }}</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         max-width: 1100px; margin: 2em auto; padding: 0 1em; color: #333; }
+  h1 { color: #2C5F8A; border-bottom: 2px solid #4A90D9; padding-bottom: 0.3em; }
+  h2 { color: #4A90D9; margin-top: 2em; }
+  .cards { display: flex; gap: 1em; flex-wrap: wrap; margin: 1em 0; }
+  .card { background: #f5f8fc; border: 1px solid #d0dce8; border-radius: 8px;
+          padding: 1em 1.5em; min-width: 150px; }
+  .card .value { font-size: 1.8em; font-weight: bold; color: #2C5F8A; }
+  .card .label { font-size: 0.85em; color: #666; }
+  table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+  th, td { border: 1px solid #d0dce8; padding: 0.5em 0.8em; text-align: left; font-size: 0.9em; }
+  th { background: #4A90D9; color: white; }
+  tr:nth-child(even) { background: #f5f8fc; }
+  .pct { text-align: right; }
+  .chart-container { margin: 1em 0; }
+  .chart-container img, .chart-container svg { max-width: 100%; height: auto; }
+  details { margin: 0.5em 0; }
+  details summary { cursor: pointer; color: #4A90D9; font-weight: bold; }
+  pre { background: #f5f8fc; padding: 1em; border-radius: 4px; overflow-x: auto;
+        font-size: 0.85em; white-space: pre-wrap; }
+  .validation-ok { color: green; font-weight: bold; }
+  .validation-warn { color: orange; }
+  .download-links a { display: inline-block; margin: 0.3em 0.5em; padding: 0.4em 1em;
+                       background: #4A90D9; color: white; border-radius: 4px; text-decoration: none; }
+</style>
+</head>
+<body>
+<h1>Portfolio X-Ray Preview</h1>
+<p>Run: <strong>{{ run_id }}</strong> | Date: {{ upload_date }}</p>
+
+{% if validation.is_valid %}
+<p class="validation-ok">Validation passed.</p>
+{% endif %}
+{% if validation.warnings %}
+<h2>Warnings</h2>
+<ul>{% for w in validation.warnings %}<li class="validation-warn">{{ w }}</li>{% endfor %}</ul>
+{% endif %}
+
+<h2>Portfolio Summary</h2>
+<div class="cards">
+  <div class="card"><div class="value">{{ summary.row_count }}</div><div class="label">Positions</div></div>
+  <div class="card"><div class="value">{{ summary.unique_templates }}</div><div class="label">Templates</div></div>
+  <div class="card"><div class="value">{{ summary.total_weight }}</div><div class="label">Total Weight</div></div>
+  <div class="card"><div class="value">{{ coverage.issuer_coverage_pct }}%</div><div class="label">Issuer Coverage</div></div>
+  <div class="card"><div class="value">{{ coverage.maturity_coverage_pct }}%</div><div class="label">Maturity Coverage</div></div>
+</div>
+
+{% for alloc_name, alloc_data in allocations.items %}
+<h2>{{ alloc_name|title }}</h2>
+<table>
+  <thead><tr><th>Code</th><th class="pct">Weight</th><th class="pct">%</th></tr></thead>
+  <tbody>
+  {% for row in alloc_data %}
+  <tr><td>{{ row.code }}</td><td class="pct">{{ row.weight }}</td><td class="pct">{{ row.pct }}%</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endfor %}
+
+<h2>Charts</h2>
+{% for chart_file in chart_files %}
+<div class="chart-container">{{ chart_file|safe }}</div>
+{% endfor %}
+
+<h2>Unrolled Positions</h2>
+<table>
+  <thead>
+    <tr><th>#</th><th>Template</th><th>Kind</th><th>Weight</th><th>Issuer</th><th>Exposure</th><th>Maturity</th></tr>
+  </thead>
+  <tbody>
+  {% for pos in positions %}
+  <tr>
+    <td>{{ pos.row_number }}</td>
+    <td>{{ pos.template_code }}</td>
+    <td>{{ pos.instrument_kind }}</td>
+    <td class="pct">{{ pos.weight }}</td>
+    <td>{{ pos.issuer_code|default:"—" }}</td>
+    <td>{{ pos.exposure_display }}</td>
+    <td>{{ pos.maturity_bucket|default:"—" }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% for pos in positions %}
+<details>
+  <summary>Row {{ pos.row_number }}: {{ pos.template_code }} — Instructions</summary>
+  {% for angle, sources in pos.instructions.items %}
+  {% if sources %}
+  <h4>{{ angle|title }}</h4>
+  <pre>{% for s in sources %}[{{ s.source|upper }}] {{ s.code }}
+{{ s.text }}
+{% endfor %}</pre>
+  {% endif %}
+  {% endfor %}
+</details>
+{% endfor %}
+
+</body>
+</html>"""
+
+
+def generate_html_preview(run_id, upload_date, validation, positions, allocations, coverage, charts_dir):
+    """Generate the HTML preview file content."""
+    # Read SVG chart files for inline embedding
+    chart_files = []
+    if os.path.isdir(charts_dir):
+        for fname in sorted(os.listdir(charts_dir)):
+            if fname.endswith('.svg'):
+                with open(os.path.join(charts_dir, fname), 'r') as f:
+                    chart_files.append(f.read())
+
+    # Prepare allocation data with percentages
+    alloc_display = {}
+    for name, data in allocations.items():
+        display_name = name.replace('by_', '').replace('_', ' ')
+        alloc_display[display_name] = [
+            {'code': d['code'], 'weight': f"{d['weight']:.4f}", 'pct': f"{d['weight'] * 100:.1f}"}
+            for d in data
+        ]
+
+    # Prepare positions for display
+    pos_display = []
+    for p in positions:
+        exp_codes = ', '.join(f"{e['code']}({e['weight']:.0%})" if e['weight'] < 1 else e['code']
+                              for e in p.economic_exposures)
+        pos_display.append({
+            'row_number': p.row_number,
+            'template_code': p.template_code,
+            'instrument_kind': p.instrument_kind,
+            'weight': f"{float(p.weight):.4f}",
+            'issuer_code': p.issuer_code,
+            'exposure_display': exp_codes,
+            'maturity_bucket': p.maturity_bucket,
+            'instructions': p.instructions,
+        })
+
+    unique_templates = len(set(p.template_code for p in positions))
+    summary = {
+        'row_count': len(positions),
+        'unique_templates': unique_templates,
+        'total_weight': f"{sum(float(p.weight) for p in positions):.4f}",
+    }
+    coverage_display = {
+        'issuer_coverage_pct': f"{coverage.get('issuer_coverage', 0) * 100:.0f}",
+        'maturity_coverage_pct': f"{coverage.get('maturity_coverage', 0) * 100:.0f}",
+    }
+
+    template = Template(HTML_TEMPLATE)
+    ctx = Context({
+        'run_id': run_id,
+        'upload_date': upload_date,
+        'validation': validation,
+        'summary': summary,
+        'coverage': coverage_display,
+        'allocations': alloc_display,
+        'chart_files': chart_files,
+        'positions': pos_display,
+    })
+    return template.render(ctx)
+
+
+================================================================================
+# FILE: processing/management/commands/process_portfolio.py
+================================================================================
+from django.core.management.base import BaseCommand, CommandError
+from processing.service import process_portfolio
+
+
+class Command(BaseCommand):
+    help = 'Process a portfolio CSV and generate the output bundle'
+
+    def add_arguments(self, parser):
+        parser.add_argument('csv_path', type=str)
+        parser.add_argument('--output-dir', type=str, default=None)
+
+    def handle(self, *args, **options):
+        result = process_portfolio(
+            options['csv_path'],
+            output_dir=options.get('output_dir'),
+        )
+        if result.success:
+            self.stdout.write(self.style.SUCCESS(f'Bundle: {result.zip_path}'))
+            self.stdout.write(f'Run ID: {result.run_id}')
+            self.stdout.write(f'Rows: {result.row_count}')
+            if result.warnings:
+                for w in result.warnings:
+                    self.stderr.write(self.style.WARNING(w))
+        else:
+            for e in result.errors:
+                self.stderr.write(self.style.ERROR(e))
+            raise CommandError('Processing failed.')
+
+
+================================================================================
+# FILE: processing/management/commands/validate_portfolio.py
+================================================================================
+import json
+from django.core.management.base import BaseCommand, CommandError
+from processing.validators import validate_csv
+
+
+class Command(BaseCommand):
+    help = 'Validate a portfolio CSV against reference data'
+
+    def add_arguments(self, parser):
+        parser.add_argument('csv_path', type=str)
+        parser.add_argument('--json', action='store_true', help='Output as JSON')
+
+    def handle(self, *args, **options):
+        result = validate_csv(options['csv_path'])
+
+        if options['json']:
+            out = {
+                'is_valid': result.is_valid,
+                'errors': result.errors,
+                'warnings': result.warnings,
+                'row_count': result.row_count,
+                'total_weight': result.total_weight,
+            }
+            self.stdout.write(json.dumps(out, indent=2))
+            return
+
+        if result.warnings:
+            for w in result.warnings:
+                self.stderr.write(self.style.WARNING(w))
+
+        if result.is_valid:
+            self.stdout.write(self.style.SUCCESS(
+                f'Validation passed. {result.row_count} rows, total weight {result.total_weight:.6f}.'
+            ))
+        else:
+            for e in result.errors:
+                self.stderr.write(self.style.ERROR(e))
+            raise CommandError('Validation failed.')
+
+
+================================================================================
+# FILE: processing/models.py
+================================================================================
+from django.db import models
+
+# Create your models here.
+
+
+================================================================================
+# FILE: processing/resolver.py
+================================================================================
+from dataclasses import dataclass, field
+from datetime import date
+from decimal import Decimal
+from typing import Optional
+
+from refdata.models import (
+    EconomicExposure, IssuerType, ReferenceBase,
+)
+
+
+@dataclass
+class ResolvedPosition:
+    row_number: int
+    template_code: str
+    weight: Decimal
+    instrument_kind: str
+    short_name: str
+
+    # Resolved references
+    tax_profile_code: str
+    issuer_code: Optional[str] = None
+    issuer_name: Optional[str] = None
+    issuer_type_code: Optional[str] = None
+    issuer_type_name: Optional[str] = None
+    economic_exposures: list = field(default_factory=list)
+    issuer_type_weights: list = field(default_factory=list)
+
+    # Derived
+    expiry_date: Optional[date] = None
+    days_to_expiry: Optional[int] = None
+    years_to_expiry: Optional[float] = None
+    maturity_bucket: Optional[str] = None
+    country_bucket: Optional[str] = None
+
+    # Instructions per angle
+    instructions: dict = field(default_factory=dict)
+
+    # Template metadata carried forward
+    template_metadata: dict = field(default_factory=dict)
+
+
+def resolve_positions(parsed_rows, upload_date=None):
+    """Resolve a list of parsed rows into ResolvedPositions."""
+    if upload_date is None:
+        upload_date = date.today()
+
+    # Pre-load lookup dicts
+    exposures = {e.exposure_code: e for e in EconomicExposure.objects.filter(active=True)}
+    issuer_types = {it.issuer_type_code: it for it in IssuerType.objects.filter(active=True)}
+
+    positions = []
+    for row in parsed_rows:
+        pos = _resolve_single(row, upload_date, exposures, issuer_types)
+        positions.append(pos)
+    return positions
+
+
+def _resolve_single(row, upload_date, exposures, issuer_types):
+    template = row['template']
+    weight = row['weight']
+
+    # 1. Basic fields
+    pos = ResolvedPosition(
+        row_number=row['row_number'],
+        template_code=row['template_code'],
+        weight=weight,
+        instrument_kind=template.instrument_kind,
+        short_name=template.short_name,
+        tax_profile_code=template.tax_profile.tax_profile_code,
+    )
+
+    # Template metadata
+    pos.template_metadata = {
+        'long_name': template.long_name,
+        'cnpj': template.cnpj,
+        'b3_listed': template.b3_listed,
+        'is_bdr': template.is_bdr,
+        'yearly_fee_pct': float(template.yearly_fee_pct) if template.yearly_fee_pct is not None else None,
+        'performance_fee_pct': float(template.performance_fee_pct) if template.performance_fee_pct is not None else None,
+        'has_fgc': template.has_fgc,
+        'requires_expiry_date': template.requires_expiry_date,
+    }
+
+    # 3. Resolve effective issuer
+    issuer = row.get('issuer')
+    if not issuer and template.issuer_id:
+        issuer = template.issuer
+    if issuer:
+        pos.issuer_code = issuer.issuer_code
+        pos.issuer_name = issuer.name
+
+    # 4. Resolve effective issuer type
+    if issuer:
+        pos.issuer_type_code = issuer.issuer_type.issuer_type_code
+        pos.issuer_type_name = issuer.issuer_type.name
+        pos.issuer_type_weights = [{'code': issuer.issuer_type.issuer_type_code, 'weight': 1.0}]
+    elif row.get('issuer_type_override'):
+        it = row['issuer_type_override']
+        pos.issuer_type_code = it.issuer_type_code
+        pos.issuer_type_name = it.name
+        pos.issuer_type_weights = [{'code': it.issuer_type_code, 'weight': 1.0}]
+    elif template.primary_issuer_type_id:
+        it = template.primary_issuer_type
+        pos.issuer_type_code = it.issuer_type_code
+        pos.issuer_type_name = it.name
+        pos.issuer_type_weights = [{'code': it.issuer_type_code, 'weight': 1.0}]
+    elif template.issuer_type_weights_json:
+        pos.issuer_type_weights = [
+            {'code': code, 'weight': w}
+            for code, w in sorted(template.issuer_type_weights_json.items(), key=lambda x: -x[1])
+        ]
+        if pos.issuer_type_weights:
+            pos.issuer_type_code = pos.issuer_type_weights[0]['code']
+
+    # 5. Resolve economic exposure
+    if template.primary_economic_exposure_id:
+        exp = template.primary_economic_exposure
+        pos.economic_exposures = [{'code': exp.exposure_code, 'weight': 1.0}]
+    elif template.economic_exposure_weights_json:
+        pos.economic_exposures = [
+            {'code': code, 'weight': w}
+            for code, w in sorted(template.economic_exposure_weights_json.items(), key=lambda x: -x[1])
+        ]
+
+    # 7. Expiry / maturity
+    pos.expiry_date = row.get('expiry_date')
+    if pos.expiry_date:
+        delta = pos.expiry_date - upload_date
+        pos.days_to_expiry = delta.days
+        pos.years_to_expiry = round(delta.days / 365.25, 2)
+        pos.maturity_bucket = _maturity_bucket(delta.days)
+
+    # Country bucket
+    pos.country_bucket = _country_bucket(pos)
+
+    # 8. Collect instructions
+    pos.instructions = _collect_instructions(template, issuer, pos, exposures, issuer_types)
+
+    return pos
+
+
+def _maturity_bucket(days):
+    if days < 365:
+        return '<1y'
+    elif days < 1096:
+        return '1-3y'
+    elif days < 1826:
+        return '3-5y'
+    elif days < 3652:
+        return '5-10y'
+    else:
+        return '10y+'
+
+
+def _country_bucket(pos):
+    """Derive Brazil / Non-Brazil from exposure or issuer type codes."""
+    br_indicators = {'_br'}
+    for exp in pos.economic_exposures:
+        if exp['code'].endswith('_br'):
+            return 'Brazil'
+    if pos.issuer_type_code and pos.issuer_type_code.startswith('br_'):
+        return 'Brazil'
+    if pos.economic_exposures:
+        return 'Non-Brazil'
+    if pos.issuer_type_code and pos.issuer_type_code.startswith('nonbr_'):
+        return 'Non-Brazil'
+    return None
+
+
+def _collect_instructions(template, issuer, pos, exposures, issuer_types):
+    """Collect instruction texts from all relevant sources for each angle."""
+    angles = ['diversification', 'liquidity', 'fees', 'tax', 'risk', 'performance']
+    result = {}
+
+    for angle in angles:
+        field_name = f'instructions_{angle}'
+        sources = []
+
+        # From instrument_template
+        text = getattr(template, field_name, '').strip()
+        if text:
+            sources.append({'source': 'instrument_template', 'code': template.template_code, 'text': text})
+
+        # From issuer (if resolved)
+        if issuer:
+            text = getattr(issuer, field_name, '').strip()
+            if text:
+                sources.append({'source': 'issuer', 'code': issuer.issuer_code, 'text': text})
+
+        # From issuer_type(s)
+        for itw in pos.issuer_type_weights:
+            it = issuer_types.get(itw['code'])
+            if it:
+                text = getattr(it, field_name, '').strip()
+                if text:
+                    sources.append({'source': 'issuer_type', 'code': it.issuer_type_code, 'text': text})
+
+        # From economic_exposure(s)
+        for ew in pos.economic_exposures:
+            exp = exposures.get(ew['code'])
+            if exp:
+                text = getattr(exp, field_name, '').strip()
+                if text:
+                    sources.append({'source': 'economic_exposure', 'code': exp.exposure_code, 'text': text})
+
+        # From tax_profile
+        tp = template.tax_profile
+        text = getattr(tp, field_name, '').strip()
+        if text:
+            sources.append({'source': 'tax_profile', 'code': tp.tax_profile_code, 'text': text})
+
+        result[angle] = sources
+
+    return result
+
+
+def flatten_instructions(sources):
+    """Flatten a list of instruction sources into the spec's text format."""
+    if not sources:
+        return ''
+    blocks = []
+    for s in sources:
+        label = s['source'].upper()
+        blocks.append(f'[{label}]\n{s["text"]}')
+    return '\n'.join(blocks)
+
+
+================================================================================
+# FILE: processing/service.py
+================================================================================
+import os
+import tempfile
+from datetime import date
+from dataclasses import dataclass
+from typing import Optional
+
+from django.conf import settings
+
+from .validators import validate_csv
+from .resolver import resolve_positions
+from .allocations import compute_allocations, compute_coverage
+from .charts import generate_all_charts
+from .html_preview import generate_html_preview
+from .bundler import build_bundle, write_zip, generate_run_id
+
+
+@dataclass
+class ProcessingResult:
+    success: bool
+    run_id: Optional[str] = None
+    zip_path: Optional[str] = None
+    row_count: int = 0
+    errors: list = None
+    warnings: list = None
+    html_preview_url: Optional[str] = None
+
+
+def process_portfolio(csv_input, output_dir=None, upload_date=None):
+    """Main entry point. Returns ProcessingResult."""
+    if output_dir is None:
+        output_dir = settings.XRAY_OUTPUT_DIR
+    if upload_date is None:
+        upload_date = date.today()
+
+    # 1. Validate
+    validation = validate_csv(csv_input)
+    if not validation.is_valid:
+        return ProcessingResult(
+            success=False, errors=validation.errors, warnings=validation.warnings,
+        )
+
+    # 2. Resolve
+    positions = resolve_positions(validation.rows, upload_date)
+
+    # 3. Allocations
+    allocations = compute_allocations(positions)
+    coverage = compute_coverage(positions)
+
+    # 4. Charts
+    run_id = generate_run_id()
+    charts_dir = os.path.join(tempfile.mkdtemp(), 'charts')
+    os.makedirs(charts_dir, exist_ok=True)
+    generate_all_charts(allocations, charts_dir)
+
+    # 5. HTML preview
+    html_content = generate_html_preview(
+        run_id, upload_date, validation, positions, allocations, coverage, charts_dir,
+    )
+
+    # 6. Read original CSV content
+    if isinstance(csv_input, str):
+        with open(csv_input, 'r') as f:
+            original_csv = f.read()
+    elif hasattr(csv_input, 'seek'):
+        csv_input.seek(0)
+        raw = csv_input.read()
+        original_csv = raw.decode('utf-8') if isinstance(raw, bytes) else raw
+    else:
+        original_csv = ''
+
+    # 7. Build bundle
+    files = build_bundle(
+        run_id, upload_date, original_csv, validation,
+        positions, allocations, coverage, charts_dir, html_content,
+    )
+
+    # 8. Write ZIP
+    zip_path = os.path.join(output_dir, f'{run_id}.zip')
+    write_zip(files, zip_path)
+
+    return ProcessingResult(
+        success=True,
+        run_id=run_id,
+        zip_path=zip_path,
+        row_count=len(positions),
+        errors=[],
+        warnings=validation.warnings,
+    )
+
+
+def process_portfolio_from_upload(uploaded_file):
+    """Wrapper for Django admin upload. Returns dict for template context."""
+    result = process_portfolio(uploaded_file)
+    if not result.success:
+        raise ValueError('; '.join(result.errors))
+    return {
+        'run_id': result.run_id,
+        'row_count': result.row_count,
+        'zip_path': result.zip_path,
+    }
+
+
+================================================================================
+# FILE: processing/templates/processing/health_dashboard.html
+================================================================================
+{% extends "admin/base_site.html" %}
+{% block title %}Reference Data Health{% endblock %}
+{% block content %}
+<h2>Reference Data Health Checks</h2>
+
+{% for check in checks %}
+<div class="module" style="margin-bottom: 1em;">
+  <h3>
+    {% if check.severity == 'error' %}&#x274C;
+    {% elif check.severity == 'warning' %}&#x26A0;&#xFE0F;
+    {% else %}&#x2139;&#xFE0F;
+    {% endif %}
+    {{ check.name }}
+  </h3>
+
+  {% if check.items is not None %}
+    {% if check.items %}
+    <ul>{% for item in check.items %}<li>{{ item }}</li>{% endfor %}</ul>
+    {% else %}
+    <p style="color:green;">All clear.</p>
+    {% endif %}
+  {% endif %}
+
+  {% if check.coverage %}
+  <table>
+    <thead><tr><th>Model</th><th>Total active</th><th>All 6 filled</th><th>None filled</th></tr></thead>
+    <tbody>
+    {% for model_name, stats in check.coverage.items %}
+    <tr>
+      <td>{{ model_name }}</td>
+      <td>{{ stats.total }}</td>
+      <td>{{ stats.with_all_6 }}</td>
+      <td style="{% if stats.with_none > 0 %}color:red{% endif %}">{{ stats.with_none }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endfor %}
+{% endblock %}
+
+
+================================================================================
+# FILE: processing/templates/processing/upload.html
+================================================================================
+{% extends "admin/base_site.html" %}
+{% block title %}Portfolio Processing{% endblock %}
+{% block content %}
+<h2>Upload Portfolio CSV</h2>
+<p>Upload a resolved portfolio CSV file. Required columns: <code>instrument_template_code, weight, expiry_date, issuer_code, issuer_type_code</code></p>
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  <p><input type="file" name="csv_file" accept=".csv" required></p>
+  <p><input type="submit" value="Validate & Process" class="default"></p>
+</form>
+
+{% if errors %}
+<div class="errornote" style="margin-top: 1em;">
+  <h3>Errors</h3>
+  <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+{% if result %}
+<div class="module" style="margin-top: 1em;">
+  <h3>Processing Complete</h3>
+  <p>Run ID: <strong>{{ result.run_id }}</strong></p>
+  <p>Rows processed: {{ result.row_count }}</p>
+  <p><a href="{% url 'admin:processing_download' result.run_id %}" class="default">Download ZIP Bundle</a></p>
+  {% if result.html_preview_url %}
+  <p><a href="{{ result.html_preview_url }}" target="_blank">View HTML Preview</a></p>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}
+
+
+================================================================================
+# FILE: processing/tests.py
+================================================================================
+from django.test import TestCase
+
+# Create your tests here.
+
+
+================================================================================
+# FILE: processing/validators.py
+================================================================================
+import csv
+import io
+from dataclasses import dataclass, field
+from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
+
+from django.conf import settings
+from refdata.models import InstrumentTemplate, Issuer, IssuerType
+
+
+REQUIRED_COLUMNS = ['instrument_template_code', 'weight', 'expiry_date', 'issuer_code', 'issuer_type_code']
+
+
+@dataclass
+class ValidationResult:
+    is_valid: bool = True
+    errors: list = field(default_factory=list)
+    warnings: list = field(default_factory=list)
+    rows: list = field(default_factory=list)
+    row_count: int = 0
+    total_weight: float = 0.0
+
+
+def validate_csv(csv_input):
+    """Validate a portfolio CSV. Accepts file path (str) or file-like object."""
+    result = ValidationResult()
+
+    if isinstance(csv_input, str):
+        with open(csv_input, 'r', newline='') as f:
+            content = f.read()
+    elif hasattr(csv_input, 'read'):
+        raw = csv_input.read()
+        content = raw.decode('utf-8') if isinstance(raw, bytes) else raw
+    else:
+        result.is_valid = False
+        result.errors.append('Invalid input: expected file path or file-like object.')
+        return result
+
+    reader = csv.DictReader(io.StringIO(content))
+    if not reader.fieldnames:
+        result.is_valid = False
+        result.errors.append('CSV file is empty or has no headers.')
+        return result
+
+    missing = [c for c in REQUIRED_COLUMNS if c not in reader.fieldnames]
+    if missing:
+        result.is_valid = False
+        result.errors.append(f'Missing required columns: {missing}')
+        return result
+
+    # Pre-load lookups
+    templates = {t.template_code: t for t in InstrumentTemplate.objects.filter(active=True)}
+    issuers = {i.issuer_code: i for i in Issuer.objects.filter(active=True).select_related('issuer_type')}
+    issuer_types = {it.issuer_type_code: it for it in IssuerType.objects.filter(active=True)}
+
+    total_weight = Decimal('0')
+    parsed_rows = []
+
+    for row_num, row in enumerate(reader, start=1):
+        tc = row.get('instrument_template_code', '').strip()
+        weight_str = row.get('weight', '').strip()
+        expiry_str = row.get('expiry_date', '').strip()
+        ic = row.get('issuer_code', '').strip()
+        itc = row.get('issuer_type_code', '').strip()
+
+        # 1. Template exists and active
+        if not tc:
+            result.errors.append(f'Row {row_num}: instrument_template_code is empty.')
+            result.is_valid = False
+            continue
+        template = templates.get(tc)
+        if not template:
+            result.errors.append(f'Row {row_num}: unknown or inactive template code "{tc}".')
+            result.is_valid = False
+            continue
+
+        # 2. Weight is numeric and positive
+        try:
+            weight = Decimal(weight_str)
+        except (InvalidOperation, ValueError):
+            result.errors.append(f'Row {row_num}: weight "{weight_str}" is not a valid number.')
+            result.is_valid = False
+            continue
+        if weight <= 0:
+            result.errors.append(f'Row {row_num}: weight must be strictly positive, got {weight}.')
+            result.is_valid = False
+            continue
+        total_weight += weight
+
+        # 3. Expiry date
+        expiry_date = None
+        if expiry_str:
+            try:
+                expiry_date = datetime.strptime(expiry_str, '%Y-%m-%d').date()
+            except ValueError:
+                result.errors.append(f'Row {row_num}: invalid expiry_date "{expiry_str}" (expected YYYY-MM-DD).')
+                result.is_valid = False
+                continue
+
+        # 4. Expiry required?
+        if template.requires_expiry_date and not expiry_date:
+            result.errors.append(f'Row {row_num}: template "{tc}" requires expiry_date but none provided.')
+            result.is_valid = False
+            continue
+
+        # 5-6. Issuer/issuer_type resolution
+        issuer = None
+        issuer_type_override = None
+        if ic:
+            issuer = issuers.get(ic)
+            if not issuer:
+                result.errors.append(f'Row {row_num}: unknown or inactive issuer_code "{ic}".')
+                result.is_valid = False
+                continue
+            if itc:
+                result.warnings.append(f'Row {row_num}: both issuer_code and issuer_type_code provided. Using issuer_code.')
+        elif itc:
+            issuer_type_override = issuer_types.get(itc)
+            if not issuer_type_override:
+                result.errors.append(f'Row {row_num}: unknown or inactive issuer_type_code "{itc}".')
+                result.is_valid = False
+                continue
+
+        # 8. Template requires issuer/issuer_type but neither provided
+        if template.requires_issuer_or_issuer_type:
+            has_issuer_info = (
+                issuer is not None
+                or issuer_type_override is not None
+                or template.issuer_id is not None
+                or template.primary_issuer_type_id is not None
+                or template.issuer_type_weights_json is not None
+            )
+            if not has_issuer_info:
+                result.errors.append(
+                    f'Row {row_num}: template "{tc}" requires issuer or issuer_type but none available.'
+                )
+                result.is_valid = False
+                continue
+
+        parsed_rows.append({
+            'row_number': row_num,
+            'template_code': tc,
+            'template': template,
+            'weight': weight,
+            'expiry_date': expiry_date,
+            'issuer': issuer,
+            'issuer_code': ic or None,
+            'issuer_type_override': issuer_type_override,
+            'issuer_type_code': itc or None,
+        })
+
+    if not parsed_rows and not result.errors:
+        result.errors.append('CSV contains no data rows.')
+        result.is_valid = False
+
+    # 3. Total weight check
+    tolerance = Decimal(str(settings.XRAY_WEIGHT_TOLERANCE))
+    if abs(total_weight - Decimal('1')) > tolerance:
+        result.errors.append(
+            f'Total weight is {total_weight:.6f}, must be 1.0 within tolerance {tolerance}.'
+        )
+        result.is_valid = False
+
+    result.rows = parsed_rows
+    result.row_count = len(parsed_rows)
+    result.total_weight = float(total_weight)
+    return result
+
+
+================================================================================
+# FILE: processing/views.py
+================================================================================
+from django.shortcuts import render
+
+# Create your views here.
+
+
+================================================================================
+# FILE: refdata/admin.py
+================================================================================
+from django.contrib import admin
+from .models import (
+    EconomicExposure, TaxProfile, IssuerType, Issuer, InstrumentTemplate
+)
+from .widgets import WeightedJsonWidget
+
+
+INSTRUCTION_FIELDSET = (
+    'Angle Instructions', {
+        'classes': ('collapse',),
+        'description': 'Instruction text for each report angle.',
+        'fields': (
+            'instructions_diversification',
+            'instructions_liquidity',
+            'instructions_fees',
+            'instructions_tax',
+            'instructions_risk',
+            'instructions_performance',
+        ),
+    }
+)
+
+STATUS_FIELDSET = (
+    'Status & Timestamps', {
+        'fields': ('active', 'created_at', 'updated_at'),
+    }
+)
+
+
+class ReferenceBaseAdmin(admin.ModelAdmin):
+    readonly_fields = ('created_at', 'updated_at')
+    list_filter = ('active',)
+    list_per_page = 50
+    actions = ['mark_inactive', 'mark_active']
+
+    def mark_inactive(self, request, queryset):
+        count = queryset.update(active=False)
+        self.message_user(request, f'{count} records deactivated.')
+    mark_inactive.short_description = 'Deactivate selected records'
+
+    def mark_active(self, request, queryset):
+        count = queryset.update(active=True)
+        self.message_user(request, f'{count} records activated.')
+    mark_active.short_description = 'Activate selected records'
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(EconomicExposure)
+class EconomicExposureAdmin(ReferenceBaseAdmin):
+    list_display = ('exposure_code', 'name', 'exposure_group', 'active')
+    list_filter = ('active', 'exposure_group')
+    search_fields = ('exposure_code', 'name')
+    fieldsets = [
+        (None, {'fields': ('exposure_code', 'name', 'exposure_group', 'description')}),
+        INSTRUCTION_FIELDSET,
+        STATUS_FIELDSET,
+    ]
+
+
+@admin.register(TaxProfile)
+class TaxProfileAdmin(ReferenceBaseAdmin):
+    list_display = ('tax_profile_code', 'name', 'active')
+    search_fields = ('tax_profile_code', 'name')
+    fieldsets = [
+        (None, {'fields': ('tax_profile_code', 'name', 'description')}),
+        INSTRUCTION_FIELDSET,
+        STATUS_FIELDSET,
+    ]
+
+
+@admin.register(IssuerType)
+class IssuerTypeAdmin(ReferenceBaseAdmin):
+    list_display = ('issuer_type_code', 'name', 'active')
+    search_fields = ('issuer_type_code', 'name')
+    fieldsets = [
+        (None, {'fields': ('issuer_type_code', 'name', 'description')}),
+        INSTRUCTION_FIELDSET,
+        STATUS_FIELDSET,
+    ]
+
+
+@admin.register(Issuer)
+class IssuerAdmin(ReferenceBaseAdmin):
+    list_display = ('issuer_code', 'name', 'issuer_type', 'active')
+    list_filter = ('active', 'issuer_type')
+    search_fields = ('issuer_code', 'name')
+    autocomplete_fields = ('issuer_type',)
+    fieldsets = [
+        (None, {'fields': ('issuer_code', 'name', 'issuer_type', 'description')}),
+        INSTRUCTION_FIELDSET,
+        STATUS_FIELDSET,
+    ]
+
+
+@admin.register(InstrumentTemplate)
+class InstrumentTemplateAdmin(ReferenceBaseAdmin):
+    list_display = (
+        'template_code', 'short_name', 'instrument_kind',
+        'tax_profile', 'active',
+    )
+    list_filter = ('active', 'instrument_kind', 'requires_expiry_date')
+    search_fields = ('template_code', 'short_name', 'long_name', 'cnpj')
+    autocomplete_fields = (
+        'primary_economic_exposure', 'tax_profile',
+        'primary_issuer_type', 'issuer',
+    )
+    actions = ['mark_inactive', 'mark_active', 'clone_templates']
+
+    fieldsets = [
+        ('Identification', {
+            'fields': (
+                'template_code', 'instrument_kind', 'short_name',
+                'long_name', 'cnpj',
+            ),
+        }),
+        ('Listing & Type Flags', {
+            'fields': (
+                'b3_listed', 'is_bdr', 'has_fgc',
+                'requires_expiry_date', 'requires_issuer_or_issuer_type',
+            ),
+        }),
+        ('Fees', {
+            'fields': ('yearly_fee_pct', 'performance_fee_pct'),
+        }),
+        ('Economic Exposure', {
+            'description': 'Set EITHER primary exposure OR weighted JSON, not both.',
+            'fields': (
+                'primary_economic_exposure',
+                'economic_exposure_weights_json',
+            ),
+        }),
+        ('Tax Profile', {
+            'fields': ('tax_profile',),
+        }),
+        ('Issuer Linkage', {
+            'description': 'Optional issuer or issuer type linkage.',
+            'fields': (
+                'issuer', 'primary_issuer_type',
+                'issuer_type_weights_json',
+            ),
+        }),
+        INSTRUCTION_FIELDSET,
+        STATUS_FIELDSET,
+    ]
+
+    def clone_templates(self, request, queryset):
+        for obj in queryset:
+            obj.pk = None
+            obj.template_code = f'{obj.template_code}_copy'
+            obj.save()
+            self.message_user(
+                request,
+                f'Cloned as "{obj.template_code}". Change the template_code before final save.'
+            )
+    clone_templates.short_description = 'Duplicate selected templates'
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name == 'economic_exposure_weights_json':
+            kwargs['widget'] = WeightedJsonWidget(
+                code_model=EconomicExposure, code_field='exposure_code',
+            )
+        elif db_field.name == 'issuer_type_weights_json':
+            kwargs['widget'] = WeightedJsonWidget(
+                code_model=IssuerType, code_field='issuer_type_code',
+            )
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
+
+
+================================================================================
+# FILE: refdata/apps.py
+================================================================================
+from django.apps import AppConfig
+
+
+class RefdataConfig(AppConfig):
+    name = 'refdata'
+
+
+================================================================================
+# FILE: refdata/health.py
+================================================================================
+from .models import (
+    EconomicExposure, TaxProfile, IssuerType, Issuer, InstrumentTemplate,
+    ReferenceBase,
+)
+
+
+def run_all_checks():
+    """Return a list of {name, severity, items} check results."""
+    checks = []
+
+    # 1. Templates with no economic exposure
+    bad = list(
+        InstrumentTemplate.objects.filter(
+            active=True,
+            primary_economic_exposure__isnull=True,
+            economic_exposure_weights_json__isnull=True,
+        ).values_list('template_code', flat=True)
+    )
+    checks.append({
+        'name': 'Templates missing economic exposure',
+        'severity': 'error',
+        'items': bad,
+    })
+
+    # 2. Weighted exposure totals != 1.0
+    bad = []
+    for t in InstrumentTemplate.objects.filter(
+        active=True, economic_exposure_weights_json__isnull=False
+    ):
+        total = sum(t.economic_exposure_weights_json.values())
+        if abs(total - 1.0) > 0.0005:
+            bad.append(f'{t.template_code} (sum={total:.4f})')
+    checks.append({
+        'name': 'Templates with invalid exposure weight totals',
+        'severity': 'error',
+        'items': bad,
+    })
+
+    # 3. Weighted issuer-type totals != 1.0
+    bad = []
+    for t in InstrumentTemplate.objects.filter(
+        active=True, issuer_type_weights_json__isnull=False
+    ):
+        total = sum(t.issuer_type_weights_json.values())
+        if abs(total - 1.0) > 0.0005:
+            bad.append(f'{t.template_code} (sum={total:.4f})')
+    checks.append({
+        'name': 'Templates with invalid issuer-type weight totals',
+        'severity': 'error',
+        'items': bad,
+    })
+
+    # 4. Active templates missing tax profile (belt-and-suspenders)
+    bad = list(
+        InstrumentTemplate.objects.filter(
+            active=True, tax_profile__isnull=True,
+        ).values_list('template_code', flat=True)
+    )
+    checks.append({
+        'name': 'Active templates missing tax profile',
+        'severity': 'error',
+        'items': bad,
+    })
+
+    # 5. Active issuers pointing to inactive issuer types
+    bad = list(
+        Issuer.objects.filter(
+            active=True, issuer_type__active=False,
+        ).values_list('issuer_code', flat=True)
+    )
+    checks.append({
+        'name': 'Active issuers with inactive issuer type',
+        'severity': 'warning',
+        'items': bad,
+    })
+
+    # 6. Templates requiring expiry_date but missing risk/performance instructions
+    bad = []
+    for t in InstrumentTemplate.objects.filter(
+        active=True, requires_expiry_date=True
+    ):
+        missing = []
+        if not t.instructions_performance.strip():
+            missing.append('instructions_performance')
+        if not t.instructions_risk.strip():
+            missing.append('instructions_risk')
+        if missing:
+            bad.append(f'{t.template_code} (missing: {", ".join(missing)})')
+    checks.append({
+        'name': 'Templates requiring expiry_date but missing risk/performance instructions',
+        'severity': 'warning',
+        'items': bad,
+    })
+
+    # 7. Instruction coverage summary
+    coverage = {}
+    for model, code_field in [
+        (EconomicExposure, 'exposure_code'),
+        (TaxProfile, 'tax_profile_code'),
+        (IssuerType, 'issuer_type_code'),
+        (Issuer, 'issuer_code'),
+        (InstrumentTemplate, 'template_code'),
+    ]:
+        active_qs = model.objects.filter(active=True)
+        total = active_qs.count()
+        with_all = 0
+        with_none = 0
+        for obj in active_qs:
+            filled = sum(1 for f in ReferenceBase.INSTRUCTION_FIELDS if getattr(obj, f, '').strip())
+            if filled == 6:
+                with_all += 1
+            elif filled == 0:
+                with_none += 1
+        coverage[model.__name__] = {
+            'total': total, 'with_all_6': with_all, 'with_none': with_none,
+        }
+    checks.append({
+        'name': 'Instruction coverage summary',
+        'severity': 'info',
+        'coverage': coverage,
+    })
+
+    return checks
+
+
+================================================================================
+# FILE: refdata/migrations/0001_initial.py
+================================================================================
+# Generated by Django 6.0.3 on 2026-04-06 20:50
+
+import django.db.models.deletion
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+
+    initial = True
+
+    dependencies = [
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name='EconomicExposure',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('instructions_diversification', models.TextField(blank=True, default='')),
+                ('instructions_liquidity', models.TextField(blank=True, default='')),
+                ('instructions_fees', models.TextField(blank=True, default='')),
+                ('instructions_tax', models.TextField(blank=True, default='')),
+                ('instructions_risk', models.TextField(blank=True, default='')),
+                ('instructions_performance', models.TextField(blank=True, default='')),
+                ('active', models.BooleanField(default=True)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('updated_at', models.DateTimeField(auto_now=True)),
+                ('exposure_code', models.CharField(max_length=64, unique=True)),
+                ('name', models.CharField(max_length=255)),
+                ('exposure_group', models.CharField(choices=[('fixed_income', 'Fixed Income'), ('equity', 'Equity'), ('real_estate', 'Real Estate'), ('crypto', 'Crypto')], max_length=32)),
+                ('description', models.TextField(blank=True, default='')),
+            ],
+            options={
+                'verbose_name_plural': 'Economic Exposures',
+                'db_table': 'economic_exposure',
+                'ordering': ['exposure_code'],
+            },
+        ),
+        migrations.CreateModel(
+            name='IssuerType',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('instructions_diversification', models.TextField(blank=True, default='')),
+                ('instructions_liquidity', models.TextField(blank=True, default='')),
+                ('instructions_fees', models.TextField(blank=True, default='')),
+                ('instructions_tax', models.TextField(blank=True, default='')),
+                ('instructions_risk', models.TextField(blank=True, default='')),
+                ('instructions_performance', models.TextField(blank=True, default='')),
+                ('active', models.BooleanField(default=True)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('updated_at', models.DateTimeField(auto_now=True)),
+                ('issuer_type_code', models.CharField(max_length=64, unique=True)),
+                ('name', models.CharField(max_length=255)),
+                ('description', models.TextField(blank=True, default='')),
+            ],
+            options={
+                'db_table': 'issuer_type',
+                'ordering': ['issuer_type_code'],
+            },
+        ),
+        migrations.CreateModel(
+            name='TaxProfile',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('instructions_diversification', models.TextField(blank=True, default='')),
+                ('instructions_liquidity', models.TextField(blank=True, default='')),
+                ('instructions_fees', models.TextField(blank=True, default='')),
+                ('instructions_tax', models.TextField(blank=True, default='')),
+                ('instructions_risk', models.TextField(blank=True, default='')),
+                ('instructions_performance', models.TextField(blank=True, default='')),
+                ('active', models.BooleanField(default=True)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('updated_at', models.DateTimeField(auto_now=True)),
+                ('tax_profile_code', models.CharField(max_length=64, unique=True)),
+                ('name', models.CharField(max_length=255)),
+                ('description', models.TextField(blank=True, default='')),
+            ],
+            options={
+                'db_table': 'tax_profile',
+                'ordering': ['tax_profile_code'],
+            },
+        ),
+        migrations.CreateModel(
+            name='Issuer',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('instructions_diversification', models.TextField(blank=True, default='')),
+                ('instructions_liquidity', models.TextField(blank=True, default='')),
+                ('instructions_fees', models.TextField(blank=True, default='')),
+                ('instructions_tax', models.TextField(blank=True, default='')),
+                ('instructions_risk', models.TextField(blank=True, default='')),
+                ('instructions_performance', models.TextField(blank=True, default='')),
+                ('active', models.BooleanField(default=True)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('updated_at', models.DateTimeField(auto_now=True)),
+                ('issuer_code', models.CharField(max_length=64, unique=True)),
+                ('name', models.CharField(max_length=255)),
+                ('description', models.TextField(blank=True, default='')),
+                ('issuer_type', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='issuers', to='refdata.issuertype')),
+            ],
+            options={
+                'db_table': 'issuer',
+                'ordering': ['issuer_code'],
+            },
+        ),
+        migrations.CreateModel(
+            name='InstrumentTemplate',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('instructions_diversification', models.TextField(blank=True, default='')),
+                ('instructions_liquidity', models.TextField(blank=True, default='')),
+                ('instructions_fees', models.TextField(blank=True, default='')),
+                ('instructions_tax', models.TextField(blank=True, default='')),
+                ('instructions_risk', models.TextField(blank=True, default='')),
+                ('instructions_performance', models.TextField(blank=True, default='')),
+                ('active', models.BooleanField(default=True)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('updated_at', models.DateTimeField(auto_now=True)),
+                ('template_code', models.CharField(max_length=64, unique=True)),
+                ('instrument_kind', models.CharField(choices=[('listed', 'Listed'), ('fixed_income', 'Fixed Income'), ('fund', 'Fund'), ('crypto', 'Crypto'), ('other', 'Other')], max_length=32)),
+                ('short_name', models.CharField(max_length=255)),
+                ('long_name', models.CharField(blank=True, default='', max_length=512)),
+                ('cnpj', models.CharField(blank=True, default='', max_length=32)),
+                ('b3_listed', models.BooleanField(blank=True, null=True)),
+                ('is_bdr', models.BooleanField(blank=True, null=True)),
+                ('yearly_fee_pct', models.DecimalField(blank=True, decimal_places=4, max_digits=8, null=True)),
+                ('performance_fee_pct', models.DecimalField(blank=True, decimal_places=4, max_digits=8, null=True)),
+                ('has_fgc', models.BooleanField(blank=True, null=True)),
+                ('requires_expiry_date', models.BooleanField(default=False)),
+                ('requires_issuer_or_issuer_type', models.BooleanField(default=False)),
+                ('economic_exposure_weights_json', models.JSONField(blank=True, null=True)),
+                ('issuer_type_weights_json', models.JSONField(blank=True, null=True)),
+                ('primary_economic_exposure', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='templates_primary', to='refdata.economicexposure')),
+                ('issuer', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='templates', to='refdata.issuer')),
+                ('primary_issuer_type', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='templates_primary', to='refdata.issuertype')),
+                ('tax_profile', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='templates', to='refdata.taxprofile')),
+            ],
+            options={
+                'db_table': 'instrument_template',
+                'ordering': ['template_code'],
+            },
+        ),
+        migrations.AddIndex(
+            model_name='issuer',
+            index=models.Index(fields=['issuer_type'], name='idx_issuer_issuer_type_id'),
+        ),
+        migrations.AddIndex(
+            model_name='instrumenttemplate',
+            index=models.Index(fields=['tax_profile'], name='idx_it_tax_profile_id'),
+        ),
+        migrations.AddIndex(
+            model_name='instrumenttemplate',
+            index=models.Index(fields=['primary_economic_exposure'], name='idx_it_prim_econ_exp_id'),
+        ),
+        migrations.AddIndex(
+            model_name='instrumenttemplate',
+            index=models.Index(fields=['primary_issuer_type'], name='idx_it_prim_issuer_type_id'),
+        ),
+        migrations.AddIndex(
+            model_name='instrumenttemplate',
+            index=models.Index(fields=['issuer'], name='idx_it_issuer_id'),
+        ),
+        migrations.AddConstraint(
+            model_name='instrumenttemplate',
+            constraint=models.CheckConstraint(condition=models.Q(models.Q(('economic_exposure_weights_json__isnull', True), ('primary_economic_exposure__isnull', False)), models.Q(('economic_exposure_weights_json__isnull', False), ('primary_economic_exposure__isnull', True)), _connector='OR'), name='chk_exposure_source'),
+        ),
+        migrations.AddConstraint(
+            model_name='instrumenttemplate',
+            constraint=models.CheckConstraint(condition=models.Q(('yearly_fee_pct__isnull', True), ('yearly_fee_pct__gte', 0), _connector='OR'), name='chk_yearly_fee_non_negative'),
+        ),
+        migrations.AddConstraint(
+            model_name='instrumenttemplate',
+            constraint=models.CheckConstraint(condition=models.Q(('performance_fee_pct__isnull', True), ('performance_fee_pct__gte', 0), _connector='OR'), name='chk_performance_fee_non_negative'),
+        ),
+    ]
+
+
+================================================================================
+# FILE: refdata/migrations/0002_seed_data.py
+================================================================================
+from django.db import migrations
+
+
+def seed_reference_data(apps, schema_editor):
+    EconomicExposure = apps.get_model('refdata', 'EconomicExposure')
+    TaxProfile = apps.get_model('refdata', 'TaxProfile')
+    IssuerType = apps.get_model('refdata', 'IssuerType')
+
+    exposures = [
+        ('fi_cdi_br', 'CDI Brazil', 'fixed_income'),
+        ('fi_ipca_br', 'IPCA Brazil', 'fixed_income'),
+        ('fi_prefixado_br', 'Prefixado Brazil', 'fixed_income'),
+        ('fi_international', 'Fixed Income International', 'fixed_income'),
+        ('eq_br', 'Equity Brazil', 'equity'),
+        ('eq_international', 'Equity International', 'equity'),
+        ('re_br', 'Real Estate Brazil', 'real_estate'),
+        ('re_international', 'Real Estate International', 'real_estate'),
+        ('crypto', 'Crypto', 'crypto'),
+    ]
+    for code, name, group in exposures:
+        EconomicExposure.objects.get_or_create(
+            exposure_code=code,
+            defaults={'name': name, 'exposure_group': group},
+        )
+
+    tax_profiles = [
+        ('general', 'General'),
+        ('tax_exempt', 'Tax Exempt'),
+        ('taxable_no_come_cotas', 'Taxable No Come-Cotas'),
+        ('previdencia', 'Previdencia'),
+    ]
+    for code, name in tax_profiles:
+        TaxProfile.objects.get_or_create(
+            tax_profile_code=code, defaults={'name': name},
+        )
+
+    issuer_types = [
+        ('br_government', 'Brazilian Government'),
+        ('br_bank', 'Brazilian Bank'),
+        ('br_infrastructure', 'Brazilian Infrastructure'),
+        ('br_other', 'Brazilian Other'),
+        ('nonbr_government', 'Non-Brazilian Government'),
+        ('nonbr_other', 'Non-Brazilian Other'),
+    ]
+    for code, name in issuer_types:
+        IssuerType.objects.get_or_create(
+            issuer_type_code=code, defaults={'name': name},
+        )
+
+
+def reverse_seed(apps, schema_editor):
+    pass
+
+
+class Migration(migrations.Migration):
+    dependencies = [
+        ('refdata', '0001_initial'),
+    ]
+    operations = [
+        migrations.RunPython(seed_reference_data, reverse_seed),
+    ]
+
+
+================================================================================
+# FILE: refdata/models.py
+================================================================================
+from django.db import models
+from django.core.exceptions import ValidationError
+
+
+class ReferenceBase(models.Model):
+    """Abstract base for all 5 reference tables."""
+    instructions_diversification = models.TextField(blank=True, default='')
+    instructions_liquidity = models.TextField(blank=True, default='')
+    instructions_fees = models.TextField(blank=True, default='')
+    instructions_tax = models.TextField(blank=True, default='')
+    instructions_risk = models.TextField(blank=True, default='')
+    instructions_performance = models.TextField(blank=True, default='')
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    INSTRUCTION_FIELDS = [
+        'instructions_diversification',
+        'instructions_liquidity',
+        'instructions_fees',
+        'instructions_tax',
+        'instructions_risk',
+        'instructions_performance',
+    ]
+
+    class Meta:
+        abstract = True
+
+
+class EconomicExposure(ReferenceBase):
+    EXPOSURE_GROUP_CHOICES = [
+        ('fixed_income', 'Fixed Income'),
+        ('equity', 'Equity'),
+        ('real_estate', 'Real Estate'),
+        ('crypto', 'Crypto'),
+    ]
+    exposure_code = models.CharField(max_length=64, unique=True)
+    name = models.CharField(max_length=255)
+    exposure_group = models.CharField(max_length=32, choices=EXPOSURE_GROUP_CHOICES)
+    description = models.TextField(blank=True, default='')
+
+    class Meta:
+        db_table = 'economic_exposure'
+        ordering = ['exposure_code']
+        verbose_name_plural = 'Economic Exposures'
+
+    def __str__(self):
+        return f"{self.exposure_code} — {self.name}"
+
+
+class TaxProfile(ReferenceBase):
+    tax_profile_code = models.CharField(max_length=64, unique=True)
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default='')
+
+    class Meta:
+        db_table = 'tax_profile'
+        ordering = ['tax_profile_code']
+
+    def __str__(self):
+        return f"{self.tax_profile_code} — {self.name}"
+
+
+class IssuerType(ReferenceBase):
+    issuer_type_code = models.CharField(max_length=64, unique=True)
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default='')
+
+    class Meta:
+        db_table = 'issuer_type'
+        ordering = ['issuer_type_code']
+
+    def __str__(self):
+        return f"{self.issuer_type_code} — {self.name}"
+
+
+class Issuer(ReferenceBase):
+    issuer_code = models.CharField(max_length=64, unique=True)
+    name = models.CharField(max_length=255)
+    issuer_type = models.ForeignKey(
+        IssuerType, on_delete=models.PROTECT, related_name='issuers'
+    )
+    description = models.TextField(blank=True, default='')
+
+    class Meta:
+        db_table = 'issuer'
+        ordering = ['issuer_code']
+        indexes = [
+            models.Index(fields=['issuer_type'], name='idx_issuer_issuer_type_id'),
+        ]
+
+    def __str__(self):
+        return f"{self.issuer_code} — {self.name}"
+
+
+class InstrumentTemplate(ReferenceBase):
+    INSTRUMENT_KIND_CHOICES = [
+        ('listed', 'Listed'),
+        ('fixed_income', 'Fixed Income'),
+        ('fund', 'Fund'),
+        ('crypto', 'Crypto'),
+        ('other', 'Other'),
+    ]
+
+    template_code = models.CharField(max_length=64, unique=True)
+    instrument_kind = models.CharField(max_length=32, choices=INSTRUMENT_KIND_CHOICES)
+    short_name = models.CharField(max_length=255)
+    long_name = models.CharField(max_length=512, blank=True, default='')
+    cnpj = models.CharField(max_length=32, blank=True, default='')
+    b3_listed = models.BooleanField(null=True, blank=True)
+    is_bdr = models.BooleanField(null=True, blank=True)
+    yearly_fee_pct = models.DecimalField(
+        max_digits=8, decimal_places=4, null=True, blank=True
+    )
+    performance_fee_pct = models.DecimalField(
+        max_digits=8, decimal_places=4, null=True, blank=True
+    )
+    has_fgc = models.BooleanField(null=True, blank=True)
+    requires_expiry_date = models.BooleanField(default=False)
+    requires_issuer_or_issuer_type = models.BooleanField(default=False)
+
+    primary_economic_exposure = models.ForeignKey(
+        EconomicExposure, on_delete=models.PROTECT,
+        null=True, blank=True, related_name='templates_primary'
+    )
+    economic_exposure_weights_json = models.JSONField(null=True, blank=True)
+
+    tax_profile = models.ForeignKey(
+        TaxProfile, on_delete=models.PROTECT, related_name='templates'
+    )
+
+    primary_issuer_type = models.ForeignKey(
+        IssuerType, on_delete=models.PROTECT,
+        null=True, blank=True, related_name='templates_primary'
+    )
+    issuer_type_weights_json = models.JSONField(null=True, blank=True)
+
+    issuer = models.ForeignKey(
+        Issuer, on_delete=models.PROTECT,
+        null=True, blank=True, related_name='templates'
+    )
+
+    class Meta:
+        db_table = 'instrument_template'
+        ordering = ['template_code']
+        indexes = [
+            models.Index(fields=['tax_profile'], name='idx_it_tax_profile_id'),
+            models.Index(fields=['primary_economic_exposure'], name='idx_it_prim_econ_exp_id'),
+            models.Index(fields=['primary_issuer_type'], name='idx_it_prim_issuer_type_id'),
+            models.Index(fields=['issuer'], name='idx_it_issuer_id'),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        primary_economic_exposure__isnull=False,
+                        economic_exposure_weights_json__isnull=True,
+                    ) | models.Q(
+                        primary_economic_exposure__isnull=True,
+                        economic_exposure_weights_json__isnull=False,
+                    )
+                ),
+                name='chk_exposure_source',
+            ),
+            models.CheckConstraint(
+                condition=models.Q(yearly_fee_pct__isnull=True) | models.Q(yearly_fee_pct__gte=0),
+                name='chk_yearly_fee_non_negative',
+            ),
+            models.CheckConstraint(
+                condition=models.Q(performance_fee_pct__isnull=True) | models.Q(performance_fee_pct__gte=0),
+                name='chk_performance_fee_non_negative',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.template_code} — {self.short_name}"
+
+    def clean(self):
+        super().clean()
+        has_primary = self.primary_economic_exposure_id is not None
+        has_weights = self.economic_exposure_weights_json is not None
+        if has_primary == has_weights:
+            raise ValidationError(
+                'Exactly one of primary_economic_exposure or '
+                'economic_exposure_weights_json must be set.'
+            )
+        if has_weights:
+            _validate_weights_json(
+                self.economic_exposure_weights_json,
+                EconomicExposure, 'exposure_code',
+                'economic_exposure_weights_json',
+            )
+        if self.issuer_type_weights_json:
+            _validate_weights_json(
+                self.issuer_type_weights_json,
+                IssuerType, 'issuer_type_code',
+                'issuer_type_weights_json',
+            )
+        if self.yearly_fee_pct is not None and self.yearly_fee_pct < 0:
+            raise ValidationError({'yearly_fee_pct': 'Must be non-negative.'})
+        if self.performance_fee_pct is not None and self.performance_fee_pct < 0:
+            raise ValidationError({'performance_fee_pct': 'Must be non-negative.'})
+
+
+def _validate_weights_json(data, model_class, code_field, field_name):
+    if not isinstance(data, dict):
+        raise ValidationError({field_name: 'Must be a JSON object.'})
+    if not data:
+        raise ValidationError({field_name: 'Must not be empty.'})
+    total = 0.0
+    for code, weight in data.items():
+        if not isinstance(weight, (int, float)):
+            raise ValidationError(
+                {field_name: f'Weight for "{code}" must be numeric.'}
+            )
+        if weight <= 0:
+            raise ValidationError(
+                {field_name: f'Weight for "{code}" must be positive.'}
+            )
+        if not model_class.objects.filter(**{code_field: code, 'active': True}).exists():
+            raise ValidationError(
+                {field_name: f'Code "{code}" not found (or inactive) in {model_class.__name__}.'}
+            )
+        total += weight
+    if abs(total - 1.0) > 0.0005:
+        raise ValidationError(
+            {field_name: f'Weights sum to {total:.4f}, must be 1.0 (tolerance 0.0005).'}
+        )
+
+
+================================================================================
+# FILE: refdata/templates/refdata/widgets/weighted_json.html
+================================================================================
+<div id="wj_{{ widget.field_name }}" class="weighted-json-widget">
+  <table>
+    <thead><tr><th>Code</th><th>Weight</th><th></th></tr></thead>
+    <tbody id="wj_{{ widget.field_name }}_body">
+      {% for code, weight in widget.rows %}
+      <tr class="wj-row">
+        <td>
+          <select name="{{ widget.field_name }}_code">
+            <option value="">---</option>
+            {% for c in widget.available_codes %}
+            <option value="{{ c }}" {% if c == code %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td><input type="number" step="0.0001" min="0" max="1" name="{{ widget.field_name }}_weight" value="{{ weight }}"></td>
+        <td><button type="button" onclick="this.closest('tr').remove();wjUpdate_{{ widget.field_name }}()">Remove</button></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td><strong>Total:</strong></td>
+        <td><span id="wj_{{ widget.field_name }}_total">0</span></td>
+        <td><button type="button" onclick="wjAdd_{{ widget.field_name }}()">+ Add row</button></td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+<script>
+(function(){
+  var name = "{{ widget.field_name }}";
+  var codes = {{ widget.available_codes|safe }};
+  window['wjAdd_' + name] = function() {
+    var tbody = document.getElementById('wj_' + name + '_body');
+    var tr = document.createElement('tr');
+    tr.className = 'wj-row';
+    var opts = '<option value="">---</option>';
+    for (var i = 0; i < codes.length; i++) {
+      opts += '<option value="' + codes[i] + '">' + codes[i] + '</option>';
+    }
+    tr.innerHTML =
+      '<td><select name="' + name + '_code">' + opts + '</select></td>' +
+      '<td><input type="number" step="0.0001" min="0" max="1" name="' + name + '_weight" value="0"></td>' +
+      '<td><button type="button" onclick="this.closest(\'tr\').remove();wjUpdate_' + name + '()">Remove</button></td>';
+    tbody.appendChild(tr);
+    tr.querySelector('input').addEventListener('input', window['wjUpdate_' + name]);
+  };
+  window['wjUpdate_' + name] = function() {
+    var inputs = document.querySelectorAll('#wj_' + name + '_body input[name="' + name + '_weight"]');
+    var total = 0;
+    for (var i = 0; i < inputs.length; i++) total += parseFloat(inputs[i].value) || 0;
+    var el = document.getElementById('wj_' + name + '_total');
+    el.textContent = total.toFixed(4);
+    el.style.color = Math.abs(total - 1.0) < 0.001 ? 'green' : 'red';
+  };
+  document.querySelectorAll('#wj_' + name + '_body input').forEach(function(inp) {
+    inp.addEventListener('input', window['wjUpdate_' + name]);
+  });
+  window['wjUpdate_' + name]();
+})();
+</script>
+
+
+================================================================================
+# FILE: refdata/tests.py
+================================================================================
+from django.test import TestCase
+
+# Create your tests here.
+
+
+================================================================================
+# FILE: refdata/views.py
+================================================================================
+from django.shortcuts import render
+
+# Create your views here.
+
+
+================================================================================
+# FILE: refdata/widgets.py
+================================================================================
+import json
+from django.forms import Widget
+from django.utils.safestring import mark_safe
+
+
+class WeightedJsonWidget(Widget):
+    """Renders a JSON weight dict as editable rows with code dropdown + weight input."""
+
+    template_name = 'refdata/widgets/weighted_json.html'
+
+    def __init__(self, code_model, code_field, attrs=None):
+        super().__init__(attrs)
+        self.code_model = code_model
+        self.code_field = code_field
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except (json.JSONDecodeError, TypeError):
+                value = {}
+        if not isinstance(value, dict):
+            value = value or {}
+        codes = list(
+            self.code_model.objects.filter(active=True)
+            .values_list(self.code_field, flat=True)
+            .order_by(self.code_field)
+        )
+        context['widget'].update({
+            'rows': list(value.items()) if value else [],
+            'available_codes': codes,
+            'field_name': name,
+        })
+        return context
+
+    def value_from_datadict(self, data, files, name):
+        codes = data.getlist(f'{name}_code')
+        weights = data.getlist(f'{name}_weight')
+        result = {}
+        for code, weight in zip(codes, weights):
+            code = code.strip()
+            weight = weight.strip()
+            if code and weight:
+                try:
+                    result[code] = round(float(weight), 6)
+                except ValueError:
+                    pass
+        return result if result else None
+
+
+================================================================================
+# FILE: render.yaml
+================================================================================
+databases:
+  - name: xray-db
+    plan: free
+    databaseName: xray
+    user: xray
+
+services:
+  - type: web
+    name: xray-oryx
+    runtime: python
+    plan: free
+    buildCommand: |
+      pip install -r requirements.txt
+      python manage.py collectstatic --noinput
+      python manage.py migrate --noinput
+    startCommand: gunicorn xray.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: xray-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: "xray-oryx.onrender.com"
+      - key: PYTHON_VERSION
+        value: "3.12.3"
+
+
+================================================================================
+# FILE: requirements.txt
+================================================================================
+Django>=6.0,<7.0
+psycopg2-binary>=2.9,<3
+dj-database-url>=3.1,<4
+whitenoise>=6.7,<7
+gunicorn>=21,<26
+djangorestframework>=3.15,<4
+django-filter>=25.0,<26
+matplotlib>=3.6,<4
+numpy>=1.26,<3
+pandas>=2.1,<4
+
+
+================================================================================
+# FILE: test_portfolio.csv
+================================================================================
+instrument_template_code,weight,expiry_date,issuer_code,issuer_type_code
+cdb_cdi_generic,0.25,2029-06-15,banco_btg,
+fii_xpml11,0.10,,,
+ivvb11,0.15,,,
+mixed_global_fund,0.20,,,
+tesouro_ipca_generic,0.30,2035-05-15,,
+
+
+================================================================================
+# FILE: test_portfolio_full.csv
+================================================================================
+instrument_template_code,weight,expiry_date,issuer_code,issuer_type_code
+cdb_cdi_generic,0.10,2027-03-15,banco_itau,
+lci_generic,0.08,2026-09-20,banco_bradesco,
+tesouro_selic,0.05,2029-01-01,,
+tesouro_ipca_generic,0.12,2035-05-15,,
+tesouro_prefixado,0.05,2028-07-01,,
+debenture_infra,0.05,2032-06-30,,br_infrastructure
+bova11,0.10,,,
+petr4,0.05,,,
+ivvb11,0.10,,,
+fii_xpml11,0.08,,,
+mixed_global_fund,0.07,,,
+previdencia_rf,0.06,,,
+bitcoin_etf,0.04,,,
+bond_intl_fund,0.05,,,
+
+
+================================================================================
+# FILE: xray/asgi.py
+================================================================================
+"""
+ASGI config for xray project.
+
+It exposes the ASGI callable as a module-level variable named ``application``.
+
+For more information on this file, see
+https://docs.djangoproject.com/en/6.0/howto/deployment/asgi/
+"""
+
+import os
+
+from django.core.asgi import get_asgi_application
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'xray.settings')
+
+application = get_asgi_application()
+
+
+================================================================================
+# FILE: xray/settings.py
+================================================================================
+import os
+from pathlib import Path
+import dj_database_url
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-insecure-key-change-in-production')
+DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'rest_framework',
+    'django_filters',
+    'refdata',
+    'api',
+    'processing',
+]
+
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+ROOT_URLCONF = 'xray.urls'
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = 'xray.wsgi.application'
+
+DATABASES = {
+    'default': dj_database_url.config(
+        default='sqlite:///' + str(BASE_DIR / 'db.sqlite3'),
+        conn_max_age=600,
+    )
+}
+
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+]
+
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = 'America/Sao_Paulo'
+USE_I18N = True
+USE_TZ = True
+
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STORAGES = {
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# --- X-Ray specific ---
+XRAY_OUTPUT_DIR = os.environ.get('XRAY_OUTPUT_DIR', str(BASE_DIR / 'output'))
+XRAY_WEIGHT_TOLERANCE = 0.0005
+
+# --- DRF ---
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'api.pagination.StandardPagination',
+    'PAGE_SIZE': 50,
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+    'EXCEPTION_HANDLER': 'api.exceptions.custom_exception_handler',
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [],
+    'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.AllowAny'],
+}
+
+
+================================================================================
+# FILE: xray/urls.py
+================================================================================
+from django.contrib import admin
+from django.urls import path, include
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('api/v1/', include('api.urls')),
+]
+
+
+================================================================================
+# FILE: xray/wsgi.py
+================================================================================
+"""
+WSGI config for xray project.
+
+It exposes the WSGI callable as a module-level variable named ``application``.
+
+For more information on this file, see
+https://docs.djangoproject.com/en/6.0/howto/deployment/wsgi/
+"""
+
+import os
+
+from django.core.wsgi import get_wsgi_application
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'xray.settings')
+
+application = get_wsgi_application()
+
+

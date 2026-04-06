@@ -1,0 +1,40 @@
+# Portfolio X-Ray MVP — Implementation Description
+
+## What It Is
+Portfolio X-Ray is a deterministic mechanical service built as a Django + PostgreSQL monolith. It accepts a resolved portfolio CSV, expands each row through 5 reference tables, and emits a structured precursor bundle (ZIP) for downstream AI report generators. The system itself contains NO AI logic.
+
+## Architecture
+- **Framework:** Django 6.0 with PostgreSQL (deployed on Render at xray-oryx.onrender.com)
+- **3 Django apps:**
+  - `refdata` — 5 reference data models + Django Admin
+  - `api` — DRF REST API for AI agents to explore/populate the DB
+  - `processing` — CSV validation, row resolver, output generation, ZIP bundler
+
+## The 5 Reference Tables
+All tables share: code field (immutable), active flag, timestamps, and 6 angle-specific instruction text fields (diversification, liquidity, fees, tax, risk, performance).
+
+1. **economic_exposure** — Economic substance taxonomy. Groups: fixed_income, equity, real_estate, crypto. 9 seed rows.
+2. **tax_profile** — Tax treatment. 4 rows: general, tax_exempt, taxable_no_come_cotas, previdencia.
+3. **issuer_type** — Issuer families. 6 rows: br_government, br_bank, br_infrastructure, br_other, nonbr_government, nonbr_other.
+4. **issuer** — Specific issuers, each belonging to one issuer_type.
+5. **instrument_template** — Core table. Maps resolved assets with: instrument_kind (listed/fixed_income/fund/crypto/other), fees, FGC, expiry requirements, economic exposure (primary or weighted JSON), tax profile, issuer type (primary or weighted JSON), issuer.
+
+## How It Works
+1. Upstream team maps raw holdings to instrument_template_code
+2. CSV upload: instrument_template_code, weight, expiry_date, issuer_code, issuer_type_code
+3. System validates, resolves each row against reference tables, computes allocations
+4. Outputs: ZIP bundle with unrolled positions (CSV+JSON), 8 allocation tables, 6 angle-specific CSVs, HTML preview with SVG charts, report_input_bundle.json, coverage_summary.json
+
+## AI-Agent REST API
+- All CRUD at /api/v1/ with code-based lookup (not numeric IDs)
+- Schema discovery at /api/v1/schema/
+- Batch instruction updates at /api/v1/batch/instructions/
+- Health checks at /api/v1/health/references/
+- Idempotent POST (409 on duplicate), immutable code fields, deactivation guards
+
+## Key Constraints
+- Deterministic: same CSV + same DB = identical output
+- No AI in processing pipeline
+- No auto-normalization of weights
+- Soft-delete only (active=false)
+- Weighted JSON fields must sum to 1.0 (tolerance 0.0005)

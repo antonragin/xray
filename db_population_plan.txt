@@ -1,0 +1,1696 @@
+================================================================================
+PORTFOLIO X-RAY — DB POPULATION PLAN
+Based on analysis of 1,231 real client positions
+Reviewed by: Cloe (OpenAI gpt-5.4), Diana (Gemini 3.1 Pro), Alice (gpt-5.4-pro)
+Date: 2026-04-06
+================================================================================
+
+================================================================================
+SECTION 1: REAL POSITIONS ANALYSIS
+================================================================================
+
+REAL CLIENT PORTFOLIO POSITIONS ANALYSIS
+==========================================
+
+We have 1,231 position rows across 2 client data files (multiple clients).
+These need to be mapped to instrument_template entries in our X-Ray database.
+
+PRODUCT TYPES BY CATEGORY:
+
+1. TESOURO DIRETO (Government Direct - 81 positions)
+   - TESOURO DIRETO - LFT (35 pos) — Selic/pos-fixado, Tesouro Selic
+   - TESOURO DIRETO - NTN-B-P (39 pos) — IPCA+ sem juros semestrais
+   - TESOURO DIRETO - NTN-B (3 pos) — IPCA+ com juros semestrais
+   - TESOURO DIRETO - LTN (3 pos) — Prefixado
+   - TESOURO DIRETO - NTN-B1 (1 pos) — variant
+
+2. NTN-B SECONDARY MARKET (68 positions)
+   - NTN-B (56 pos) + NTNB (12 pos) — bought on secondary market, not Tesouro Direto
+
+3. CDB (59 positions)
+   - Various strategies: Pós-fixado (CDI), Pré-fixado, Inflação (IPCA+)
+   - Issuers: multiple banks (BTG, Bradesco, Banco Master, etc.)
+   - Has FGC coverage, requires expiry_date
+
+4. CRA (150 positions — largest category!)
+   - Certificado de Recebíveis do Agronegócio
+   - Strategies: Pós-fixado, Pré-fixado, Inflação
+   - Tax-exempt (isento de IR)
+   - 88 unique issuers including: FS BIO, RAIZEN, COFCO, MINERVA, JBS, etc.
+   - Has expiry_date
+
+5. CRI (44 positions)
+   - Certificado de Recebíveis Imobiliários
+   - Strategies: Pré-fixado, Inflação, Pós-fixado
+   - Tax-exempt
+   - 37 unique issuers
+
+6. DEBÊNTURE (124 positions)
+   - Mix of incentivada (tax-exempt per Lei 12.431) and regular (taxed)
+   - Strategies: Pós-fixado, Pré-fixado, Inflação
+   - 77 unique issuers including infrastructure companies
+   - Some are incentivadas (IR=0), some are regular (IR>0)
+
+7. CDCA (14 positions)
+   - Certificado de Direitos Creditórios do Agronegócio
+   - Similar to CRA but different legal structure
+
+8. LCA (17 positions) — Tax-exempt, bank-issued, FGC
+9. LCI (9 positions) — Tax-exempt, bank-issued, FGC
+10. COMPROMISSADA (7 positions) — Repo operations
+
+11. LISTED EQUITIES - BR (104 positions, 63 unique tickers)
+    Top holdings: BOVA11, VALE3, B3SA3, MBRF3, PRIO3, TOTS3, IVVB11
+    Includes ETFs: BOVA11, IVVB11, KDOL11, USTK11, GOLD11, B5P211, DEBB11
+    Includes BDRs: TSLA34, AURA33, XPBR31
+
+12. FII - Real Estate Funds (57 positions, 41 unique tickers)
+    BTLG11, HSML11, HGLG11, KNCR11, KNIP11, MCCI11, XPML11, etc.
+
+13. INVESTMENT FUNDS (288 positions, 94 unique fund names!)
+    Strategies: Pós-fixado (majority), Renda Variável, Retorno Absoluto (MM), Inflação, Alternativo
+    Types include:
+    - FIRF / FI Renda Fixa (credit, selic, infra)
+    - FIM / Multimercado (macro, credit, quantitative)
+    - FIA / Ações (equity, BDR)
+    - FIDC (credit receivables)
+    - FIP (private equity / infra)
+    - FII (imobiliário via funds)
+    - FIAGRO (agricultural)
+    - FIC (feeder funds)
+    - Previdência funds (PREV in name)
+    Top funds: BTG CDB Plus FIRF CrPr (23), BTG Tesouro Selic FIRFRefDI (19), Porto DI CrPr FIRef (17)
+
+14. COE (26 positions, 19 product types)
+    - Certificado de Operações Estruturadas
+    - Various underlying: US equities, gold, commodities, single stocks
+    - All from BTG Pactual or XP
+    - Has expiry_date
+
+15. CRYPTO (10 positions, 8 unique tokens)
+    - Bitcoin, Ethereum, Solana, AAVE, LINK, POLYGON, UNISWAP, Render
+
+16. CONTA CORRENTE (125 positions) — Cash balances, not investment
+17. DIVIDENDOS/JUROS (34 positions) — Dividend/interest receivables, not positions
+
+KEY CHALLENGE FOR instrument_template DESIGN:
+The central question is: how granular should templates be?
+
+Option A: One template per PRODUCT TYPE (e.g., "cra_pos_fixado", "cra_pre_fixado", "cra_inflacao")
+  - ~30-40 templates total
+  - Simple but loses issuer-specific detail
+
+Option B: One template per SPECIFIC ASSET (e.g., "cra_fs_bio_ipca_2029")
+  - ~400+ templates
+  - Maximum detail but massive admin burden
+
+Option C: Templates by product+strategy, with issuer supplied per CSV row
+  - ~50-80 templates
+  - Good balance: e.g., "cra_pos_fixado" template + issuer_code per row
+  - This is what the spec intended
+
+SPECIFIC QUESTIONS:
+1. How to handle the 150 CRAs with 88 different issuers? One template per strategy (cra_pos_fixado, cra_ipca, cra_pre) with issuer supplied per row?
+2. The 94 unique investment funds — should each fund be its own template (with CNPJ, fee data)? Or group by strategy?
+3. COEs are diverse (gold, US equities, single stocks). Each COE product is unique. Template per COE? Or one "coe_unresolved"?
+4. How to handle NTN-B bought on secondary market vs Tesouro Direto? Same underlying but different purchase mechanism.
+5. How to distinguish incentivada debentures (tax-exempt) from regular debentures (taxed)?
+6. ETFs (BOVA11, IVVB11) — each is a specific product. Template per ETF?
+7. Listed equities (63 tickers) — one generic template "equity_br_listed" or template per ticker?
+8. FIIs (41 tickers) — one generic template or per-FII template?
+
+
+================================================================================
+SECTION 2: CLOE'S DB POPULATION RECOMMENDATION
+================================================================================
+
+Below is the plan I would use.
+
+**Short answer first:**  
+Your best design is **hybrid**:
+
+- **Use generic templates by product + payoff/index family** for instruments where the **issuer and maturity vary per row** and the template is mainly describing mechanics:
+  - Tesouro
+  - CDB
+  - CRA
+  - CRI
+  - CDCA
+  - LCA
+  - LCI
+  - Compromissada
+  - Debêntures
+  - Common Brazilian equities
+  - BDRs
+
+- **Use dedicated templates per actual product** where the **wrapper itself matters** because of fee, CNPJ, strategy, or identity:
+  - ETFs
+  - FIIs
+  - Investment funds
+  - Crypto tokens
+  - COEs (at least per payoff family; ideally per marketed product type)
+
+That gives you a catalog that is still manageable, but preserves the right detail.
+
+---
+
+# 0. One important caveat
+
+You asked me to “be exhaustive” and list **every** `instrument_template` and **every** `issuer` entry needed.
+
+I can do that **fully for the template architecture and all category-level templates**.  
+But I **cannot truthfully enumerate every issuer row** or every dedicated fund/FII template from the summary alone, because you did **not include**:
+
+- the full distinct issuer list for the 150 CRAs / 44 CRIs / 124 debêntures / 14 CDCAs
+- the full 41 FII tickers
+- the full 94 fund names / CNPJs
+- the full ETF list beyond the examples shown
+- the 19 COE product type names
+
+So I’ll give you:
+
+1. the **complete recommended DB population design**,
+2. the **full base template catalog**,
+3. the **dedicated-template rules** for FIIs/funds/COEs,
+4. the **issuer population rules** and the issuers definitely known from your summary.
+
+If you paste the distinct names/tickers/CNPJs next, I can turn this into a literal seed file.
+
+---
+
+# 1. Recommended granularity by category
+
+| Category | Recommended granularity | Why |
+|---|---|---|
+| Tesouro Direto / NTN-B secondary | **One template per bond family** | Purchase channel is not part of the reference model; economic substance is the same |
+| CDB | **One template per rate family** | Issuer and maturity vary by row |
+| CRA | **One template per rate family** | 88 issuers; issuer belongs in row/issuer table |
+| CRI | **One template per rate family** | Same logic as CRA |
+| Debênture | **One template per tax regime + rate family** | Incentivada vs regular changes tax profile |
+| CDCA | **One template per rate family** | Issuer varies by row |
+| LCA / LCI | **One template per rate family** | Issuer and maturity vary by row |
+| Compromissada | **Generic template** | Short-term mechanical product |
+| Brazilian listed equities | **One generic template + issuer per row** | Avoid 63 templates while preserving issuer concentration |
+| BDRs | **One generic template + issuer per row** | Same logic as equities |
+| ETFs | **One template per ETF ticker** | Fee, exposure, and wrapper identity matter |
+| FIIs | **One template per FII ticker** | Strategy/fee/exposure materially differ by FII |
+| Investment funds | **One template per fund CNPJ/name** | CNPJ, fee, tax, and exposure differ materially |
+| COEs | **At least one template per payoff family / underlying family; ideally per product type** | COEs are structurally heterogeneous |
+| Crypto | **One template per token** | Token identity is the product |
+
+---
+
+# 2. First scope cut: what should NOT be loaded
+
+These should be **excluded upstream**, not mapped into templates:
+
+- `CONTA CORRENTE` cash balances
+- `DIVIDENDOS/JUROS` receivables
+
+Why: your spec explicitly forbids a cash bucket and this system is for investment positions, not ledger balances or receivables.
+
+---
+
+# 3. Core reference seeds you should definitely have
+
+You already defined these, but for completeness:
+
+## 3.1 economic_exposure
+Use exactly these 9:
+
+- `fi_cdi_br`
+- `fi_ipca_br`
+- `fi_prefixado_br`
+- `fi_international`
+- `eq_br`
+- `eq_international`
+- `re_br`
+- `re_international`
+- `crypto`
+
+## 3.2 tax_profile
+
+- `general`
+- `tax_exempt`
+- `taxable_no_come_cotas`
+- `previdencia`
+
+## 3.3 issuer_type
+
+- `br_government`
+- `br_bank`
+- `br_infrastructure`
+- `br_other`
+- `nonbr_government`
+- `nonbr_other`
+
+---
+
+# 4. Complete recommended `instrument_template` catalog
+
+I’ll separate this into:
+
+1. **Base generic templates** — fully enumerable now  
+2. **Dedicated product templates** — fully defined as a rule, with known examples
+
+---
+
+## 4.1 Government bonds — create these templates
+
+**Decision:**  
+Do **not** distinguish Tesouro Direto vs secondary market in `instrument_template`.  
+Use the same template families for both.
+
+### Templates
+
+| template_code | instrument_kind | short_name | economic_exposure | tax_profile | default issuer / issuer_type | requires_expiry_date | requires_issuer_or_issuer_type | yearly_fee_pct | performance_fee_pct |
+|---|---|---|---|---|---|---:|---:|---|---|
+| `tesouro_selic_generic` | `fixed_income` | Tesouro Selic | `fi_cdi_br` | `general` | issuer=`tesouro_nacional` / `br_government` | true | false | null | null |
+| `tesouro_ipca_principal_generic` | `fixed_income` | Tesouro IPCA+ Principal | `fi_ipca_br` | `general` | issuer=`tesouro_nacional` / `br_government` | true | false | null | null |
+| `tesouro_ipca_juros_generic` | `fixed_income` | Tesouro IPCA+ com Juros | `fi_ipca_br` | `general` | issuer=`tesouro_nacional` / `br_government` | true | false | null | null |
+| `tesouro_prefixado_generic` | `fixed_income` | Tesouro Prefixado | `fi_prefixado_br` | `general` | issuer=`tesouro_nacional` / `br_government` | true | false | null | null |
+
+### Mapping guidance
+- LFT → `tesouro_selic_generic`
+- NTN-B-P / Tesouro IPCA+ sem juros → `tesouro_ipca_principal_generic`
+- NTN-B / Tesouro IPCA+ com juros → `tesouro_ipca_juros_generic`
+- LTN → `tesouro_prefixado_generic`
+- NTN-B bought in secondary market → same IPCA template as above
+- `NTN-B1` → map to whichever IPCA family actually matches its coupon structure; **do not create a separate template unless truly needed**
+
+---
+
+## 4.2 Bank fixed income — create these templates
+
+**Decision:**  
+Templates are product + rate family.  
+**Issuer must come from the CSV row** whenever possible.
+
+| template_code | instrument_kind | short_name | economic_exposure | tax_profile | default issuer / issuer_type | requires_expiry_date | requires_issuer_or_issuer_type | yearly_fee_pct | performance_fee_pct | has_fgc |
+|---|---|---|---|---|---|---:|---:|---|---|---|
+| `cdb_cdi_generic` | `fixed_income` | CDB CDI | `fi_cdi_br` | `general` | none; row issuer expected (`br_bank`) | true | true | null | null | true |
+| `cdb_ipca_generic` | `fixed_income` | CDB IPCA+ | `fi_ipca_br` | `general` | none; row issuer expected (`br_bank`) | true | true | null | null | true |
+| `cdb_prefixado_generic` | `fixed_income` | CDB Prefixado | `fi_prefixado_br` | `general` | none; row issuer expected (`br_bank`) | true | true | null | null | true |
+| `lca_cdi_generic` | `fixed_income` | LCA CDI | `fi_cdi_br` | `tax_exempt` | none; row issuer expected (`br_bank`) | true | true | null | null | true |
+| `lca_ipca_generic` | `fixed_income` | LCA IPCA+ | `fi_ipca_br` | `tax_exempt` | none; row issuer expected (`br_bank`) | true | true | null | null | true |
+| `lca_prefixado_generic` | `fixed_income` | LCA Prefixado | `fi_prefixado_br` | `tax_exempt` | none; row issuer expected (`br_bank`) | true | true | null | null | true |
+| `lci_cdi_generic` | `fixed_income` | LCI CDI | `fi_cdi_br` | `tax_exempt` | none; row issuer expected (`br_bank`) | true | true | null | null | true |
+| `lci_ipca_generic` | `fixed_income` | LCI IPCA+ | `fi_ipca_br` | `tax_exempt` | none; row issuer expected (`br_bank`) | true | true | null | null | true |
+| `lci_prefixado_generic` | `fixed_income` | LCI Prefixado | `fi_prefixado_br` | `tax_exempt` | none; row issuer expected (`br_bank`) | true | true | null | null | true |
+| `compromissada_cdi_generic` | `fixed_income` | Operação Compromissada | `fi_cdi_br` | `general` | none; row issuer/counterparty expected | true | true | null | null | false |
+
+---
+
+## 4.3 CRA / CRI / CDCA — create these templates
+
+**Decision:**  
+Use **generic templates by product + rate family**.  
+The **economic-risk issuer** should come from the row.
+
+That means for CRA/CRI/CDCA, your `issuer` row should usually represent the **economic obligor / credit name** recognized in the report, not just the securitization shell, if the goal is concentration analysis that humans care about.
+
+### CRA
+
+| template_code | kind | short_name | exposure | tax | default issuer/type | expiry | issuer req | fees |
+|---|---|---|---|---|---|---:|---:|---|
+| `cra_cdi_generic` | `fixed_income` | CRA CDI | `fi_cdi_br` | `tax_exempt` | none; row issuer expected | true | true | null/null |
+| `cra_ipca_generic` | `fixed_income` | CRA IPCA+ | `fi_ipca_br` | `tax_exempt` | none; row issuer expected | true | true | null/null |
+| `cra_prefixado_generic` | `fixed_income` | CRA Prefixado | `fi_prefixado_br` | `tax_exempt` | none; row issuer expected | true | true | null/null |
+
+### CRI
+
+| template_code | kind | short_name | exposure | tax | default issuer/type | expiry | issuer req | fees |
+|---|---|---|---|---|---|---:|---:|---|
+| `cri_cdi_generic` | `fixed_income` | CRI CDI | `fi_cdi_br` | `tax_exempt` | none; row issuer expected | true | true | null/null |
+| `cri_ipca_generic` | `fixed_income` | CRI IPCA+ | `fi_ipca_br` | `tax_exempt` | none; row issuer expected | true | true | null/null |
+| `cri_prefixado_generic` | `fixed_income` | CRI Prefixado | `fi_prefixado_br` | `tax_exempt` | none; row issuer expected | true | true | null/null |
+
+### CDCA
+
+| template_code | kind | short_name | exposure | tax | default issuer/type | expiry | issuer req | fees |
+|---|---|---|---|---|---|---:|---:|---|
+| `cdca_cdi_generic` | `fixed_income` | CDCA CDI | `fi_cdi_br` | `tax_exempt` | none; row issuer expected | true | true | null/null |
+| `cdca_ipca_generic` | `fixed_income` | CDCA IPCA+ | `fi_ipca_br` | `tax_exempt` | none; row issuer expected | true | true | null/null |
+| `cdca_prefixado_generic` | `fixed_income` | CDCA Prefixado | `fi_prefixado_br` | `tax_exempt` | none; row issuer expected | true | true | null/null |
+
+---
+
+## 4.4 Debêntures — create these templates
+
+**Decision:**  
+Split by:
+
+- **tax regime**: incentivada vs regular
+- **rate family**: CDI / IPCA / prefixado
+
+This is one place where taxonomy **must** split, because tax materially changes downstream analysis.
+
+| template_code | instrument_kind | short_name | economic_exposure | tax_profile | default issuer/type | requires_expiry_date | requires_issuer_or_issuer_type | yearly_fee_pct | performance_fee_pct |
+|---|---|---|---|---|---|---:|---:|---|---|
+| `debenture_incentivada_cdi_generic` | `fixed_income` | Debênture Incentivada CDI | `fi_cdi_br` | `tax_exempt` | none; row issuer expected | true | true | null | null |
+| `debenture_incentivada_ipca_generic` | `fixed_income` | Debênture Incentivada IPCA+ | `fi_ipca_br` | `tax_exempt` | none; row issuer expected | true | true | null | null |
+| `debenture_incentivada_prefixado_generic` | `fixed_income` | Debênture Incentivada Prefixada | `fi_prefixado_br` | `tax_exempt` | none; row issuer expected | true | true | null | null |
+| `debenture_regular_cdi_generic` | `fixed_income` | Debênture CDI | `fi_cdi_br` | `general` | none; row issuer expected | true | true | null | null |
+| `debenture_regular_ipca_generic` | `fixed_income` | Debênture IPCA+ | `fi_ipca_br` | `general` | none; row issuer expected | true | true | null | null |
+| `debenture_regular_prefixado_generic` | `fixed_income` | Debênture Prefixada | `fi_prefixado_br` | `general` | none; row issuer expected | true | true | null | null |
+
+**Issuer type rule:**
+- use `br_infrastructure` for infrastructure names / concessionaires / utilities where appropriate
+- otherwise `br_other`
+
+---
+
+## 4.5 Listed equities and BDRs — create these templates
+
+**Decision:**  
+For common listed companies, do **not** create one template per ticker.  
+Create **generic templates** and load the **company as issuer**.
+
+This is exactly what the `issuer` table is for.
+
+| template_code | instrument_kind | short_name | economic_exposure | tax_profile | default issuer/type | requires_expiry_date | requires_issuer_or_issuer_type | yearly_fee_pct | performance_fee_pct | b3_listed | is_bdr |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| `equity_br_listed_generic` | `listed` | Ação Brasileira Listada | `eq_br` | `general` | none; row issuer expected (`br_other`) | false | true | null | null | true | false |
+| `bdr_equity_listed_generic` | `listed` | BDR de Ação Internacional | `eq_international` | `general` | none; row issuer expected (`nonbr_other`) | false | true | null | null | true | true |
+
+Examples:
+- VALE3 → `equity_br_listed_generic` + issuer=`vale`
+- B3SA3 → `equity_br_listed_generic` + issuer=`b3_sa`
+- PRIO3 → `equity_br_listed_generic` + issuer=`prio`
+- TSLA34 → `bdr_equity_listed_generic` + issuer=`tesla`
+- AURA33 → `bdr_equity_listed_generic` + issuer=`aura_minerals`
+- XPBR31 → `bdr_equity_listed_generic` + issuer=`xp_inc`
+
+---
+
+## 4.6 ETFs — create one template per ETF ticker
+
+**Decision:**  
+Yes, ETFs should be **dedicated templates per ticker**.
+
+Reason:
+- each ETF has its own fee
+- wrapper identity matters
+- exposure differs by ETF
+- no row-level field exists for “ticker” besides `instrument_template_code`
+
+### Templates definitely indicated by your summary
+
+| template_code | kind | short_name | exposure | tax | issuer/type | expiry | issuer req | yearly_fee_pct | perf_fee_pct | notes |
+|---|---|---|---|---|---|---:|---:|---|---|---|
+| `etf_bova11` | `listed` | BOVA11 | `eq_br` | `general` | none | false | false | product-specific | null | Brazilian equity ETF |
+| `etf_ivvb11` | `listed` | IVVB11 | `eq_international` | `general` | none | false | false | product-specific | null | International equity ETF |
+| `etf_kdol11` | `listed` | KDOL11 | `eq_international` | `general` | none | false | false | product-specific | null | International equity ETF |
+| `etf_ustk11` | `listed` | USTK11 | `eq_international` | `general` | none | false | false | product-specific | null | International equity ETF |
+| `etf_gold11` | `listed` | GOLD11 | **proxy = `eq_international`** | `general` | none | false | false | product-specific | null | Taxonomy mismatch; no commodity bucket in MVP |
+| `etf_b5p211` | `listed` | B5P211 | `fi_ipca_br` | `general` | none | false | false | product-specific | null | Fixed-income ETF despite listed wrapper |
+| `etf_debb11` | `listed` | DEBB11 | `fi_ipca_br` or product-specific weighted FI | `general` | none | false | false | product-specific | null | Debenture ETF |
+
+### Important note on GOLD11
+Your MVP taxonomy has **no commodities bucket**.  
+So `GOLD11` is a **known boundary mismatch**.
+
+Within the agreed MVP, I would:
+- keep it as a dedicated ETF template
+- map its exposure to the **least-bad proxy**, usually `eq_international`
+- add strong instructions in risk/performance/diversification saying this is a **commodity proxy outside the exposure taxonomy**
+
+That is not perfect, but it respects your non-negotiable boundary.
+
+---
+
+## 4.7 FIIs — recommended: one template per FII ticker
+
+**Decision:**  
+Use **one dedicated template per FII ticker**.
+
+Why:
+- FII strategy matters
+- admin fee matters
+- ticker is the product
+- 41 templates is not too many
+
+### Known FII templates from your summary
+
+| template_code | kind | short_name | exposure | tax | expiry | issuer req | yearly_fee_pct | perf_fee_pct |
+|---|---|---|---|---|---:|---:|---|---|
+| `fii_btlg11` | `listed` | BTLG11 | `re_br` | `general` | false | false | product-specific | usually null |
+| `fii_hsml11` | `listed` | HSML11 | `re_br` | `general` | false | false | product-specific | usually null |
+| `fii_hglg11` | `listed` | HGLG11 | `re_br` | `general` | false | false | product-specific | usually null |
+| `fii_kncr11` | `listed` | KNCR11 | `fi_cdi_br` | `general` | false | false | product-specific | usually null |
+| `fii_knip11` | `listed` | KNIP11 | `fi_ipca_br` | `general` | false | false | product-specific | usually null |
+| `fii_mcci11` | `listed` | MCCI11 | `fi_ipca_br` or product-specific weighted FI | `general` | false | false | product-specific | usually null |
+| `fii_xpml11` | `listed` | XPML11 | `re_br` | `general` | false | false | product-specific | usually null |
+
+### Rule for the remaining FIIs
+For every additional observed FII ticker, create:
+
+- `fii_<ticker_lower>`
+
+Examples:
+- `fii_abcd11`
+- `fii_efgh11`
+
+### Exposure rule for FIIs
+Do **not** force all FIIs into `re_br`.
+
+Use economic substance:
+
+- logistics / office / shopping / residential FIIs → `re_br`
+- paper FII CDI book → `fi_cdi_br`
+- paper FII IPCA book → `fi_ipca_br`
+- hybrid paper FII → weighted FI JSON
+- hybrid property FII → `re_br` unless clearly mostly credit
+
+This is better aligned with your “economic substance” model.
+
+---
+
+## 4.8 Investment funds — target state: one template per fund CNPJ
+
+**Decision:**  
+For investment funds, your **target state should be one template per actual fund / share class / CNPJ**.
+
+I would **not** stop at generic strategy-only templates as the end state.
+
+Why:
+- 94 unique funds is actually manageable
+- funds are exactly the kind of product where `cnpj`, `yearly_fee_pct`, `performance_fee_pct`, and tax behavior matter
+- a generic template loses too much
+
+So the practical answer is:
+
+- **target state:** one template per fund CNPJ/name
+- **migration fallback:** strategy-level generic templates for the long tail while you backfill
+
+### Recommended code convention for dedicated funds
+Best option:
+- `fund_cnpj_<14digits>`
+
+Alternative mnemonic option:
+- `fund_<normalized_name>`
+
+I strongly prefer **CNPJ-based** codes for funds, because names change more often than CNPJs.
+
+### Known funds you explicitly mentioned
+These should definitely get dedicated templates:
+
+| template_code | kind | short_name | exposure | tax | expiry | issuer req | yearly_fee_pct | perf_fee_pct | notes |
+|---|---|---|---|---|---:|---:|---|---|---|
+| `fund_btg_cdb_plus_firf_crpr` | `fund` | BTG CDB Plus FIRF CrPr | `fi_cdi_br` | `general` | false | false | actual | actual/null | dedicated |
+| `fund_btg_tesouro_selic_firf_refdi` | `fund` | BTG Tesouro Selic FIRF Ref DI | `fi_cdi_br` | `general` | false | false | actual | null | dedicated |
+| `fund_porto_di_crpr_firef` | `fund` | Porto DI CrPr FI Ref | `fi_cdi_br` | `general` | false | false | actual | null | dedicated |
+
+### Fund tax-profile rules
+Use:
+
+- `general` for open-end funds with come-cotas / regular taxable treatment
+- `taxable_no_come_cotas` for fund structures that truly fit that bucket
+- `previdencia` for previdência funds
+- `tax_exempt` only if genuinely appropriate, which is probably rare here
+
+### Practical fallback fund templates for migration
+These are useful while you are still building dedicated fund rows:
+
+| template_code | kind | short_name | exposure | tax_profile |
+|---|---|---|---|---|
+| `fund_rf_di_generic` | `fund` | Fundo RF DI | `fi_cdi_br` | `general` |
+| `fund_rf_credit_private_generic` | `fund` | Fundo RF Crédito Privado | `fi_cdi_br` | `general` |
+| `fund_rf_inflation_generic` | `fund` | Fundo RF Inflação | `fi_ipca_br` | `general` |
+| `fund_rf_infra_generic` | `fund` | Fundo RF Infra | `fi_ipca_br` or weighted FI | `general` |
+| `fund_multimercado_macro_generic` | `fund` | Fundo Multimercado Macro | weighted | `general` |
+| `fund_multimercado_quant_generic` | `fund` | Fundo Multimercado Quant | weighted | `general` |
+| `fund_multimercado_credit_generic` | `fund` | Fundo Multimercado Crédito | weighted | `general` |
+| `fund_multimercado_global_generic` | `fund` | Fundo Multimercado Global | weighted | `general` |
+| `fund_equity_br_generic` | `fund` | Fundo de Ações BR | `eq_br` | `taxable_no_come_cotas` |
+| `fund_equity_international_generic` | `fund` | Fundo de Ações Internacional | `eq_international` | `taxable_no_come_cotas` |
+| `fund_equity_bdr_generic` | `fund` | Fundo de Ações BDR | `eq_international` | `taxable_no_come_cotas` |
+| `fund_fidc_generic` | `fund` | FIDC | `fi_cdi_br` | `taxable_no_come_cotas` |
+| `fund_fip_private_equity_generic` | `fund` | FIP Private Equity | `eq_br` | `taxable_no_come_cotas` |
+| `fund_fip_infra_generic` | `fund` | FIP Infra | `eq_br` or weighted | `taxable_no_come_cotas` |
+| `fund_fii_generic` | `fund` | Fundo Imobiliário Não Listado | `re_br` | `general` |
+| `fund_fiagro_debt_generic` | `fund` | FIAGRO Dívida | `fi_cdi_br` or `fi_ipca_br` | `general` |
+| `fund_fiagro_equity_generic` | `fund` | FIAGRO Equity | `re_br` | `general` |
+| `fund_previdencia_rf_generic` | `fund` | Previdência RF | `fi_cdi_br` | `previdencia` |
+| `fund_previdencia_multimercado_generic` | `fund` | Previdência Multimercado | weighted | `previdencia` |
+| `fund_previdencia_equity_br_generic` | `fund` | Previdência Ações BR | `eq_br` | `previdencia` |
+| `fund_previdencia_equity_international_generic` | `fund` | Previdência Ações Internacional | `eq_international` | `previdencia` |
+
+**Important:** these are **fallbacks**, not the preferred end state.
+
+---
+
+## 4.9 COEs — use family templates at minimum, product templates if feasible
+
+**Decision:**  
+Do **not** use only one `coe_unresolved`.
+
+You already know there are:
+- 26 positions
+- 19 product types
+- underlyings include US equities, gold, commodities, single stocks
+
+That is enough variation to justify a more structured COE catalog.
+
+### Best option
+Create **one template per recurring product type / payoff family**.
+
+### Minimum acceptable option
+Create a family catalog like this:
+
+| template_code | kind | short_name | economic_exposure | tax | default issuer/type | expiry | issuer req | fees |
+|---|---|---|---|---|---|---:|---:|---|
+| `coe_capital_protected_us_equity_basket` | `other` | COE Capital Protegido Ações EUA | weighted `{fi_cdi_br, eq_international}` | `general` | row issuer expected (`br_bank`) | true | true | null/null |
+| `coe_capital_protected_single_stock` | `other` | COE Capital Protegido Ação Única | weighted | `general` | row issuer expected (`br_bank`) | true | true | null/null |
+| `coe_capital_protected_gold` | `other` | COE Capital Protegido Ouro | weighted proxy `{fi_cdi_br, eq_international}` | `general` | row issuer expected (`br_bank`) | true | true | null/null |
+| `coe_capital_protected_commodities` | `other` | COE Capital Protegido Commodities | weighted proxy `{fi_cdi_br, eq_international}` | `general` | row issuer expected (`br_bank`) | true | true | null/null |
+| `coe_autocall_us_equity_basket` | `other` | COE Autocall Ações EUA | weighted `{fi_cdi_br, eq_international}` | `general` | row issuer expected (`br_bank`) | true | true | null/null |
+| `coe_autocall_single_stock` | `other` | COE Autocall Ação Única | weighted | `general` | row issuer expected (`br_bank`) | true | true | null/null |
+| `coe_digital_us_equity` | `other` | COE Digital Ações EUA | weighted | `general` | row issuer expected (`br_bank`) | true | true | null/null |
+| `coe_other_unresolved` | `other` | COE Outros / Não Classificado | weighted proxy | `general` | row issuer expected (`br_bank`) | true | true | null/null |
+
+### COE weighting guidance
+Because COEs combine protection + option payoff, the cleanest MVP approximation is weighted exposure, e.g.:
+
+- capital protected equity COE: `{ "fi_cdi_br": 0.80, "eq_international": 0.20 }`
+- more directional/autocall equity COE: `{ "fi_cdi_br": 0.60, "eq_international": 0.40 }`
+
+For gold/commodity-linked COEs, same warning as `GOLD11`: the taxonomy is imperfect.
+
+---
+
+## 4.10 Crypto — create one template per token
+
+| template_code | kind | short_name | exposure | tax | expiry | issuer req | yearly_fee_pct | perf_fee_pct |
+|---|---|---|---|---|---:|---:|---|---|
+| `crypto_btc` | `crypto` | Bitcoin | `crypto` | `general` | false | false | null | null |
+| `crypto_eth` | `crypto` | Ethereum | `crypto` | `general` | false | false | null | null |
+| `crypto_sol` | `crypto` | Solana | `crypto` | `general` | false | false | null | null |
+| `crypto_aave` | `crypto` | AAVE | `crypto` | `general` | false | false | null | null |
+| `crypto_link` | `crypto` | Chainlink | `crypto` | `general` | false | false | null | null |
+| `crypto_polygon` | `crypto` | Polygon | `crypto` | `general` | false | false | null | null |
+| `crypto_uniswap` | `crypto` | Uniswap | `crypto` | `general` | false | false | null | null |
+| `crypto_render` | `crypto` | Render | `crypto` | `general` | false | false | null | null |
+
+---
+
+# 5. What this means in template-count terms
+
+## Base catalog you can seed immediately
+Roughly:
+
+- Government bonds: 4
+- Bank paper / repo: 10
+- CRA/CRI/CDCA: 9
+- Debêntures: 6
+- Generic listed equity / BDR: 2
+- Known ETFs from summary: 7
+- Crypto: 8
+- COE family templates: 8
+- Fund fallback templates: 21
+
+That is **75 explicit templates** you can seed now.
+
+## Dedicated templates to add from the actual inventories
+Then add:
+
+- **1 per observed FII ticker**: ~41
+- **1 per observed fund CNPJ/name**: ~94
+- **1 per additional ETF ticker not listed in your summary**
+- **1 per COE product type**, if you go beyond family templates
+
+That puts your real catalog in the **~180–220 template** range, which is still totally reasonable for this system.
+
+That is much better than 400+ “one template per every bond series / asset line item,” and much better than an over-collapsed 30-template catalog.
+
+---
+
+# 6. `issuer` table population plan
+
+Again: I cannot literally list all issuer rows because the distinct lists are not in your prompt.  
+But here is the **correct issuer loading strategy**.
+
+## 6.1 Issuers you definitely need from the summary
+
+| issuer_code | name | issuer_type_code |
+|---|---|---|
+| `tesouro_nacional` | Tesouro Nacional | `br_government` |
+| `banco_btg_pactual` | Banco BTG Pactual | `br_bank` |
+| `banco_bradesco` | Banco Bradesco | `br_bank` |
+| `banco_master` | Banco Master | `br_bank` |
+| `banco_xp` | Banco XP | `br_bank` |
+| `fs_bio` | FS Bio | `br_other` |
+| `raizen` | Raízen | `br_other` |
+| `cofco` | COFCO | `br_other` or `nonbr_other` depending on actual issuer entity |
+| `minerva` | Minerva | `br_other` |
+| `jbs` | JBS | `br_other` |
+| `vale` | Vale | `br_other` |
+| `b3_sa` | B3 S.A. | `br_other` |
+| `marfrig` | Marfrig | `br_other` |
+| `prio` | PRIO | `br_other` |
+| `totvs` | TOTVS | `br_other` |
+| `tesla` | Tesla, Inc. | `nonbr_other` |
+| `aura_minerals` | Aura Minerals | `nonbr_other` |
+| `xp_inc` | XP Inc. | `nonbr_other` |
+
+## 6.2 Full issuer load rules
+
+Create one issuer row for:
+
+1. **Sovereigns**
+   - `tesouro_nacional`
+
+2. **Every bank/counterparty** appearing in:
+   - CDB
+   - LCA
+   - LCI
+   - compromissada
+   - COE
+
+3. **Every economic-risk name** appearing in:
+   - CRA
+   - CRI
+   - CDCA
+   - debêntures
+
+4. **Every listed company / BDR underlying** if you adopt generic stock/BDR templates
+
+## 6.3 Approximate issuer-row count
+You’ll likely end up with something like:
+
+- 1 sovereign
+- 10–20 banks
+- 130–170 corporate credit issuers after dedupe
+- 60–70 listed-company issuers if using generic equity/BDR templates
+
+So call it roughly **200–260 issuer rows**.  
+That is still very manageable.
+
+## 6.4 Issuer-type assignment rules
+
+Use these rules mechanically:
+
+- Tesouro / sovereign → `br_government`
+- domestic banks → `br_bank`
+- infrastructure concessionary / utility / energia / saneamento / rodovia names used in incentivada logic → `br_infrastructure`
+- other domestic corporates / agro / industrial / retail / securitized economic-risk names → `br_other`
+- foreign corporates / BDR underlyings → `nonbr_other`
+- foreign sovereigns if ever needed → `nonbr_government`
+
+---
+
+# 7. Practical grouping strategy for the 94 investment funds
+
+## My recommendation
+For funds, the right target state is:
+
+> **One template per fund CNPJ/share class**
+
+This is the most natural use of `instrument_template` because fund-specific metadata matters:
+
+- `cnpj`
+- `yearly_fee_pct`
+- `performance_fee_pct`
+- tax behavior
+- exposure
+- often special instructions
+
+## If you need a phased rollout
+Use this rule:
+
+### Phase 1 — create dedicated templates for:
+- all funds with **>= 2 rows**
+- all funds with **material portfolio weight**
+- all funds with **performance fee**
+- all **previdência** funds
+- all funds whose name clearly identifies a distinct product family
+- all top holdings you already cited
+
+### Phase 2 — use generic family templates for the remaining long tail
+Then progressively promote them.
+
+## Which funds should definitely be individual templates?
+At minimum:
+- recurring BTG DI / Selic / CDB Plus funds
+- Porto DI fund
+- all previdência funds
+- all multimercados with perf fee
+- all FIPs / FIDCs / FIAGROs / unusual wrappers
+- any fund with a dedicated CNPJ that appears more than once
+
+So in practice, I think you will quickly converge to **most of the 94 funds being dedicated templates anyway**.
+
+---
+
+# 8. COE template strategy
+
+My view:
+
+- **Not** one `coe_unresolved`
+- **Best:** one template per recurring marketed COE product type
+- **Minimum:** one template per payoff family / underlying family plus one fallback unresolved
+
+Since you only have **19 product types**, I would lean toward:
+- either **19 dedicated COE templates**
+- or the **8-family catalog** I listed above if you need faster go-live
+
+If a COE appears only once but has a very distinct structure, it can still be a dedicated template.  
+Admin burden is low because there are only 19 types.
+
+---
+
+# 9. Direct answers to your 8 specific questions
+
+## 1. How to handle the 150 CRAs with 88 issuers?
+**Yes:** use one template per strategy family:
+
+- `cra_cdi_generic`
+- `cra_ipca_generic`
+- `cra_prefixado_generic`
+
+Then supply `issuer_code` per CSV row.
+
+That is exactly the right use of the model.
+
+---
+
+## 2. The 94 unique investment funds — each fund its own template or group by strategy?
+**Target state:** each fund gets its **own template**.
+
+Reason:
+- fund fees matter
+- CNPJ matters
+- tax behavior differs
+- strategy nuance differs
+- 94 is manageable
+
+**Practical rollout:** use generic strategy templates only as a temporary migration bridge.
+
+---
+
+## 3. COEs — template per COE product or one `coe_unresolved`?
+**Do not** use only one `coe_unresolved`.
+
+Use:
+- **per product type** if you can
+- otherwise **per payoff family / underlying family** with one fallback unresolved code
+
+Because COEs are too heterogeneous for one bucket.
+
+---
+
+## 4. NTN-B bought on secondary market vs Tesouro Direto — same or different?
+**Same template.**
+
+Use the same Tesouro IPCA family templates.  
+Purchase channel is not part of your reference model and should not create reference-data fragmentation.
+
+---
+
+## 5. How to distinguish incentivada debentures vs regular debentures?
+Use **different templates**, because tax profile differs:
+
+- `debenture_incentivada_*` → `tax_exempt`
+- `debenture_regular_*` → `general`
+
+This split is mandatory.
+
+---
+
+## 6. ETFs — each ETF a specific product?
+**Yes. One template per ETF ticker.**
+
+Examples:
+- `etf_bova11`
+- `etf_ivvb11`
+- `etf_b5p211`
+- `etf_debb11`
+
+This is the correct level of granularity.
+
+---
+
+## 7. Listed equities (63 tickers) — one generic template or one per ticker?
+Use **one generic Brazilian equity template** plus `issuer_code` per row:
+
+- `equity_br_listed_generic`
+
+That preserves concentration by company without exploding template count.
+
+For BDRs:
+- `bdr_equity_listed_generic`
+
+This is the cleanest design.
+
+---
+
+## 8. FIIs (41 tickers) — one generic template or per FII?
+**Recommended:** one template per FII ticker.
+
+Why:
+- FII strategy matters
+- fee matters
+- ticker is the actual product
+- 41 is manageable
+
+If you are under time pressure, you can temporarily use subtype generics, but I would treat that as a migration shortcut, not the target design.
+
+---
+
+# 10. Final recommended catalog shape
+
+If I were implementing this for your real portfolio, I would use this exact policy:
+
+## Generic templates
+Use generic-by-family for:
+- Tesouro
+- CDB
+- CRA
+- CRI
+- CDCA
+- LCA
+- LCI
+- Compromissada
+- Debêntures
+- BR listed equities
+- BDRs
+
+## Dedicated templates
+Use dedicated per actual product for:
+- ETFs
+- FIIs
+- Investment funds
+- Crypto tokens
+- COEs
+
+That is the best balance between:
+- admin effort
+- reporting fidelity
+- deterministic mapping
+- staying inside your MVP spec
+
+---
+
+# 11. If you want the literal seed files next
+
+If you send me any of these extracted distinct lists:
+
+- all unique issuer names
+- all unique FII tickers
+- all unique ETF tickers
+- all unique fund names + CNPJs
+- all COE product names/types
+
+I can turn this into:
+
+1. `instrument_template.csv` seed rows  
+2. `issuer.csv` seed rows  
+3. `upstream mapping rules` by category
+
+in a literal load-ready format.
+
+================================================================================
+SECTION 3: DIANA'S DB POPULATION RECOMMENDATION
+================================================================================
+
+Based on the system specification, the hard constraints of the MVP (exactly 5 tables, no AI resolution, no portfolio storage), and the realities of the Brazilian financial market, **Option C is absolutely the correct architectural choice**.
+
+The specification was explicitly designed to handle this exact scenario: keeping the `instrument_template` table small and manageable while using the CSV row-level `issuer_code`, `issuer_type_code`, and `expiry_date` to inject the necessary granularity.
+
+Here is the expert recommendation for populating the database and mapping these 1,231 positions efficiently.
+
+---
+
+### 1. Template Granularity: Generic vs. Specific
+**Recommendation:** A hybrid approach. Use **Generic Templates** for direct credit/equities and **Specific Templates** for Investment Funds.
+
+*   **Why Generic for FI/Credit/Equities?** The specification states: *"For fixed income... issuer are still supplied per uploaded row, not baked into the template."* You do not need 150 templates for CRAs. You need exactly 3 templates (`cra_pos_fixado`, `cra_ipca`, `cra_prefixado`), and you pass the issuer and maturity dynamically in the CSV. 
+*   **Why Specific for Funds?** Funds have unique CNPJs, management/performance fees, and highly specific mixed economic exposures. A generic "multimarket fund" template fails to capture the true risk exposure of an individual fund.
+
+### 2. Which Products Must Be Specific vs. Generic?
+**MUST BE SPECIFIC (One template per product):**
+*   **Investment Funds (94 templates):** Each of the 94 unique funds needs its own template. E.g., `fund_btg_cdb_plus_firf`, `fund_porto_di_firf`. This allows you to set `yearly_fee_pct`, map the exact `tax_profile` (FIA vs FIM), and use `economic_exposure_weights_json` if it's a mixed macro fund.
+*   **Highly Complex ETFs/BDRs:** If an ETF has mixed exposure or specific fees, make it a template (e.g., `etf_ivvb11`, `etf_bova11`).
+
+**MUST BE GENERIC (Shared templates):**
+*   **Tesouro Direto / NTN-B:** `tesouro_selic`, `tesouro_ipca`, `tesouro_ipca_juros`, `tesouro_prefixado`. 
+*   **Bank Credit:** `cdb_cdi`, `cdb_ipca`, `cdb_pre`, `lca_lci_cdi`, `lca_lci_ipca`.
+*   **Corporate Credit:** `cra_cri_cdi`, `cra_cri_ipca`, `cra_cri_pre`, `deb_incentivada_ipca`, `deb_regular_cdi`.
+*   **Listed Equities:** `equity_br_listed` (Use this single template for all 63 tickers, and just pass `issuer_code="vale3"` in the CSV row).
+*   **FIIs:** `fii_generic` (Use for all 41 tickers, pass the ticker as the `issuer_code`).
+*   **Crypto:** `crypto_generic`.
+*   **COE:** `coe_unresolved` (COEs are black boxes in this MVP. Map to `other` instrument kind, `requires_expiry_date=true`).
+
+### 3. How to Populate the Issuer Table
+Follow the 80/20 rule. **Do not create all 88 CRA issuers or 77 Debenture issuers.**
+*   **Essential Issuers (Add to DB):** Top 5 Banks (BTG, Itaú, Bradesco, etc.), Government (`tesouro_nacional`), Top 15 highly traded Equities/BDRs (Vale, Petrobras, B3, Tesla), and the Top 10 heavy-weight corporate issuers (e.g., JBS, Raizen, Minerva, Vale).
+*   **The Long Tail Strategy:** For a minor CRA issued by "FS BIO", **do not create an issuer record**. Simply leave `issuer_code` blank in the CSV and supply `issuer_type_code="br_infrastructure"`. The system's processing pipeline (Section 6, Rule 4) will seamlessly fall back to `br_infrastructure` and correctly calculate the allocation without polluting the database.
+
+### 4. Tax Profile Mapping (Brazilian Rules)
+The MVP has exactly 4 tax profiles. Here is how Brazilian products strictly map to them:
+
+*   **`general`** (Tabela Regressiva de IR, subject to Come-Cotas if applicable):
+    *   CDB, LTN, NTN-B, LFT, Compromissadas.
+    *   Debêntures Comuns (Regular).
+    *   FIRF (Fixed Income Funds) and FIM (Multimarket Funds).
+    *   COE.
+*   **`tax_exempt`** (Isento de IR para Pessoa Física):
+    *   CRA, CRI, CDCA.
+    *   LCA, LCI.
+    *   Debêntures Incentivadas (Lei 12.431).
+*   **`taxable_no_come_cotas`** (Tributação no resgate/venda, sem come-cotas):
+    *   Listed Equities BR / BDRs (15% swing trade / 20% day trade).
+    *   FIIs (Yield is exempt, but principal is taxed at 20%; in this framework, this bucket is safest, though some wealth managers proxy it as exempt).
+    *   FIA (Fundo de Ações) and ETFs (BOVA11, IVVB11).
+    *   Crypto.
+*   **`previdencia`**:
+    *   Any PGBL / VGBL fund.
+
+### 5. Economic Exposure Mapping
+Since the MVP has strictly 9 exposures and no cash bucket:
+
+*   **`fi_cdi_br`**: Tesouro Selic, CDB/LCA/CRA Pós-fixados, FIRF DI, Compromissadas.
+    *   *Workaround for the 125 "Conta Corrente" rows:* Map to a template called `cash_proxy` -> Exposure: `fi_cdi_br`, Issuer Type: `br_bank`, Maturity: 0 days. 
+*   **`fi_ipca_br`**: NTN-B, NTN-B-P, Debêntures/CRA/CRI IPCA.
+*   **`fi_prefixado_br`**: LTN, CDB/CRA Pré.
+*   **`eq_br`**: BR Listed Equities, BOVA11, FIA BR.
+*   **`eq_international`**: IVVB11, BDRs (TSLA34, AURA33), Global Equity Funds.
+*   **`re_br`**: FIIs, Real Estate Funds.
+*   **`crypto`**: BTC, ETH, Solana, etc.
+
+### 6. Minimum Viable Set of Templates (The "Day 1" Database)
+To process all 1,231 rows flawlessly, you only need to create approximately **115 templates**:
+
+**The ~21 Generic Product Templates:**
+1. `tesouro_selic`
+2. `tesouro_ipca` (sem juros)
+3. `tesouro_ipca_juros`
+4. `tesouro_prefixado`
+5. `cdb_cdi` (requires_expiry, has_fgc=True)
+6. `cdb_ipca` (requires_expiry, has_fgc=True)
+7. `cdb_pre` (requires_expiry, has_fgc=True)
+8. `lca_lci_cdi` (tax_profile=tax_exempt, has_fgc=True)
+9. `cra_cri_cdi` (tax_profile=tax_exempt)
+10. `cra_cri_ipca` (tax_profile=tax_exempt)
+11. `cra_cri_pre` (tax_profile=tax_exempt)
+12. `deb_incentivada_ipca` (tax_profile=tax_exempt)
+13. `deb_regular_cdi` (tax_profile=general)
+14. `deb_regular_ipca` (tax_profile=general)
+15. `equity_br_listed` (requires_issuer=True)
+16. `equity_intl_bdr`
+17. `fii_generic`
+18. `crypto_generic`
+19. `coe_unresolved` (requires_expiry_date=True)
+20. `cash_account_proxy` (exposure=fi_cdi_br)
+21. `receivables_proxy` (for dividendos/juros em trânsito)
+
+**The ~94 Specific Fund Templates:**
+*   `fund_cnpj_X` (e.g., `fund_btg_cdb_plus_firf`) — you will load these 94 rows into the database using the system's Django Admin or Batch API, setting their specific `yearly_fee_pct` and `economic_exposure_weights_json` if they are multimarket.
+
+### Summary Strategy for the Upstream CSV Team
+Instruct the upstream data parsing team to format the CSVs like this:
+*   **For a CRA by JBS:** `cra_cri_ipca, 0.05, 2029-05-15, jbs, `
+*   **For a CRA by obscure issuer:** `cra_cri_ipca, 0.02, 2027-10-10, , br_infrastructure` (skips the issuer table entirely!)
+*   **For Vale3 Equity:** `equity_br_listed, 0.08, , vale, `
+*   **For BTG FI Fund:** `fund_btg_cdb_plus_firf, 0.12, , , ` (Issuer is baked into the template's primary issuer type = br_bank).
+
+================================================================================
+SECTION 4: ALICE'S FINAL REVIEW & DEFINITIVE PLAN
+================================================================================
+
+## Bottom line
+
+Use a **hybrid catalog**:
+
+- **Generic templates** for direct instruments where the row itself carries the important variation:
+  - Tesouro
+  - CDB
+  - LCA / LCI
+  - CRA / CRI / CDCA
+  - Debêntures
+  - Compromissadas
+  - Direct BR equities
+  - Direct BDRs
+
+- **Dedicated templates per actual product** where product identity itself matters because of fee, CNPJ, wrapper, or payoff:
+  - ETFs
+  - FIIs
+  - Investment funds
+  - Crypto tokens
+  - COEs
+
+Overall, **Cloe is closer to the correct architecture**.  
+**Diana is right on some tax-profile calls and on using row-level issuer/issuer_type fallback**, but she collapses too many products and she proposes cash/receivable proxies that violate the MVP boundary.
+
+---
+
+# 1) Conflict resolution
+
+## Final rulings where Cloe and Diana disagree
+
+| Topic | Final ruling | Why |
+|---|---|---|
+| Overall architecture | **Option C / hybrid is correct** | This is exactly what the spec was built for: generic direct-credit templates, dedicated wrapper/product templates where identity matters. |
+| Cash / conta corrente / dividend receivables | **Cloe correct: exclude upstream** | The spec explicitly forbids a cash bucket and these are not investment positions. Do **not** create `cash_proxy` or `receivables_proxy` in MVP. |
+| CRA / CRI / CDCA granularity | **Cloe correct: separate templates by product + rate family** | `CRA != CRI != CDCA`. Legal wrapper and instructions differ. Diana’s combined `cra_cri_*` is too coarse. |
+| LCA vs LCI | **Cloe correct: separate templates** | Same reason: similar economics, but different wrapper identity and instruction text. |
+| Debênture incentivada vs regular | **Both basically right; final = separate by tax regime + rate family** | Tax profile materially differs, so split is mandatory. |
+| Tesouro Direto vs secondary-market NTN-B | **Both right: same templates** | Purchase channel is not part of the reference model. |
+| Direct BR equities | **Hybrid: generic template + issuer per row** | One template per stock would be wasteful; one generic template preserves concentration via `issuer`. |
+| BDRs | **Hybrid: generic template + issuer per row** | Same logic as equities. |
+| ETFs | **Cloe correct: dedicated template per ETF ticker** | Fees, wrapper identity, and exposure differ materially; there is no row-level ticker field other than `instrument_template_code`. |
+| FIIs | **Cloe correct: dedicated template per FII ticker** | Same reason as ETFs. `fii_generic` is too lossy. |
+| Investment funds | **Both mostly agree; final = one template per fund CNPJ/share class** | This is the correct end state. Generic fund templates are only a temporary migration aid, not the final plan. |
+| Crypto | **Cloe correct: one template per token** | A single `crypto_generic` loses product identity and makes `allocation_by_instrument_template` unhelpful. Only 8 tokens exist here, so admin burden is tiny. |
+| COEs | **Closer to Cloe: not one `coe_unresolved`** | Because there are 19 product types. Final plan: one template per COE product type if product names/codes are available; otherwise family-level fallback, not single unresolved. |
+| Issuer-table population | **Cloe correct: load all known issuers, not just top names** | The system has `allocation_by_issuer.csv` and issuer coverage metrics. Diana’s “top issuers only” would knowingly destroy a key output. Use issuer-type fallback only where the issuer truly is unknown or not worth modeling. |
+| Tax profile for listed wrappers / crypto | **Diana correct here** | Listed equities, BDRs, ETFs, FIIs, and direct crypto fit **`taxable_no_come_cotas`** better than `general`. |
+| FII tax profile | **Diana correct** | FII distributions may be exempt, but the wrapper is not cleanly `tax_exempt`; `taxable_no_come_cotas` is the least-wrong MVP bucket. |
+| ETF tax profile | **Diana correct** | Exchange-traded wrapper; use `taxable_no_come_cotas`. |
+| Crypto tax profile | **Diana correct** | Use `taxable_no_come_cotas`. |
+
+## Final synthesis
+
+- **Cloe wins on granularity and MVP-boundary discipline.**
+- **Diana wins on tax-profile usage for listed wrappers / crypto and on using issuer_type fallback as a contingency.**
+- The executed plan should be: **Cloe’s catalog shape, plus Diana’s tax-profile corrections, while rejecting Diana’s cash proxies and “top issuers only” shortcut.**
+
+---
+
+# 2) Final instrument_template catalog
+
+## 2.1 Exact static templates to seed now
+
+These are the fixed templates I would create immediately.
+
+### A. Government bonds
+
+| template_code | kind | short_name | exposure | tax | issuer_type default | expiry | issuer req | yearly_fee | perf_fee | b3 | bdr | fgc |
+|---|---|---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|
+| `tesouro_selic_generic` | fixed_income | Tesouro Selic | `fi_cdi_br` | `general` | `br_government` | true | false | null | null | false | false | false |
+| `tesouro_ipca_principal_generic` | fixed_income | Tesouro IPCA+ Principal | `fi_ipca_br` | `general` | `br_government` | true | false | null | null | false | false | false |
+| `tesouro_ipca_juros_generic` | fixed_income | Tesouro IPCA+ com Juros | `fi_ipca_br` | `general` | `br_government` | true | false | null | null | false | false | false |
+| `tesouro_prefixado_generic` | fixed_income | Tesouro Prefixado | `fi_prefixado_br` | `general` | `br_government` | true | false | null | null | false | false | false |
+
+**Note:** set default `issuer_id = tesouro_nacional` on all 4.
+
+---
+
+### B. Bank paper + repo
+
+| template_code | kind | short_name | exposure | tax | issuer_type default | expiry | issuer req | yearly_fee | perf_fee | b3 | bdr | fgc |
+|---|---|---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|
+| `cdb_cdi_generic` | fixed_income | CDB CDI | `fi_cdi_br` | `general` | `br_bank` | true | true | null | null | false | false | true |
+| `cdb_ipca_generic` | fixed_income | CDB IPCA+ | `fi_ipca_br` | `general` | `br_bank` | true | true | null | null | false | false | true |
+| `cdb_prefixado_generic` | fixed_income | CDB Prefixado | `fi_prefixado_br` | `general` | `br_bank` | true | true | null | null | false | false | true |
+| `lca_cdi_generic` | fixed_income | LCA CDI | `fi_cdi_br` | `tax_exempt` | `br_bank` | true | true | null | null | false | false | true |
+| `lca_ipca_generic` | fixed_income | LCA IPCA+ | `fi_ipca_br` | `tax_exempt` | `br_bank` | true | true | null | null | false | false | true |
+| `lca_prefixado_generic` | fixed_income | LCA Prefixada | `fi_prefixado_br` | `tax_exempt` | `br_bank` | true | true | null | null | false | false | true |
+| `lci_cdi_generic` | fixed_income | LCI CDI | `fi_cdi_br` | `tax_exempt` | `br_bank` | true | true | null | null | false | false | true |
+| `lci_ipca_generic` | fixed_income | LCI IPCA+ | `fi_ipca_br` | `tax_exempt` | `br_bank` | true | true | null | null | false | false | true |
+| `lci_prefixado_generic` | fixed_income | LCI Prefixada | `fi_prefixado_br` | `tax_exempt` | `br_bank` | true | true | null | null | false | false | true |
+| `compromissada_cdi_generic` | fixed_income | Operação Compromissada | `fi_cdi_br` | `general` | `br_bank` | true | true | null | null | false | false | false |
+
+---
+
+### C. CRA / CRI / CDCA
+
+| template_code | kind | short_name | exposure | tax | issuer_type default | expiry | issuer req | yearly_fee | perf_fee | b3 | bdr | fgc |
+|---|---|---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|
+| `cra_cdi_generic` | fixed_income | CRA CDI | `fi_cdi_br` | `tax_exempt` | — | true | true | null | null | false | false | false |
+| `cra_ipca_generic` | fixed_income | CRA IPCA+ | `fi_ipca_br` | `tax_exempt` | — | true | true | null | null | false | false | false |
+| `cra_prefixado_generic` | fixed_income | CRA Prefixado | `fi_prefixado_br` | `tax_exempt` | — | true | true | null | null | false | false | false |
+| `cri_cdi_generic` | fixed_income | CRI CDI | `fi_cdi_br` | `tax_exempt` | — | true | true | null | null | false | false | false |
+| `cri_ipca_generic` | fixed_income | CRI IPCA+ | `fi_ipca_br` | `tax_exempt` | — | true | true | null | null | false | false | false |
+| `cri_prefixado_generic` | fixed_income | CRI Prefixado | `fi_prefixado_br` | `tax_exempt` | — | true | true | null | null | false | false | false |
+| `cdca_cdi_generic` | fixed_income | CDCA CDI | `fi_cdi_br` | `tax_exempt` | — | true | true | null | null | false | false | false |
+| `cdca_ipca_generic` | fixed_income | CDCA IPCA+ | `fi_ipca_br` | `tax_exempt` | — | true | true | null | null | false | false | false |
+| `cdca_prefixado_generic` | fixed_income | CDCA Prefixado | `fi_prefixado_br` | `tax_exempt` | — | true | true | null | null | false | false | false |
+
+**Rule:** for these, use row-level `issuer_code` whenever known. If not, row-level `issuer_type_code` is the fallback. Do **not** hard-code `br_other` into the template.
+
+---
+
+### D. Debêntures
+
+| template_code | kind | short_name | exposure | tax | issuer_type default | expiry | issuer req | yearly_fee | perf_fee | b3 | bdr | fgc |
+|---|---|---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|
+| `debenture_incentivada_cdi_generic` | fixed_income | Debênture Incentivada CDI | `fi_cdi_br` | `tax_exempt` | — | true | true | null | null | false | false | false |
+| `debenture_incentivada_ipca_generic` | fixed_income | Debênture Incentivada IPCA+ | `fi_ipca_br` | `tax_exempt` | — | true | true | null | null | false | false | false |
+| `debenture_incentivada_prefixado_generic` | fixed_income | Debênture Incentivada Prefixada | `fi_prefixado_br` | `tax_exempt` | — | true | true | null | null | false | false | false |
+| `debenture_regular_cdi_generic` | fixed_income | Debênture CDI | `fi_cdi_br` | `general` | — | true | true | null | null | false | false | false |
+| `debenture_regular_ipca_generic` | fixed_income | Debênture IPCA+ | `fi_ipca_br` | `general` | — | true | true | null | null | false | false | false |
+| `debenture_regular_prefixado_generic` | fixed_income | Debênture Prefixada | `fi_prefixado_br` | `general` | — | true | true | null | null | false | false | false |
+
+---
+
+### E. Direct listed equities and BDRs
+
+| template_code | kind | short_name | exposure | tax | issuer_type default | expiry | issuer req | yearly_fee | perf_fee | b3 | bdr | fgc |
+|---|---|---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|
+| `equity_br_listed_generic` | listed | Ação Brasileira Listada | `eq_br` | `taxable_no_come_cotas` | — | false | true | null | null | true | false | false |
+| `bdr_equity_listed_generic` | listed | BDR de Ação Internacional | `eq_international` | `taxable_no_come_cotas` | — | false | true | null | null | true | true | false |
+
+**Rule:** upstream should provide `issuer_code` for these rows.  
+Do **not** create one template per common stock ticker.
+
+---
+
+## 2.2 Dedicated ETF templates
+
+Create **one row per distinct ETF ticker observed**.
+
+### Known mandatory ETF rows from the brief
+
+| template_code | kind | short_name | exposure | tax | issuer_type | expiry | issuer req | yearly_fee | perf_fee | b3 | bdr | fgc |
+|---|---|---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|
+| `etf_bova11` | listed | BOVA11 | `eq_br` | `taxable_no_come_cotas` | — | false | false | null* | null | true | false | false |
+| `etf_ivvb11` | listed | IVVB11 | `eq_international` | `taxable_no_come_cotas` | — | false | false | null* | null | true | false | false |
+| `etf_kdol11` | listed | KDOL11 | `eq_international` | `taxable_no_come_cotas` | — | false | false | null* | null | true | false | false |
+| `etf_ustk11` | listed | USTK11 | `eq_international` | `taxable_no_come_cotas` | — | false | false | null* | null | true | false | false |
+| `etf_gold11` | listed | GOLD11 | `eq_international`** | `taxable_no_come_cotas` | — | false | false | null* | null | true | false | false |
+| `etf_b5p211` | listed | B5P211 | `fi_ipca_br` | `taxable_no_come_cotas` | — | false | false | null* | null | true | false | false |
+| `etf_debb11` | listed | DEBB11 | `fi_ipca_br`*** | `taxable_no_come_cotas` | — | false | false | null* | null | true | false | false |
+
+\* Backfill actual admin fee from B3/CVM docs before go-live if available.  
+\** Commodity proxy because MVP has no commodities bucket. Add strong instructions.  
+\*** If fund docs show a mixed debenture book, use weighted FI exposure instead.
+
+**Decision:** Diana’s “only complex ETFs need dedicated templates” is too conservative.  
+All ETFs get dedicated templates.
+
+---
+
+## 2.3 Dedicated FII templates
+
+Create **one template per observed FII ticker**.  
+Count from the brief: **41 templates**.
+
+### Code convention
+- `fii_<ticker_lower>`
+
+### Known mandatory examples
+
+| template_code | kind | short_name | exposure | tax | issuer_type | expiry | issuer req | yearly_fee | perf_fee | b3 | bdr | fgc |
+|---|---|---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|
+| `fii_btlg11` | listed | BTLG11 | `re_br` | `taxable_no_come_cotas` | — | false | false | null* | null | true | false | false |
+| `fii_hsml11` | listed | HSML11 | `re_br` | `taxable_no_come_cotas` | — | false | false | null* | null | true | false | false |
+| `fii_hglg11` | listed | HGLG11 | `re_br` | `taxable_no_come_cotas` | — | false | false | null* | null | true | false | false |
+| `fii_kncr11` | listed | KNCR11 | `fi_cdi_br` | `taxable_no_come_cotas` | — | false | false | null* | null | true | false | false |
+| `fii_knip11` | listed | KNIP11 | `fi_ipca_br` | `taxable_no_come_cotas` | — | false | false | null* | null | true | false | false |
+| `fii_mcci11` | listed | MCCI11 | `fi_ipca_br`** | `taxable_no_come_cotas` | — | false | false | null* | null | true | false | false |
+| `fii_xpml11` | listed | XPML11 | `re_br` | `taxable_no_come_cotas` | — | false | false | null* | null | true | false | false |
+
+\* Backfill fee fields if available.  
+\** If underlying book is genuinely hybrid, use weighted FI exposure.
+
+### FII exposure rule
+- Property/logistics/office/shopping/residential FIIs → `re_br`
+- Paper CDI FIIs → `fi_cdi_br`
+- Paper IPCA FIIs → `fi_ipca_br`
+- Hybrid paper FIIs → weighted FI JSON
+- Do **not** force all FIIs into `re_br`
+
+This is one of the places where Cloe is clearly right.
+
+---
+
+## 2.4 Dedicated investment-fund templates
+
+Create **one template per fund CNPJ/share class**.  
+Count from the brief: **94 templates**.
+
+### Code convention
+Preferred:
+- `fund_cnpj_<14digits>`
+
+Fallback only if CNPJ is unavailable at seed time:
+- `fund_<normalized_name>`
+
+### Known mandatory examples
+
+| template_code | kind | short_name | exposure | tax | issuer_type | expiry | issuer req | yearly_fee | perf_fee | b3 | bdr | fgc |
+|---|---|---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|
+| `fund_btg_cdb_plus_firf_crpr`* | fund | BTG CDB Plus FIRF CrPr | `fi_cdi_br` | `general` | — | false | false | null** | null** | false | false | false |
+| `fund_btg_tesouro_selic_firf_ref_di`* | fund | BTG Tesouro Selic FIRF Ref DI | `fi_cdi_br` | `general` | — | false | false | null** | null** | false | false | false |
+| `fund_porto_di_crpr_fi_ref`* | fund | Porto DI CrPr FI Ref | `fi_cdi_br` | `general` | — | false | false | null** | null** | false | false | false |
+
+\* If actual CNPJ is known, use `fund_cnpj_<digits>` instead of name-based code.  
+\** Backfill from fund docs.
+
+### Fund mapping rules
+For each of the 94 funds:
+
+- **FIRF / FI Referenciado DI / caixa / Selic / RF crédito / RF inflação / multimercado**  
+  → `instrument_kind = fund`  
+  → `tax_profile = general`  
+  → `exposure = primary or weighted`
+
+- **FIA / FIC FIA / equity-heavy funds**  
+  → `tax_profile = taxable_no_come_cotas`
+
+- **Previdência funds**  
+  → `tax_profile = previdencia`
+
+- **FIDC / FIP / special closed-end wrappers**  
+  → use actual legal-wrapper tax treatment; if no come-cotas, use `taxable_no_come_cotas`
+
+- **Global / balanced / macro funds**  
+  → use `economic_exposure_weights_json`
+
+### Important ruling
+Diana is right that funds should be specific.  
+Cloe is right that generic fund templates are only a **temporary bridge**, not the final executed catalog.
+
+---
+
+## 2.5 Dedicated crypto templates
+
+Create one template per token.
+
+| template_code | kind | short_name | exposure | tax | issuer_type | expiry | issuer req | yearly_fee | perf_fee | b3 | bdr | fgc |
+|---|---|---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|
+| `crypto_btc` | crypto | Bitcoin | `crypto` | `taxable_no_come_cotas` | — | false | false | null | null | false | false | false |
+| `crypto_eth` | crypto | Ethereum | `crypto` | `taxable_no_come_cotas` | — | false | false | null | null | false | false | false |
+| `crypto_sol` | crypto | Solana | `crypto` | `taxable_no_come_cotas` | — | false | false | null | null | false | false | false |
+| `crypto_aave` | crypto | AAVE | `crypto` | `taxable_no_come_cotas` | — | false | false | null | null | false | false | false |
+| `crypto_link` | crypto | Chainlink | `crypto` | `taxable_no_come_cotas` | — | false | false | null | null | false | false | false |
+| `crypto_polygon` | crypto | Polygon | `crypto` | `taxable_no_come_cotas` | — | false | false | null | null | false | false | false |
+| `crypto_uniswap` | crypto | Uniswap | `crypto` | `taxable_no_come_cotas` | — | false | false | null | null | false | false | false |
+| `crypto_render` | crypto | Render | `crypto` | `taxable_no_come_cotas` | — | false | false | null | null | false | false | false |
+
+Diana’s `crypto_generic` is not the right final design.
+
+---
+
+## 2.6 COE templates
+
+## Final ruling
+Create **one template per observed COE product type** if the source files contain stable COE product names/codes.  
+Count from the brief: **19 product types**.
+
+### Preferred code convention
+- `coe_<normalized_product_type>`
+- If the statement contains a stable BTG/XP product code, use that in the template code.
+
+### Shared field defaults for all COE templates
+- `instrument_kind = other`
+- `tax_profile_code = general`
+- `primary_issuer_type_code = br_bank`
+- `requires_expiry_date = true`
+- `requires_issuer_or_issuer_type = true`
+- `b3_listed = false`
+- `is_bdr = false`
+- `has_fgc = false`
+
+### Exposure rule
+Use weighted exposure JSON by payoff family, for example:
+
+- capital protected US equity basket  
+  `{"fi_cdi_br": 0.80, "eq_international": 0.20}`
+
+- autocall US equity basket  
+  `{"fi_cdi_br": 0.60, "eq_international": 0.40}`
+
+- digital / directional equity  
+  `{"fi_cdi_br": 0.50, "eq_international": 0.50}`
+
+- gold / commodity-linked COE  
+  use `eq_international` as the non-Brazil risk-asset proxy and document the taxonomy limitation in instructions
+
+### If the COE product names are still messy
+Use family fallback templates, **not** one `coe_unresolved`.
+
+---
+
+## 2.7 Minimum final catalog size
+
+Based on the brief:
+
+- Static generic direct templates: **31**
+- Known ETF templates: **7** minimum
+- FII templates: **41**
+- Investment fund templates: **94**
+- Crypto templates: **8**
+- COE product-type templates: **19**
+
+**Minimum expected final catalog: 200 templates**, assuming the 7 named ETFs are the full ETF set.  
+If distinct extraction finds more ETF tickers, add one template per extra ticker.
+
+---
+
+# 3) Final issuer list
+
+## Final rule
+Load **all distinct normalized issuers** for the **direct-holding categories**:
+
+1. **Tesouro**
+2. **All bank issuers / counterparties** for CDB / LCA / LCI / compromissada / COE
+3. **All corporate credit issuers** for CRA / CRI / CDCA / debêntures
+4. **All underlying companies** for direct equities and BDRs
+
+Do **not** truncate to “top issuers only”.
+
+## Why Diana’s issuer shortcut is wrong
+Because this system explicitly produces:
+
+- `allocation_by_issuer.csv`
+- issuer coverage metrics
+- row-level issuer context in diversification/risk
+
+If the issuer is known, load it.
+
+## Issuers definitely known from the brief
+
+### Sovereign
+| issuer_code | name | issuer_type_code |
+|---|---|---|
+| `tesouro_nacional` | Tesouro Nacional | `br_government` |
+
+### Banks / counterparties explicitly named
+| issuer_code | name | issuer_type_code |
+|---|---|---|
+| `banco_btg_pactual` | Banco BTG Pactual | `br_bank` |
+| `banco_bradesco` | Banco Bradesco | `br_bank` |
+| `banco_master` | Banco Master | `br_bank` |
+| `banco_xp` | Banco XP | `br_bank` |
+
+### Corporate credit issuers explicitly named
+| issuer_code | name | issuer_type_code |
+|---|---|---|
+| `fs_bio` | FS Bio | `br_other` |
+| `raizen` | Raízen | `br_other` |
+| `cofco_<resolved_entity>` | COFCO (resolved legal entity) | `br_other` or `nonbr_other` |
+| `minerva` | Minerva | `br_other` |
+| `jbs` | JBS | `br_other` |
+
+### Direct equity issuers explicitly named
+| issuer_code | name | issuer_type_code |
+|---|---|---|
+| `vale` | Vale | `br_other` |
+| `b3_sa` | B3 S.A. | `br_other` |
+| `marfrig` | Marfrig | `br_other` |
+| `prio` | PRIO | `br_other` |
+| `totvs` | TOTVS | `br_other` |
+
+### BDR underlyings explicitly named
+| issuer_code | name | issuer_type_code |
+|---|---|---|
+| `tesla_inc` | Tesla, Inc. | `nonbr_other` |
+| `aura_minerals` | Aura Minerals | `nonbr_other` |
+| `xp_inc` | XP Inc. | `nonbr_other` |
+
+## Final issuer-load policy by category
+
+### Must load all distinct issuers from:
+- CDB
+- LCA
+- LCI
+- compromissadas
+- COEs
+- CRA
+- CRI
+- CDCA
+- debêntures
+- direct equities
+- direct BDRs
+
+### Usually do **not** need issuer rows for:
+- ETFs
+- FIIs
+- investment funds
+- crypto tokens
+
+Those are modeled as dedicated templates, not issuers.
+
+## Important issuer modeling note
+For CRA / CRI / CDCA, prefer the **economic-risk name** if that is what the advisor/client actually cares about for concentration analysis.  
+Only fall back to the securitization shell if that is all the upstream team can resolve.
+
+---
+
+# 4) Issuer type additions
+
+## Final answer: **No additions needed**
+
+The existing 6 are sufficient:
+
+- `br_government`
+- `br_bank`
+- `br_infrastructure`
+- `br_other`
+- `nonbr_government`
+- `nonbr_other`
+
+## Classification guidance
+- Use `br_infrastructure` only for actual infrastructure/concession/utilities names, **not** as a synonym for “tax-exempt credit”.
+- Most CRA / CRI / CDCA / non-infra debênture names will be `br_other`.
+- Foreign stock/BDR underlyings go to `nonbr_other`.
+
+Do **not** add:
+- `br_securitizer`
+- `fund_manager`
+- `fii_manager`
+- `commodity_issuer`
+- `crypto_protocol`
+
+Those would be outside the MVP intent.
+
+---
+
+# 5) Economic exposure additions
+
+## Final answer: **No additions needed**
+
+The existing 9 are enough for MVP:
+
+- `fi_cdi_br`
+- `fi_ipca_br`
+- `fi_prefixado_br`
+- `fi_international`
+- `eq_br`
+- `eq_international`
+- `re_br`
+- `re_international`
+- `crypto`
+
+## But use them carefully
+
+### Known boundary mismatches
+- **GOLD11 / commodity-linked COEs**  
+  No commodities bucket exists.  
+  Use `eq_international` as the proxy and put the caveat into instructions.
+
+- **Private equity / FIP funds**  
+  Use `eq_br` or `eq_international` depending on geography.
+
+- **FIAGRO**  
+  - debt-like → `fi_cdi_br` / `fi_ipca_br`
+  - land/equity-like → `re_br`
+
+- **Paper FIIs**  
+  Often `fi_cdi_br` / `fi_ipca_br`, not `re_br`.
+
+### What not to do
+Do **not** add:
+- `cash`
+- `commodities`
+- `alternatives`
+- `structured`
+
+That would violate the agreed MVP boundary.
+
+---
+
+# 6) Coverage verification
+
+## Short answer
+### All **investment** positions named in the brief can be mapped with this design.
+### But **not all 1,231 raw rows should enter X-Ray**.
+
+## Critical count issue
+The category counts you provided sum to **1,217**, not **1,231**.
+
+So before execution, you must reconcile a **14-row gap**.
+
+## Out-of-scope rows
+You explicitly listed:
+
+- `CONTA CORRENTE`: **125**
+- `DIVIDENDOS/JUROS`: **34**
+
+That is **159 rows** that should be excluded upstream.
+
+## Therefore
+If 1,231 is the true raw-row total:
+
+- raw rows = **1,231**
+- out-of-scope non-investment rows = **159**
+- expected in-scope investment rows = **1,072**
+
+But based on your category breakdown as written:
+
+- listed categories total = **1,217**
+- after excluding 159 non-investment rows = **1,058**
+
+So there is still a **14-row discrepancy** to resolve.
+
+## Final verification statement
+- **Yes**, the catalog above covers every named **investment category** in the brief.
+- **No**, the raw 1,231 cannot all be loaded into X-Ray as-is under strict MVP, because 159 are non-investment rows and should be filtered upstream.
+- **Before go-live**, reconcile the missing 14 rows and confirm whether they are:
+  - omitted investment positions,
+  - more non-investment rows,
+  - or count/reporting error.
+
+---
+
+# 7) Implementation priority
+
+## Phase 0 — do this before any manual DB work
+Run a deterministic extraction from the 2 source files to produce:
+
+1. distinct ETF tickers
+2. distinct FII tickers
+3. distinct fund CNPJs / share classes
+4. distinct COE product names/codes
+5. distinct direct-holding issuers
+6. explicit reject list for cash / receivables / other out-of-scope rows
+7. reconciliation of the 14-row discrepancy
+
+This is the real first step.
+
+## Phase 1 — seed the three small core tables
+1. `economic_exposure`
+2. `tax_profile`
+3. `issuer_type`
+
+## Phase 2 — populate `issuer`
+Load:
+- Tesouro
+- all banks/counterparties
+- all direct-credit issuers
+- all direct equity/BDR underlyings
+
+## Phase 3 — create the 31 static generic templates
+These unlock immediate mapping for all direct fixed income and direct stock rows.
+
+## Phase 4 — create dedicated wrapper templates
+In this order:
+1. ETFs
+2. FIIs
+3. crypto
+4. funds
+5. COEs
+
+## Phase 5 — backfill quality fields
+Prioritize:
+- fees on funds / ETFs / FIIs
+- CNPJ on funds
+- exposure weights on mixed funds / COEs
+- instruction texts for tax / risk / performance
+
+## Phase 6 — dry-run processing
+Run:
+- a small representative portfolio
+- then the full extracted in-scope portfolio
+- then health checks
+
+---
+
+# 8) Edge cases and solutions
+
+## 1. Cash balances and dividend receivables
+**Problem:** not valid investment positions for this MVP.  
+**Solution:** reject upstream; keep them in a sidecar reconciliation report, not in X-Ray templates.
+
+## 2. 14-row discrepancy
+**Problem:** counts don’t reconcile.  
+**Solution:** mandatory pre-load inventory reconciliation.
+
+## 3. GOLD11 and commodity-linked COEs
+**Problem:** no commodity exposure bucket.  
+**Solution:** use `eq_international` proxy + explicit instruction warnings.
+
+## 4. Paper FIIs
+**Problem:** many people lazily map all FIIs to `re_br`.  
+**Solution:** don’t. KNCR11/KNIP11/MCCI11-style vehicles should use FI exposure where appropriate.
+
+## 5. Debênture incentivada vs regular
+**Problem:** if upstream doesn’t distinguish them, tax analysis breaks.  
+**Solution:** upstream must classify instrument tax status before producing `instrument_template_code`.
+
+## 6. Tesouro Direto vs secondary-market NTN-B
+**Problem:** teams may want separate templates because purchase channel differs.  
+**Solution:** do not separate. Same economic product.
+
+## 7. Listed-export category mixing
+**Problem:** your “listed equities” bucket already includes ETFs and BDRs.  
+**Solution:** split by actual wrapper before mapping:
+- direct BR equity → `equity_br_listed_generic`
+- BDR → `bdr_equity_listed_generic`
+- ETF → dedicated ETF template
+
+## 8. Fund naming instability
+**Problem:** names change; codes are immutable.  
+**Solution:** use `fund_cnpj_<digits>` whenever possible.
+
+## 9. COEs with messy names
+**Problem:** one generic `coe_unresolved` is too lossy.  
+**Solution:** normalize to 19 product-type templates if possible; otherwise family-level fallback templates.
+
+## 10. Issuer alias drift
+**Problem:** no alias table exists in MVP.  
+**Solution:** upstream parser must canonicalize issuer names before they hit X-Ray.
+
+## 11. XP appears in two different roles
+**Problem:** `XP` can mean a Brazilian bank/counterparty or the foreign listed company underlying `XPBR31`.  
+**Solution:** use separate issuer rows:
+- `banco_xp` → `br_bank`
+- `xp_inc` → `nonbr_other`
+
+## 12. Fund sponsor vs issuer confusion
+**Problem:** BTG/Porto appearing in fund names may tempt operators to set fund issuer = bank.  
+**Solution:** do **not** use sponsor/manager as `issuer` unless economically relevant. Product identity belongs in the template.
+
+---
+
+# Final recommendation
+
+## Execute this final policy
+
+### Generic templates
+Use generic-by-family for:
+- Tesouro
+- CDB
+- LCA
+- LCI
+- CRA
+- CRI
+- CDCA
+- Debêntures
+- Compromissadas
+- Direct BR equities
+- Direct BDRs
+
+### Dedicated templates
+Use dedicated per product for:
+- ETFs
+- FIIs
+- investment funds
+- crypto tokens
+- COEs
+
+### Issuers
+Load **all distinct known issuers** for direct holdings.  
+Do **not** stop at top names.
+
+### No schema expansion
+- No new issuer types
+- No new economic exposures
+- No cash proxies
+- No dividend proxies
+
+If you want, next I can turn this into a **load-ready seed plan** with:
+1. `instrument_template.csv` schema rows for the static catalog,  
+2. a **generation spec** for the 41 FII / 94 fund / 19 COE rows, and  
+3. an `issuer.csv` normalization checklist for the upstream team.
