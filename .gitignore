@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+db.sqlite3
+.env
+*.env
+staticfiles/
+media/
+output/
+git_access_info.txt
+render_access_info.txt
+*.docx
+*.zip

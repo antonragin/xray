@@ -1,0 +1,6 @@
+instrument_template_code,weight,expiry_date,issuer_code,issuer_type_code
+cdb_cdi_generic,0.25,2029-06-15,banco_btg,
+fii_xpml11,0.10,,,
+ivvb11,0.15,,,
+mixed_global_fund,0.20,,,
+tesouro_ipca_generic,0.30,2035-05-15,,

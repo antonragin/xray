@@ -1,0 +1,61 @@
+<div id="wj_{{ widget.field_name }}" class="weighted-json-widget">
+  <table>
+    <thead><tr><th>Code</th><th>Weight</th><th></th></tr></thead>
+    <tbody id="wj_{{ widget.field_name }}_body">
+      {% for code, weight in widget.rows %}
+      <tr class="wj-row">
+        <td>
+          <select name="{{ widget.field_name }}_code">
+            <option value="">---</option>
+            {% for c in widget.available_codes %}
+            <option value="{{ c }}" {% if c == code %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td><input type="number" step="0.0001" min="0" max="1" name="{{ widget.field_name }}_weight" value="{{ weight }}"></td>
+        <td><button type="button" onclick="this.closest('tr').remove();wjUpdate_{{ widget.field_name }}()">Remove</button></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td><strong>Total:</strong></td>
+        <td><span id="wj_{{ widget.field_name }}_total">0</span></td>
+        <td><button type="button" onclick="wjAdd_{{ widget.field_name }}()">+ Add row</button></td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+<script>
+(function(){
+  var name = "{{ widget.field_name }}";
+  var codes = {{ widget.available_codes|safe }};
+  window['wjAdd_' + name] = function() {
+    var tbody = document.getElementById('wj_' + name + '_body');
+    var tr = document.createElement('tr');
+    tr.className = 'wj-row';
+    var opts = '<option value="">---</option>';
+    for (var i = 0; i < codes.length; i++) {
+      opts += '<option value="' + codes[i] + '">' + codes[i] + '</option>';
+    }
+    tr.innerHTML =
+      '<td><select name="' + name + '_code">' + opts + '</select></td>' +
+      '<td><input type="number" step="0.0001" min="0" max="1" name="' + name + '_weight" value="0"></td>' +
+      '<td><button type="button" onclick="this.closest(\'tr\').remove();wjUpdate_' + name + '()">Remove</button></td>';
+    tbody.appendChild(tr);
+    tr.querySelector('input').addEventListener('input', window['wjUpdate_' + name]);
+  };
+  window['wjUpdate_' + name] = function() {
+    var inputs = document.querySelectorAll('#wj_' + name + '_body input[name="' + name + '_weight"]');
+    var total = 0;
+    for (var i = 0; i < inputs.length; i++) total += parseFloat(inputs[i].value) || 0;
+    var el = document.getElementById('wj_' + name + '_total');
+    el.textContent = total.toFixed(4);
+    el.style.color = Math.abs(total - 1.0) < 0.001 ? 'green' : 'red';
+  };
+  document.querySelectorAll('#wj_' + name + '_body input').forEach(function(inp) {
+    inp.addEventListener('input', window['wjUpdate_' + name]);
+  });
+  window['wjUpdate_' + name]();
+})();
+</script>

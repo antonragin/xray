@@ -1,0 +1,31 @@
+{% extends "admin/base_site.html" %}
+{% block title %}Portfolio Processing{% endblock %}
+{% block content %}
+<h2>Upload Portfolio CSV</h2>
+<p>Upload a resolved portfolio CSV file. Required columns: <code>instrument_template_code, weight, expiry_date, issuer_code, issuer_type_code</code></p>
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  <p><input type="file" name="csv_file" accept=".csv" required></p>
+  <p><input type="submit" value="Validate & Process" class="default"></p>
+</form>
+
+{% if errors %}
+<div class="errornote" style="margin-top: 1em;">
+  <h3>Errors</h3>
+  <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+{% if result %}
+<div class="module" style="margin-top: 1em;">
+  <h3>Processing Complete</h3>
+  <p>Run ID: <strong>{{ result.run_id }}</strong></p>
+  <p>Rows processed: {{ result.row_count }}</p>
+  <p><a href="{% url 'admin:processing_download' result.run_id %}" class="default">Download ZIP Bundle</a></p>
+  {% if result.html_preview_url %}
+  <p><a href="{{ result.html_preview_url }}" target="_blank">View HTML Preview</a></p>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "admin/base_site.html" %}
+{% block title %}Reference Data Health{% endblock %}
+{% block content %}
+<h2>Reference Data Health Checks</h2>
+
+{% for check in checks %}
+<div class="module" style="margin-bottom: 1em;">
+  <h3>
+    {% if check.severity == 'error' %}&#x274C;
+    {% elif check.severity == 'warning' %}&#x26A0;&#xFE0F;
+    {% else %}&#x2139;&#xFE0F;
+    {% endif %}
+    {{ check.name }}
+  </h3>
+
+  {% if check.items is not None %}
+    {% if check.items %}
+    <ul>{% for item in check.items %}<li>{{ item }}</li>{% endfor %}</ul>
+    {% else %}
+    <p style="color:green;">All clear.</p>
+    {% endif %}
+  {% endif %}
+
+  {% if check.coverage %}
+  <table>
+    <thead><tr><th>Model</th><th>Total active</th><th>All 6 filled</th><th>None filled</th></tr></thead>
+    <tbody>
+    {% for model_name, stats in check.coverage.items %}
+    <tr>
+      <td>{{ model_name }}</td>
+      <td>{{ stats.total }}</td>
+      <td>{{ stats.with_all_6 }}</td>
+      <td style="{% if stats.with_none > 0 %}color:red{% endif %}">{{ stats.with_none }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endfor %}
+{% endblock %}
