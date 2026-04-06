@@ -1,0 +1,1217 @@
+This is an excellent checkpoint. The core infrastructure is highly functional, and the split-allocation logic handles the complex products smoothly.
+
+For **Round 3**, I focused strictly on **production readiness, edge cases that cause silent failures, and financial accuracy.** 
+
+### Key Upgrades Implemented
+
+1. **Parsing Robustness (`_safe_float`)**: If an export system returns a US-formatted float (e.g., `1,234.56`), the previous logic mistakenly parsed it as `1.23456`. The new logic dynamically checks whether the comma or period comes last to correctly identify BR vs. US formatting.
+2. **Python Truthiness Bug**: In Monte Carlo rendering, `if cagr:` fails silently if the CAGR is exactly `0.0`. All metric checks now use `is not None` to prevent metrics from disappearing on zero-return portfolios.
+3. **Excel Crash Prevention**: OpenPyXL will crash if a sheet name contains characters like `*`, `?`, `:`, `[`, `]`, `\`, `/`. We now safely sanitize the `sheet_name` via regex.
+4. **Financial Accuracy (Debentures)**: Direct debentures tied to inflation were accidentally falling back to `IMA-B` (Government Bonds). They now map correctly to `IDA-IPCA` to reflect corporate credit risk.
+5. **Financial Accuracy (FIPs)**: Added mapping for Private Equity funds ("FIP" or "Participações"), mapping them to `Ibovespa [APPROX]` as an equity proxy.
+6. **BRL Locale Polish**: Display metrics on the Plotly charts now natively use Brazilian `1.234,56` numeric formatting.
+
+Here is the updated, production-ready code.
+
+### 1. `map_positions.py`
+
+```python
+"""
+Map client positions from Posição.xlsx to OryxMC asset categories/indices.
+Generate Excel with per-client allocation sheets.
+"""
+
+import os
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.drawing.image import Image as XlImage
+from openpyxl.utils import get_column_letter
+import unicodedata
+import re
+from collections import defaultdict
+from datetime import datetime, date
+
+# ─── Constants ───────────────────────────────────────────────────────────────
+
+POSITION_DATE = date(2026, 2, 28)
+
+ORYXMC_CATEGORIES = {
+    "br_fixed_income": "Renda Fixa Brasil",
+    "br_equities": "Ações Brasil",
+    "intl_equities": "Ações Internacionais",
+    "intl_fixed_income": "Renda Fixa Internacional",
+    "intl_reits": "REITs Internacionais",
+    "br_reits": "FIIs Brasil",
+}
+
+# Display names matching the OryxMC system
+INDEX_DISPLAY_NAMES = {
+    "CDI": "CDI",
+    "IDA-DI": "TEVA-DI / IDA-DI",
+    "IDA-IPCA": "IDA-IPCA",
+    "IDA-Infra": "IDA-IPCA Infraestrutura",
+    "IMA-B": "IMA-B",
+    "IMA-B 5": "IMA-B 5",
+    "IMA-B 5+": "IMA-B 5+",
+    "IRF-M": "IRF-M",
+    "Ibovespa": "Ibovespa",
+    "IBX": "IBrX 100",
+    "IDIV": "IDIV",
+    "SP500TR": "S&P 500 Total Return",
+    "URTH": "MSCI World",
+    "EEM": "MSCI Emerging Markets",
+    "ACWI": "MSCI ACWI",
+    "AGG": "Bloomberg US Agg Bond",
+    "HYG": "US High Yield Bond",
+    "SHY": "US Treasury 1-3 Anos",
+    "TLT": "US Treasury 20+ Anos",
+    "VNQ": "US REITs (MSCI)",
+    "IFIX": "IFIX",
+}
+
+INDEX_TO_CATEGORY = {
+    "CDI": "br_fixed_income",
+    "IDA-DI": "br_fixed_income",
+    "IDA-IPCA": "br_fixed_income",
+    "IDA-Infra": "br_fixed_income",
+    "IMA-B": "br_fixed_income",
+    "IMA-B 5": "br_fixed_income",
+    "IMA-B 5+": "br_fixed_income",
+    "IRF-M": "br_fixed_income",
+    "Ibovespa": "br_equities",
+    "IBX": "br_equities",
+    "IDIV": "br_equities",
+    "SP500TR": "intl_equities",
+    "URTH": "intl_equities",
+    "EEM": "intl_equities",
+    "ACWI": "intl_equities",
+    "AGG": "intl_fixed_income",
+    "HYG": "intl_fixed_income",
+    "SHY": "intl_fixed_income",
+    "TLT": "intl_fixed_income",
+    "VNQ": "intl_reits",
+    "IFIX": "br_reits",
+}
+
+
+# ─── Helper ──────────────────────────────────────────────────────────────────
+
+def strip_accents(text):
+    """Remove accents for comparison."""
+    if not text:
+        return ""
+    nfkd = unicodedata.normalize("NFKD", str(text))
+    return "".join(c for c in nfkd if not unicodedata.combining(c))
+
+
+def _safe_float(val, default=0.0):
+    """Safely convert a value to float, handling both BR and US formats."""
+    if val is None or val == "":
+        return default
+    try:
+        if isinstance(val, str):
+            clean = val.strip()
+            if "," in clean and "." in clean:
+                # Dynamic check: which separator comes last?
+                if clean.rfind(",") > clean.rfind("."):
+                    # BR format: 1.234,56
+                    clean = clean.replace(".", "").replace(",", ".")
+                else:
+                    # US format: 1,234.56
+                    clean = clean.replace(",", "")
+            elif "," in clean:
+                # BR format without thousands separator: 1234,56
+                clean = clean.replace(",", ".")
+            return float(clean)
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+
+# ─── Fund Mapping ────────────────────────────────────────────────────────────
+
+def map_fund(name):
+    """Map a fund/previdência product name to oryxmc index or split dict."""
+    if not name:
+        return ("CDI", "Empty fund name → CDI [APPROX]")
+
+    raw = str(name)
+    n = strip_accents(raw).upper()
+
+    # 1. Real estate / FII → IFIX
+    if re.search(r"\bFII\b", n) or "IMOBILIARIO" in n or "IMOBILIARIA" in n:
+        if "CREDITO" in n or "CDI" in n:
+            return ("IDA-DI", "Real estate credit fund → IDA-DI [APPROX]")
+        return ("IFIX", "FII/real estate → IFIX")
+
+    # 2. Global equities via BDR/FIA
+    if re.search(r"GLOB|GLOBAL", n) and re.search(r"ACAO|ACOES|BDR|FIA", n):
+        return ("ACWI", "Global equity fund → ACWI")
+        
+    # 3. Private Equity / FIP
+    if re.search(r"\bFIP\b", n) or "PARTICIPACOES" in n or "PARTICIPAÇÕES" in raw.upper():
+        return ("Ibovespa", "FIP / Private Equity → Ibovespa [APPROX]")
+
+    # 4. Gold fund
+    if re.search(r"\bOURO\b", n):
+        return ("SP500TR", "Gold fund (no gold proxy, equity risk proxy) → SP500TR [APPROX]")
+
+    # 5. Crypto fund
+    if "HASHDEX" in n:
+        return ({"CDI": 0.80, "SP500TR": 0.20},
+                "Crypto fund ~80% CDI + 20% crypto (equity proxy) [APPROX]")
+    if "CRYPTO" in n:
+        return ("SP500TR", "Crypto fund (equity risk proxy) → SP500TR [APPROX]")
+
+    # 6. Uranium fund
+    if "URANIO" in n:
+        return ("SP500TR", "Uranium/mining fund → intl equities proxy [APPROX]")
+
+    # 7. Inflation + infrastructure → IDA-Infra
+    if re.search(r"INFLAC", n) and "INFRA" in n:
+        return ("IDA-Infra", "Inflation + infrastructure → IDA-Infra")
+
+    # 8. Infrastructure / incentivized debentures
+    if re.search(r"INFRA|INCENTIVAD|DEBENTURE", n):
+        if "CDI" in n:
+            return ("IDA-DI", "CDI-linked infrastructure → IDA-DI")
+        return ("IDA-Infra", "Infrastructure fund → IDA-Infra")
+
+    # 9. Credit private / FIDC
+    is_credit = bool(
+        re.search(r"\bCRPR\b|CRPR|CR\s*PR", n)
+        or re.search(r"CREDITO\s*PRIVADO", n)
+        or re.search(r"\bCP\b", n)
+        or "FIDC" in n
+    )
+    if is_credit:
+        return ("IDA-DI", "Credit private fund → IDA-DI")
+
+    # 10. Cash / Selic / DI pure funds
+    if re.search(r"CASH|SELIC|TESOURO SELIC", n):
+        return ("CDI", "Cash/Selic fund → CDI")
+    if re.search(r"\bDI\b", n) and re.search(r"FIRF|FICFIRF|FREF|FIREF", n):
+        return ("CDI", "DI reference fund → CDI")
+
+    # 11. Default
+    return ("CDI", "Fund unclassified → CDI [APPROX]")
+
+
+# ─── Position Mapping ────────────────────────────────────────────────────────
+
+def map_position(row):
+    """Map a single position to oryxmc index(es)."""
+    mercado = strip_accents(str(row.get("mercado", "") or "")).strip()
+    submercado = strip_accents(str(row.get("submercado", "") or "")).strip()
+    ativo = str(row.get("ativo", "") or "").strip()
+    produto = str(row.get("produto", "") or "").strip()
+    estrategia = str(row.get("estrategia", "") or "").strip()
+    vencimento = row.get("vencimento")
+
+    # ── Conta Corrente ──
+    if mercado == "Conta Corrente":
+        return ("CDI", "Cash → CDI")
+
+    # ── COE (structured products) — split allocation ──
+    if mercado == "COE":
+        p = strip_accents(produto).upper()
+        if "BOLSA AMERICANA" in p or "S&P" in p:
+            return ({"CDI": 0.60, "SP500TR": 0.40},
+                    "COE principal-protected US equity → 60% CDI + 40% SP500TR [APPROX]")
+        if "OURO" in p or "GOLD" in p:
+            return ({"CDI": 0.50, "SP500TR": 0.50},
+                    "COE gold-linked (no gold proxy) → 50% CDI + 50% SP500TR [APPROX]")
+        return ({"CDI": 0.60, "SP500TR": 0.40},
+                "COE intl equity-linked → 60% CDI + 40% SP500TR [APPROX]")
+
+    # ── Criptoativos ──
+    if mercado == "Criptoativos":
+        return ("SP500TR", "Crypto (no proxy, equity risk proxy) → SP500TR [APPROX]")
+
+    # ── Renda Fixa ──
+    if mercado == "Renda Fixa":
+        prod_type = produto.strip()
+
+        # NTNB → IMA-B variants based on maturity
+        if prod_type == "NTNB":
+            venc_date = None
+            if isinstance(vencimento, datetime):
+                venc_date = vencimento.date()
+            elif isinstance(vencimento, date):
+                venc_date = vencimento
+            elif isinstance(vencimento, str):
+                for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d/%m/%y"):
+                    try:
+                        venc_date = datetime.strptime(vencimento[:10], fmt).date()
+                        break
+                    except ValueError:
+                        pass
+
+            if venc_date is None:
+                return ("IMA-B", "NTNB (no maturity) → IMA-B [APPROX]")
+
+            years = (venc_date - POSITION_DATE).days / 365.25
+            if years <= 5:
+                return ("IMA-B 5", f"NTNB {venc_date.year} ({years:.1f}y) → IMA-B 5")
+            else:
+                return ("IMA-B 5+", f"NTNB {venc_date.year} ({years:.1f}y) → IMA-B 5+")
+
+        # Strategy-based mapping for other RF instruments
+        est = strip_accents(estrategia).upper()
+
+        if "INFLACAO" in est or "INFLAÇÃO" in estrategia:
+            if prod_type in ("CRA", "CRI", "CDCA", "DEB"):
+                return ("IDA-IPCA", f"{prod_type} IPCA-linked → IDA-IPCA")
+            return ("IMA-B", f"{prod_type} inflação → IMA-B")
+
+        if "PRE" in est or "PRÉ" in estrategia:
+            if prod_type in ("CRA", "CRI", "CDCA", "DEB"):
+                return ("IRF-M", f"{prod_type} pré-fixado corp → IRF-M [APPROX]")
+            return ("IRF-M", f"{prod_type} pré-fixado → IRF-M")
+
+        if "POS" in est or "PÓS" in estrategia:
+            if prod_type in ("LFSN", "CDCA", "CRA", "CRI", "DEB", "FIDC"):
+                return ("IDA-DI", f"{prod_type} pós-fixado corp → IDA-DI")
+            if prod_type in ("CDB", "LCA", "LCI"):
+                return ("CDI", f"{prod_type} pós-fixado → CDI")
+            return ("CDI", f"{prod_type} pós-fixado → CDI")
+
+        return ("CDI", f"RF unclassified ({prod_type}) → CDI [APPROX]")
+
+    # ── Renda Variável ──
+    if mercado == "Renda Variavel" or mercado == "Renda Variável":
+        if ativo == "IVVB11":
+            return ("SP500TR", "IVVB11 (S&P 500 BDR ETF) → SP500TR")
+        if ativo == "USTK11":
+            return ("SP500TR", "USTK11 (US Tech BDR ETF) → SP500TR [APPROX]")
+        if ativo == "DEBB11":
+            return ("IDA-DI", "DEBB11 (debentures ETF) → IDA-DI")
+        if ativo == "XPBR31":
+            return ("SP500TR", "XPBR31 (XP Inc BDR) → SP500TR [APPROX]")
+        if ativo == "AURA33":
+            return ("SP500TR", "AURA33 (mining BDR) → SP500TR [APPROX]")
+
+        return ("Ibovespa", f"{ativo} → Ibovespa")
+
+    # ── Valor em Trânsito ──
+    if mercado == "Valor em Transito" or mercado == "Valor em Trânsito":
+        return ("CDI", "Dividends/JCP in transit (cash receivable) → CDI")
+
+    # ── Fundos & Previdência ──
+    if mercado in ("Fundos", "Previdencia", "Previdência"):
+        return map_fund(produto)
+
+    return ("CDI", f"Unclassified ({mercado}) → CDI [APPROX]")
+
+
+# ─── Read Excel ──────────────────────────────────────────────────────────────
+
+def read_positions(filepath):
+    """Read positions from Excel and return list of dicts."""
+    wb = openpyxl.load_workbook(filepath, data_only=True)
+    ws = wb["Export"]
+
+    cols = [
+        "conta", "data", "mercado", "submercado", "ativo", "produto",
+        "cnpj", "emissor", "data_compra", "taxa_compra", "taxa_emissao",
+        "vencimento", "quantidade", "valor_bruto", "ir", "iof",
+        "valor_liquido", "estrategia", "escritorio", "tipo_plano", "id"
+    ]
+
+    positions = []
+    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, values_only=True):
+        d = {}
+        for i, col in enumerate(cols):
+            d[col] = row[i] if i < len(row) else None
+        positions.append(d)
+
+    return positions
+
+
+# ─── Aggregate ───────────────────────────────────────────────────────────────
+
+def aggregate_by_account(positions):
+    """Map each position and aggregate by account."""
+    accounts = defaultdict(lambda: {
+        "total_brl": 0.0,
+        "allocations": defaultdict(float),
+        "details": [],
+        "warnings": [],
+        "index_notes": defaultdict(set),
+    })
+
+    for pos in positions:
+        conta = str(pos.get("conta", "")).strip()
+        if not conta:
+            continue
+
+        valor = _safe_float(pos.get("valor_bruto"), 0.0)
+
+        mercado = pos.get("mercado", "")
+        ativo = pos.get("ativo", "")
+        produto = pos.get("produto", "")
+
+        if mercado in ("Fundos", "Previdência", "Previdencia"):
+            display = produto or "(unknown fund)"
+        elif mercado in ("Valor em Trânsito", "Valor em Transito"):
+            display = produto or "(dividends)"
+        elif ativo:
+            display = ativo
+        else:
+            display = produto or mercado
+
+        mapping, note = map_position(pos)
+
+        acct = accounts[conta]
+        acct["total_brl"] += valor
+        is_approx = "[APPROX]" in note or "unclassified" in note.lower()
+
+        if isinstance(mapping, dict):
+            split_parts = [f"{int(w*100)}% {k}" for k, w in
+                           sorted(mapping.items(), key=lambda x: -x[1])]
+            split_display = " + ".join(split_parts)
+            for idx_key, weight in mapping.items():
+                acct["allocations"][idx_key] += valor * weight
+                if is_approx:
+                    acct["index_notes"][idx_key].add("≈ proxy")
+            acct["details"].append((mercado, display, valor, split_display, note))
+        else:
+            acct["allocations"][mapping] += valor
+            if is_approx:
+                acct["index_notes"][mapping].add("≈ proxy")
+            acct["details"].append((mercado, display, valor, mapping, note))
+
+        if is_approx and valor > 0:
+            idx_label = mapping if isinstance(mapping, str) else (
+                " + ".join(f"{int(w*100)}% {k}" for k, w in
+                           sorted(mapping.items(), key=lambda x: -x[1])))
+            acct["warnings"].append(f"  {display}: R${valor:,.2f} → {idx_label} ({note})")
+
+    return dict(accounts)
+
+
+# ─── Print Summary ───────────────────────────────────────────────────────────
+
+def print_mapping_summary(accounts):
+    """Print a summary of the mapping for verification."""
+    print("=" * 100)
+    print("CLIENT PORTFOLIO → ORYXMC INDEX MAPPING SUMMARY")
+    print("=" * 100)
+
+    sorted_accts = sorted(accounts.items(), key=lambda x: -x[1]["total_brl"])
+
+    for conta, data in sorted_accts:
+        total = data["total_brl"]
+        if total <= 0:
+            continue
+
+        print(f"\n{'─' * 80}")
+        print(f"Account: {conta}  |  Total: R$ {total:>15,.2f}")
+        print(f"{'─' * 80}")
+
+        allocs = sorted(data["allocations"].items(), key=lambda x: -x[1])
+        print(f"  {'Index':<15} {'Category':<25} {'Amount (R$)':>15} {'Weight':>8}")
+        print(f"  {'─'*15} {'─'*25} {'─'*15} {'─'*8}")
+        for idx_key, brl in allocs:
+            if brl <= 0:
+                continue
+            pct = brl / total * 100
+            cat = ORYXMC_CATEGORIES.get(INDEX_TO_CATEGORY.get(idx_key, ""), "?")
+            print(f"  {idx_key:<15} {cat:<25} {brl:>15,.2f} {pct:>7.1f}%")
+
+        if data["warnings"]:
+            print(f"\n  ⚠ Approximate/unclassified mappings:")
+            for w in data["warnings"]:
+                print(f"    {w}")
+
+    print(f"\n{'=' * 100}")
+    print("OVERALL SUMMARY")
+    print(f"{'=' * 100}")
+    total_all = sum(d["total_brl"] for d in accounts.values())
+    idx_totals = defaultdict(float)
+    for d in accounts.values():
+        for k, v in d["allocations"].items():
+            idx_totals[k] += v
+    print(f"\nTotal AUM: R$ {total_all:,.2f}")
+    print(f"Accounts: {len(accounts)} ({sum(1 for d in accounts.values() if d['total_brl'] > 0)} with positions)")
+    print(f"\n  {'Index':<15} {'Total (R$)':>15} {'% of AUM':>8}")
+    if total_all > 0:
+        for idx, amt in sorted(idx_totals.items(), key=lambda x: -x[1]):
+            print(f"  {idx:<15} {amt:>15,.2f} {amt/total_all*100:>7.1f}%")
+
+
+# ─── Generate Excel ──────────────────────────────────────────────────────────
+
+def generate_excel(accounts, output_path, images_dir=None):
+    """Generate Excel with one sheet per client showing oryxmc allocation."""
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)
+
+    # Styles
+    header_font = Font(name="Calibri", bold=True, size=11, color="FFFFFF")
+    header_fill = PatternFill(start_color="1B3A5C", end_color="1B3A5C", fill_type="solid")
+    cat_fill = PatternFill(start_color="E8EEF4", end_color="E8EEF4", fill_type="solid")
+    cat_font = Font(name="Calibri", bold=True, size=10)
+    num_font = Font(name="Calibri", size=10)
+    note_font = Font(name="Calibri", size=9, color="888888")
+    pct_format = "0.0%"
+    brl_format = '#,##0.00'
+    thin_border = Border(
+        left=Side(style="thin", color="C0C0C0"),
+        right=Side(style="thin", color="C0C0C0"),
+        top=Side(style="thin", color="C0C0C0"),
+        bottom=Side(style="thin", color="C0C0C0"),
+    )
+    warn_font = Font(name="Calibri", size=9, italic=True, color="CC6600")
+
+    sorted_accts = sorted(accounts.items(), key=lambda x: -x[1]["total_brl"])
+
+    for conta, data in sorted_accts:
+        total = data["total_brl"]
+        if total <= 0:
+            continue
+
+        # Safely sanitize sheet name to prevent openpyxl crashes
+        sheet_name = re.sub(r'[\\/*\[\]:?]', '_', str(conta))[:31]
+        ws = wb.create_sheet(title=sheet_name)
+        index_notes = data.get("index_notes", {})
+
+        # ── Header ──
+        ws.merge_cells("A1:E1")
+        ws["A1"] = f"Portfolio Allocation — Account {conta}"
+        ws["A1"].font = Font(name="Calibri", bold=True, size=14, color="1B3A5C")
+
+        ws["A2"] = f"Position Date: {POSITION_DATE:%d/%m/%Y}"
+        ws["A2"].font = Font(name="Calibri", size=10, color="666666")
+
+        ws["A3"] = f"Total Portfolio: R$ {total:,.2f}"
+        ws["A3"].font = Font(name="Calibri", bold=True, size=11)
+
+        # ── Allocation Table ──
+        row = 5
+        headers = ["OryxMC Index", "Category", "Amount (R$)", "Weight (%)", "Notes"]
+        for c, h in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=c, value=h)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal="center")
+            cell.border = thin_border
+        row += 1
+
+        by_category = defaultdict(list)
+        for idx_key, brl in data["allocations"].items():
+            if brl <= 0:
+                continue
+            cat_key = INDEX_TO_CATEGORY.get(idx_key, "unknown")
+            cat_name = ORYXMC_CATEGORIES.get(cat_key, cat_key)
+            by_category[cat_name].append((idx_key, brl))
+
+        cat_order = [
+            "Renda Fixa Brasil", "Ações Brasil", "Ações Internacionais",
+            "Renda Fixa Internacional", "REITs Internacionais", "FIIs Brasil",
+        ]
+
+        for cat_name in cat_order:
+            if cat_name not in by_category:
+                continue
+            items = sorted(by_category[cat_name], key=lambda x: -x[1])
+            cat_total = sum(b for _, b in items)
+            cat_pct = cat_total / total
+
+            for c in range(1, 6):
+                ws.cell(row=row, column=c).fill = cat_fill
+                ws.cell(row=row, column=c).border = thin_border
+            ws.cell(row=row, column=1, value=f"► {cat_name}").font = cat_font
+            ws.cell(row=row, column=3, value=cat_total).number_format = brl_format
+            ws.cell(row=row, column=3).font = Font(name="Calibri", bold=True, size=10)
+            ws.cell(row=row, column=4, value=cat_pct).number_format = pct_format
+            ws.cell(row=row, column=4).font = Font(name="Calibri", bold=True, size=10)
+            row += 1
+
+            for idx_key, brl in items:
+                pct = brl / total
+                display_name = INDEX_DISPLAY_NAMES.get(idx_key, idx_key)
+                ws.cell(row=row, column=1, value=f"    {display_name}").font = num_font
+                ws.cell(row=row, column=2, value=cat_name).font = num_font
+                ws.cell(row=row, column=3, value=brl).number_format = brl_format
+                ws.cell(row=row, column=3).font = num_font
+                ws.cell(row=row, column=4, value=pct).number_format = pct_format
+                ws.cell(row=row, column=4).font = num_font
+                idx_note = ", ".join(index_notes.get(idx_key, []))
+                if idx_note:
+                    ws.cell(row=row, column=5, value=idx_note).font = note_font
+                for c in range(1, 6):
+                    ws.cell(row=row, column=c).border = thin_border
+                row += 1
+
+        ws.cell(row=row, column=1, value="TOTAL").font = Font(name="Calibri", bold=True, size=11)
+        ws.cell(row=row, column=3, value=total).number_format = brl_format
+        ws.cell(row=row, column=3).font = Font(name="Calibri", bold=True, size=11)
+        ws.cell(row=row, column=4, value=1.0).number_format = pct_format
+        ws.cell(row=row, column=4).font = Font(name="Calibri", bold=True, size=11)
+        for c in range(1, 6):
+            ws.cell(row=row, column=c).border = Border(
+                top=Side(style="double", color="1B3A5C"),
+                bottom=Side(style="double", color="1B3A5C"),
+                left=Side(style="thin", color="C0C0C0"),
+                right=Side(style="thin", color="C0C0C0"),
+            )
+        row += 2
+
+        # ── Warnings ──
+        if data["warnings"]:
+            ws.cell(row=row, column=1, value="Approximate / Unclassified Mappings:").font = Font(
+                name="Calibri", bold=True, size=10, color="CC6600"
+            )
+            row += 1
+            for w in data["warnings"]:
+                ws.cell(row=row, column=1, value=w).font = warn_font
+                row += 1
+            row += 1
+
+        # ── Position Details ──
+        ws.cell(row=row, column=1, value="Position Details:").font = Font(
+            name="Calibri", bold=True, size=11, color="1B3A5C"
+        )
+        row += 1
+        det_headers = ["Market", "Asset/Product", "Value (R$)", "→ OryxMC Index", "Mapping Note"]
+        for c, h in enumerate(det_headers, 1):
+            cell = ws.cell(row=row, column=c, value=h)
+            cell.font = Font(name="Calibri", bold=True, size=9, color="FFFFFF")
+            cell.fill = PatternFill(start_color="4A6FA5", end_color="4A6FA5", fill_type="solid")
+            cell.border = thin_border
+        row += 1
+
+        for mercado, display, valor, idx_key, note in sorted(data["details"], key=lambda x: -x[2]):
+            ws.cell(row=row, column=1, value=mercado).font = Font(size=9)
+            ws.cell(row=row, column=2, value=display[:60]).font = Font(size=9)
+            ws.cell(row=row, column=3, value=valor).number_format = brl_format
+            ws.cell(row=row, column=3).font = Font(size=9)
+            ws.cell(row=row, column=4, value=INDEX_DISPLAY_NAMES.get(idx_key, idx_key)).font = Font(size=9)
+            ws.cell(row=row, column=5, value=note).font = Font(size=9, color="888888")
+            for c in range(1, 6):
+                ws.cell(row=row, column=c).border = thin_border
+            row += 1
+
+        # ── Simulation Charts ──
+        if images_dir:
+            row += 1
+            ws.cell(row=row, column=1, value="Monte Carlo Simulation:").font = Font(
+                name="Calibri", bold=True, size=11, color="1B3A5C"
+            )
+            row += 1
+
+            chart_files = [
+                (f"{conta}_trajectory.png", "Trajectory Fan Chart (Real, 10yr)"),
+                (f"{conta}_frontier.png", "Efficient Frontier"),
+                (f"{conta}_histogram.png", "Final Value Distribution"),
+            ]
+            for fname, label in chart_files:
+                fpath = os.path.join(images_dir, fname)
+                if not os.path.isfile(fpath):
+                    continue
+                ws.cell(row=row, column=1, value=label).font = Font(
+                    name="Calibri", bold=True, size=10, color="4A6FA5"
+                )
+                row += 1
+                img = XlImage(fpath)
+                from PIL import Image as PILImage
+                with PILImage.open(fpath) as pil:
+                    orig_w, orig_h = pil.size
+                img.width = 900
+                img.height = int(orig_h * (900 / orig_w))
+                ws.add_image(img, f"A{row}")
+                rows_needed = max(1, img.height // 15 + 2)
+                row += rows_needed
+
+        ws.column_dimensions["A"].width = 28
+        ws.column_dimensions["B"].width = 28
+        ws.column_dimensions["C"].width = 18
+        ws.column_dimensions["D"].width = 12
+        ws.column_dimensions["E"].width = 50
+
+    # ── Summary Sheet ──
+    ws_sum = wb.create_sheet(title="Summary", index=0)
+    ws_sum.merge_cells("A1:H1")
+    ws_sum["A1"] = "Client Portfolio Allocation Summary"
+    ws_sum["A1"].font = Font(name="Calibri", bold=True, size=14, color="1B3A5C")
+    ws_sum["A2"] = f"Generated: {datetime.now():%Y-%m-%d %H:%M}"
+    ws_sum["A2"].font = Font(size=9, color="999999")
+
+    row = 4
+    sum_headers = ["Account", "Total (R$)", "BR Fixed Income", "BR Equities",
+                   "Intl Equities", "Intl Fixed Income", "Intl REITs", "BR REITs"]
+    for c, h in enumerate(sum_headers, 1):
+        cell = ws_sum.cell(row=row, column=c, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+        cell.border = thin_border
+    row += 1
+
+    cat_keys = ["br_fixed_income", "br_equities", "intl_equities",
+                "intl_fixed_income", "intl_reits", "br_reits"]
+
+    for conta, data in sorted_accts:
+        total = data["total_brl"]
+        if total <= 0:
+            continue
+
+        ws_sum.cell(row=row, column=1, value=conta).font = num_font
+        ws_sum.cell(row=row, column=1).border = thin_border
+        ws_sum.cell(row=row, column=2, value=total).number_format = brl_format
+        ws_sum.cell(row=row, column=2).font = num_font
+        ws_sum.cell(row=row, column=2).border = thin_border
+
+        for ci, cat_key in enumerate(cat_keys, 3):
+            cat_total = sum(
+                v for k, v in data["allocations"].items()
+                if INDEX_TO_CATEGORY.get(k) == cat_key and v > 0
+            )
+            pct = cat_total / total if total > 0 else 0
+            ws_sum.cell(row=row, column=ci, value=pct).number_format = pct_format
+            ws_sum.cell(row=row, column=ci).font = num_font
+            ws_sum.cell(row=row, column=ci).border = thin_border
+        row += 1
+
+    ws_sum.column_dimensions["A"].width = 14
+    ws_sum.column_dimensions["B"].width = 18
+    for c in range(3, 9):
+        ws_sum.column_dimensions[get_column_letter(c)].width = 16
+
+    wb.save(output_path)
+    print(f"\nExcel saved to: {output_path}")
+    return wb
+
+
+# ─── Main ────────────────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    positions = read_positions("Posição.xlsx")
+    print(f"Read {len(positions)} positions")
+
+    accounts = aggregate_by_account(positions)
+    print(f"Found {len(accounts)} accounts")
+
+    print_mapping_summary(accounts)
+
+    images_dir = "client_simulations"
+    if os.path.isdir(images_dir):
+        print(f"Embedding simulation charts from {images_dir}/")
+    else:
+        images_dir = None
+    generate_excel(accounts, "client_allocations.xlsx", images_dir=images_dir)
+```
+
+---
+
+### 2. `simulate_clients.py`
+
+```python
+"""
+Run OryxMC Monte Carlo simulations for each client portfolio and generate
+renderings (trajectory fan chart + efficient frontier plot) saved as images.
+
+Usage: python3 simulate_clients.py
+"""
+
+import sys
+import os
+import numpy as np
+
+# Add oryxmc to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "oryxmc"))
+import engine
+
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+# Import mapping from step (a)/(b)
+from map_positions import read_positions, aggregate_by_account, INDEX_TO_CATEGORY, ORYXMC_CATEGORIES
+
+# ─── Styling constants (matching OryxMC dark theme) ──────────────────────────
+
+BG_PRIMARY = "#0f172a"
+BG_CARD = "rgba(30, 41, 59, 0.95)"
+TEXT_PRIMARY = "#e2e8f0"
+TEXT_SECONDARY = "#94a3b8"
+ACCENT = "#22d3ee"
+GREEN = "#34d399"
+RED = "#f87171"
+ORANGE = "#fb923c"
+
+BAND_COLORS = [
+    "rgba(34,211,238,0.06)",   # p5-p95 outer band
+    "rgba(34,211,238,0.10)",   # p10-p90
+    "rgba(34,211,238,0.18)",   # p25-p75
+]
+MEDIAN_COLOR = ACCENT
+CDI_COLOR = "#fb923c"
+
+# Category colors for frontier
+CAT_COLORS = {
+    "br_fixed_income": "#3b82f6",
+    "br_equities": "#22c55e",
+    "intl_equities": "#a855f7",
+    "intl_fixed_income": "#f59e0b",
+    "intl_reits": "#ec4899",
+    "br_reits": "#14b8a6",
+}
+
+
+def brl_fmt(val):
+    """Format number as BRL using strictly Brazilian locale conventions (1.234,56)."""
+    if val >= 1_000_000:
+        s = f"{val/1_000_000:,.2f}M"
+    elif val >= 1_000:
+        s = f"{val/1_000:,.1f}k"
+    else:
+        s = f"{val:,.2f}"
+    
+    # Swap dots and commas for correct BR localization on the plots
+    s = s.replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"R$ {s}"
+
+
+# ─── Chart Generators ────────────────────────────────────────────────────────
+
+def make_trajectory_chart(sim_result, mode, account, total_brl):
+    """Create fan chart of Monte Carlo trajectories."""
+    stats = sim_result[mode]
+    params = sim_result["params"]
+    time_years = stats["time_years"]
+    pct = stats["percentiles"]
+
+    mode_label = "Real (IPCA-adjusted)" if mode == "real" else "Nominal"
+
+    fig = go.Figure()
+
+    # Percentile bands (5-95, 10-90, 25-75)
+    band_pairs = [(5, 95), (10, 90), (25, 75)]
+    band_labels = ["5%-95%", "10%-90%", "25%-75%"]
+    for i, (lo, hi) in enumerate(band_pairs):
+        fig.add_trace(go.Scatter(
+            x=time_years + time_years[::-1],
+            y=pct[hi] + pct[lo][::-1],
+            fill="toself",
+            fillcolor=BAND_COLORS[i],
+            line=dict(width=0),
+            name=band_labels[i],
+            showlegend=True,
+            hoverinfo="skip",
+        ))
+
+    # Median line
+    fig.add_trace(go.Scatter(
+        x=time_years, y=pct[50],
+        mode="lines",
+        line=dict(color=MEDIAN_COLOR, width=2.5),
+        name="Mediana (p50)",
+    ))
+
+    # CDI benchmark median if available
+    if stats.get("benchmark_median_path"):
+        fig.add_trace(go.Scatter(
+            x=time_years, y=stats["benchmark_median_path"],
+            mode="lines",
+            line=dict(color=CDI_COLOR, width=2, dash="dot"),
+            name="CDI (mediana)",
+        ))
+
+    # Sample trajectories (faded)
+    samples = stats.get("sample_trajectories", [])
+    for j, traj in enumerate(samples[:5]):
+        fig.add_trace(go.Scatter(
+            x=time_years, y=traj,
+            mode="lines",
+            line=dict(color="rgba(148,163,184,0.15)", width=0.8),
+            showlegend=(j == 0),
+            name="Trajetórias" if j == 0 else "",
+            hoverinfo="skip",
+        ))
+
+    # Annotation (ensure robust truthiness checks to allow 0.0 values)
+    median_final = stats["final_median"]
+    cagr = stats.get("median_cagr")
+    cagr_text = f"CAGR mediano: {cagr*100:.1f}%" if cagr is not None else ""
+    vol = stats.get("median_ann_vol")
+    vol_text = f"Vol: {vol*100:.1f}%" if vol is not None else ""
+    p_loss = stats.get("prob_loss")
+    loss_text = f"P(perda): {p_loss:.1f}%" if p_loss is not None else ""
+    dd = stats.get("median_max_drawdown")
+    dd_text = f"Max DD med: {dd*100:.1f}%" if dd is not None else ""
+    p_beat = stats.get("prob_beat_benchmark")
+    beat_text = f"P(>CDI): {p_beat:.0f}%" if p_beat is not None else ""
+
+    info_lines = [l for l in [cagr_text, vol_text, loss_text, dd_text, beat_text] if l]
+
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor=BG_PRIMARY,
+        plot_bgcolor=BG_PRIMARY,
+        font=dict(family="Inter, sans-serif", color=TEXT_PRIMARY, size=12),
+        title=dict(
+            text=(
+                f"<b>Conta {account}</b> — Simulação Monte Carlo ({mode_label})<br>"
+                f"<span style='font-size:13px;color:{TEXT_SECONDARY}'>"
+                f"Portfólio: {brl_fmt(total_brl)} | "
+                f"{params['n_trajectories']:,} trajetórias | "
+                f"{params['n_years']} anos | "
+                f"Mediana final: {brl_fmt(median_final)}</span>"
+            ),
+            font=dict(size=16),
+            x=0.01, xanchor="left",
+        ),
+        xaxis=dict(
+            title="Anos", gridcolor="rgba(100,116,139,0.15)",
+            zeroline=False,
+        ),
+        yaxis=dict(
+            title="Valor do Portfólio (R$)",
+            gridcolor="rgba(100,116,139,0.15)",
+            zeroline=False,
+            tickformat=",.0f", # Kept broad as it naturally abbreviates values
+        ),
+        legend=dict(
+            bgcolor="rgba(15,23,42,0.8)",
+            bordercolor="rgba(100,116,139,0.25)",
+            borderwidth=1,
+            font=dict(size=11),
+        ),
+        margin=dict(l=80, r=30, t=100, b=60),
+        width=1200,
+        height=650,
+        annotations=[dict(
+            x=0.99, y=0.98, xref="paper", yref="paper",
+            text="<br>".join(info_lines),
+            showarrow=False,
+            font=dict(size=11, color=TEXT_SECONDARY),
+            align="right",
+            bgcolor="rgba(15,23,42,0.7)",
+            bordercolor="rgba(100,116,139,0.3)",
+            borderwidth=1,
+            borderpad=8,
+        )] if info_lines else [],
+    )
+
+    return fig
+
+
+def make_frontier_chart(data, allocations, account, total_brl):
+    """Plot efficient frontier with the client's portfolio point."""
+    frontier = data.get("efficient_frontier", {})
+    real_frontier_data = frontier.get("real", {})
+    # Use "full" period frontier
+    real_frontier = real_frontier_data.get("full", []) if isinstance(real_frontier_data, dict) else real_frontier_data
+
+    if not real_frontier:
+        return None
+
+    # Compute portfolio point
+    port_stats = engine.compute_portfolio_risk_return(data, allocations)
+    if not port_stats:
+        return None
+
+    fig = go.Figure()
+
+    # Frontier curve
+    vols = [p["vol"] * 100 for p in real_frontier]
+    cagrs = [p["cagr"] * 100 for p in real_frontier]
+    fig.add_trace(go.Scatter(
+        x=vols, y=cagrs,
+        mode="lines",
+        line=dict(color=ACCENT, width=2),
+        name="Fronteira Eficiente",
+    ))
+
+    # Individual indices
+    indices = engine.get_available_indices(data)
+    for idx_info in indices:
+        idx_key = idx_info["key"]
+        try:
+            idx_stats = engine.compute_portfolio_risk_return(data, {idx_key: 1.0})
+            if not idx_stats:
+                continue
+            s = idx_stats["real"]["full"]
+            cat = idx_info["category"]
+            color = CAT_COLORS.get(cat, "#888888")
+            fig.add_trace(go.Scatter(
+                x=[s["vol"] * 100], y=[s["cagr"] * 100],
+                mode="markers+text",
+                marker=dict(size=8, color=color, line=dict(width=1, color="white")),
+                text=[idx_info["name"]],
+                textposition="top center",
+                textfont=dict(size=9, color=color),
+                showlegend=False,
+                hovertemplate=f"<b>{idx_info['name']}</b><br>Vol: %{{x:.1f}}%<br>CAGR: %{{y:.1f}}%<extra></extra>",
+            ))
+        except Exception as e:
+            print(f"    [frontier] Skipping index {idx_key}: {e}", flush=True)
+
+    # Client portfolio point
+    ps = port_stats["real"]["full"]
+    fig.add_trace(go.Scatter(
+        x=[ps["vol"] * 100], y=[ps["cagr"] * 100],
+        mode="markers",
+        marker=dict(
+            size=16, color=RED,
+            symbol="star",
+            line=dict(width=2, color="white"),
+        ),
+        name=f"Conta {account}",
+        hovertemplate=(
+            f"<b>Conta {account}</b><br>"
+            f"Vol: %{{x:.1f}}%<br>"
+            f"CAGR: %{{y:.1f}}%<br>"
+            f"Sharpe: {ps['sharpe']:.2f}"
+            f"<extra></extra>"
+        ),
+    ))
+
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor=BG_PRIMARY,
+        plot_bgcolor=BG_PRIMARY,
+        font=dict(family="Inter, sans-serif", color=TEXT_PRIMARY, size=12),
+        title=dict(
+            text=(
+                f"<b>Conta {account}</b> — Fronteira Eficiente (Real)<br>"
+                f"<span style='font-size:13px;color:{TEXT_SECONDARY}'>"
+                f"CAGR: {ps['cagr']*100:.1f}% | "
+                f"Vol: {ps['vol']*100:.1f}% | "
+                f"Sharpe: {ps['sharpe']:.2f}</span>"
+            ),
+            font=dict(size=16),
+            x=0.01, xanchor="left",
+        ),
+        xaxis=dict(
+            title="Volatilidade Anualizada (%)",
+            gridcolor="rgba(100,116,139,0.15)",
+            zeroline=False,
+        ),
+        yaxis=dict(
+            title="CAGR Real (%)",
+            gridcolor="rgba(100,116,139,0.15)",
+            zeroline=False,
+        ),
+        legend=dict(
+            bgcolor="rgba(15,23,42,0.8)",
+            bordercolor="rgba(100,116,139,0.25)",
+            borderwidth=1,
+        ),
+        margin=dict(l=80, r=30, t=100, b=60),
+        width=1200,
+        height=650,
+    )
+
+    return fig
+
+
+def make_histogram_chart(sim_result, mode, account, total_brl):
+    """Create histogram of final portfolio values."""
+    stats = sim_result[mode]
+    hist = stats.get("histogram") or {}
+    counts = hist.get("counts", [])
+    mids = hist.get("mids", [])
+
+    if not counts or not mids:
+        return None
+
+    mode_label = "Real" if mode == "real" else "Nominal"
+
+    fig = go.Figure()
+
+    # Histogram bars
+    fig.add_trace(go.Bar(
+        x=mids, y=counts,
+        marker=dict(
+            color=ACCENT,
+            opacity=0.7,
+            line=dict(width=0.5, color="rgba(34,211,238,0.9)"),
+        ),
+        name="Distribuição",
+    ))
+
+    # Vertical lines for key percentiles
+    for pname, val, color, dash in [
+        ("p5", stats.get("final_p5", 0), RED, "dash"),
+        ("Mediana", stats.get("final_median", 0), ACCENT, "solid"),
+        ("p95", stats.get("final_p95", 0), GREEN, "dash"),
+    ]:
+        fig.add_vline(
+            x=val, line=dict(color=color, width=1.5, dash=dash),
+            annotation_text=f"{pname}: {brl_fmt(val)}",
+            annotation_position="top",
+            annotation_font=dict(size=10, color=color),
+        )
+
+    # Initial value line
+    fig.add_vline(
+        x=total_brl,
+        line=dict(color="white", width=1, dash="dot"),
+        annotation_text="Valor Inicial",
+        annotation_position="bottom",
+        annotation_font=dict(size=9, color="white"),
+    )
+
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor=BG_PRIMARY,
+        plot_bgcolor=BG_PRIMARY,
+        font=dict(family="Inter, sans-serif", color=TEXT_PRIMARY, size=12),
+        title=dict(
+            text=(
+                f"<b>Conta {account}</b> — Distribuição do Valor Final ({mode_label})<br>"
+                f"<span style='font-size:13px;color:{TEXT_SECONDARY}'>"
+                f"Mediana: {brl_fmt(stats.get('final_median', 0))} | "
+                f"p5: {brl_fmt(stats.get('final_p5', 0))} | "
+                f"p95: {brl_fmt(stats.get('final_p95', 0))}</span>"
+            ),
+            font=dict(size=16),
+            x=0.01, xanchor="left",
+        ),
+        xaxis=dict(
+            title="Valor Final (R$)",
+            gridcolor="rgba(100,116,139,0.15)",
+            tickformat=",.0f",
+        ),
+        yaxis=dict(
+            title="Frequência",
+            gridcolor="rgba(100,116,139,0.15)",
+        ),
+        showlegend=False,
+        margin=dict(l=80, r=30, t=100, b=60),
+        width=1200,
+        height=500,
+    )
+
+    return fig
+
+
+# ─── Combined Dashboard ─────────────────────────────────────────────────────
+
+def make_dashboard(sim_result, data, allocations, account, total_brl):
+    """Create a combined dashboard with all charts for a client."""
+    # Trajectory (real)
+    fig_traj = make_trajectory_chart(sim_result, "real", account, total_brl)
+
+    # Frontier
+    fig_frontier = make_frontier_chart(data, allocations, account, total_brl)
+
+    # Histogram (real)
+    fig_hist = make_histogram_chart(sim_result, "real", account, total_brl)
+
+    return fig_traj, fig_frontier, fig_hist
+
+
+# ─── Main ────────────────────────────────────────────────────────────────────
+
+def main():
+    print("Loading OryxMC data...")
+    data = engine.load_data()
+    engine.validate_data(data)
+    engine.verify_frontier_checksum(data)
+
+    # Build CDI benchmark
+    cdi_portfolio = engine.build_portfolio_returns(data, {"CDI": 1.0})
+
+    print("Reading client positions...")
+    positions = read_positions("Posição.xlsx")
+    accounts = aggregate_by_account(positions)
+
+    # Output directory
+    out_dir = "client_simulations"
+    os.makedirs(out_dir, exist_ok=True)
+
+    # Filter accounts with meaningful portfolios
+    active_accounts = {
+        k: v for k, v in accounts.items()
+        if v["total_brl"] > 0
+    }
+
+    print(f"Simulating {len(active_accounts)} client portfolios...\n")
+
+    for i, (conta, acct_data) in enumerate(
+        sorted(active_accounts.items(), key=lambda x: -x[1]["total_brl"])
+    ):
+        total = acct_data["total_brl"]
+
+        # Build normalized allocations for oryxmc
+        raw_allocs = {k: v for k, v in acct_data["allocations"].items()
+                      if v > 0 and k in data["indices"]}
+
+        if not raw_allocs:
+            print(f"  [{i+1}] Account {conta}: No valid allocations, skipping")
+            continue
+
+        # Renormalize to 1.0 (some positions may have been dropped)
+        alloc_sum = sum(raw_allocs.values())
+        allocs = {k: v / alloc_sum for k, v in raw_allocs.items()}
+
+        if not allocs:
+            print(f"  [{i+1}] Account {conta}: No valid allocations, skipping")
+            continue
+
+        print(f"  [{i+1}/{len(active_accounts)}] Account {conta} "
+              f"(R$ {total:,.2f}, {len(allocs)} indices)...", end=" ", flush=True)
+
+        try:
+            # Build portfolio returns
+            portfolio = engine.build_portfolio_returns(data, allocs)
+
+            # Build individual returns for non-monthly rebalancing
+            individual_returns, asset_weights = engine.build_individual_returns(
+                data, allocs, portfolio["months"]
+            )
+
+            # Run Monte Carlo (block bootstrap for regime persistence)
+            sim = engine.run_monte_carlo(
+                portfolio["portfolio_returns"],
+                portfolio["ipca"],
+                initial_value=total,
+                n_years=10,
+                n_trajectories=10000,
+                withdrawal_annual=0,
+                benchmark_returns=cdi_portfolio["portfolio_returns"],
+                benchmark_name="CDI",
+                bootstrap_mode="block",
+                block_size=12,
+                rebalance_months=1,
+                individual_returns=individual_returns,
+                asset_weights=asset_weights,
+            )
+            sim["warnings"] = portfolio["warnings"]
+
+            # Generate charts
+            fig_traj, fig_frontier, fig_hist = make_dashboard(
+                sim, data, allocs, conta, total
+            )
+
+            # Save as PNG
+            prefix = os.path.join(out_dir, f"{conta}")
+
+            fig_traj.write_image(f"{prefix}_trajectory.png", scale=2)
+            if fig_frontier:
+                fig_frontier.write_image(f"{prefix}_frontier.png", scale=2)
+            if fig_hist:
+                fig_hist.write_image(f"{prefix}_histogram.png", scale=2)
+
+            # Also save as HTML (interactive)
+            fig_traj.write_html(f"{prefix}_trajectory.html", include_plotlyjs="cdn")
+
+            median_real = sim["real"]["final_median"]
+            cagr = sim["real"].get("median_cagr")
+            cagr_str = f"CAGR={cagr*100:.1f}%" if cagr is not None else ""
+            print(f"OK — Median final: {brl_fmt(median_real)} {cagr_str}")
+
+        except Exception as e:
+            print(f"ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+
+    print(f"\nAll simulations complete. Output in: {out_dir}/")
+
+
+if __name__ == "__main__":
+    main()
+```

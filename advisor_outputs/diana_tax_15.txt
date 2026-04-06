@@ -1,0 +1,33 @@
+Here is a review of your TAX precursor questions based on current Brazilian tax law and the real-world execution of an LLM for financial analysis. 
+
+### 1. Verify Brazilian Tax Rates for 2026
+I ran a web search to verify the tax landscape for 2026. **The classic tax rules remain in effect, but it was a close call.** 
+In late 2025, the Brazilian government proposed Medida Provisória (MP) 1.303/2025, which attempted to drastically change investments by creating a flat 17.5% IR rate, taxing LCI/LCA at 5-7.5%, and taxing FII dividends. **This MP was officially rejected/expired in October 2025.** 
+
+Therefore, the rates for 2026 are:
+*   **IR Regressive Table (Fixed Income):** Unchanged. 22.5% (up to 180 days), 20% (181-360 days), 17.5% (361-720 days), and 15% (over 720 days).
+*   **Come-Cotas:** Unchanged for open-end funds. Anticipated IR deduction happens in May and November (15% for long-term funds, 20% for short-term funds).
+*   **LCI/LCA/CRI/CRA:** **100% exempt** from IR for individual investors (Pessoa Física).
+*   **FII / Fiagro Dividends:** **Exempt** for individual investors (provided the fund meets the minimum cotistas rule and is exchange-traded). However, capital gains on the *sale* of FII quotas are taxed at 20%.
+*   **IOF Regressivo:** Unchanged. It applies only to withdrawals made within the first 29 days, regressing from 96% of the yield on Day 1 down to 0% on Day 30.
+
+### 2. Risk of embedding literal tax rates in instructions?
+**High Risk.** Embedding literal rates (e.g., "tax is exactly 15% after 720 days") creates a maintenance liability. As demonstrated by the MP 1.303/2025 scare, Brazilian tax law is notoriously volatile. 
+*   **The Trade-off:** If you do not embed them, the LLM might hallucinate or pull outdated data (or falsely assume MP 1.303 passed). If you do embed them, an actual law change mid-year makes the system legally inaccurate and gives false net-return numbers.
+*   **Best Practice:** Do not hardcode literal percentages into the static LLM prompt template. Instead, hardcode the **tax mechanisms** (e.g., "These assets follow a time-regressive table," "These assets are exempt"). Pass the *actual percentages* dynamically as a JSON payload in the system instructions alongside the portfolio data at runtime (e.g., `{"current_tax_rates": {"lci_exemption": true, "ir_max": 22.5}}`). This keeps the prompt agnostic and shifts the rate-updating burden to your backend.
+
+### 3. Handling the PGBL/VGBL MVP Grouping
+Previdência Privada is arguably the most dangerous area for an AI to generalize because **PGBL taxes the entire principal + yield**, whereas **VGBL taxes only the yield**. Grouping them in an MVP can lead to disastrously wrong net-worth projections.
+
+**How to instruct the AI honestly:**
+Add a strict guardrail in your precursor explicitly restricting the AI from calculating final numbers. 
+*Draft Instruction:*
+> *"MVP LIMITATION: The provided portfolio data groups PGBL and VGBL simply as 'Previdência'. Because PGBL taxes the total balance and VGBL taxes only the yield, YOU MUST NOT calculate or project literal tax deductions for this asset block. You must state: 'Your portfolio contains Previdência funds. To accurately forecast your tax burden, we need to know if these are PGBL or VGBL, and which tax regime (Progressive or Regressive) you are under. Remember that under Law 14.803/2024, you can now choose your tax regime at the time of withdrawal.'"*
+
+### 4. Minimum mandatory tax facts the precursor must contain
+To prevent the LLM from making illegal or logically flawed financial statements, your precursor must enforce these absolute facts:
+1.  **Base of Incidence (Lucro vs. Principal):** Explicitly state that IR and IOF on standard fixed income (CDBs, Tesouro, etc.) **only apply to the yield (rentabilidade/lucro)**, never to the principal.
+2.  **Order of Deduction:** IOF is calculated *before* the IR. IR is applied to the yield *after* the IOF has been deducted.
+3.  **Come-cotas is NOT double taxation:** The LLM sometimes hallucinates that funds are heavily penalized by come-cotas. Instruct it to define come-cotas as an *anticipation* of the IR. At the time of withdrawal, the investor only pays the difference between what was already anticipated and the final regressive bracket.
+4.  **Stock Funds (FIA) Exception:** Explicitly state that Equity Funds (Fundos de Ações) are taxed at a flat 15% upon withdrawal and **do not** suffer come-cotas.
+5.  **Previdência 2024 Rule:** Mention the recent *Lei 14.803/2024*. The AI should know that investors are no longer locked into their tax regime (Progressive vs. Regressive) at the start of the contract; they can now choose the most advantageous regime at the time of redemption/benefit.

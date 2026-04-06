@@ -1,0 +1,34 @@
+Here is a review of your PERFORMANCE precursor for the Brazilian Portfolio X-Ray, specifically addressing your questions and incorporating current Brazilian macroeconomic conditions as of April 2026.
+
+### 1. Credibility Given Current Brazilian Conditions (April 2026)
+Yes, the framing will produce a credible report, **but only if the system is explicitly grounded in the current macro inflection point.** 
+
+As of April 2026, Brazil has just entered a highly anticipated economic shift:
+*   **The Selic Pivot:** After being held at a restrictive 15.00% for a prolonged period, the Central Bank (Copom) formally began an easing cycle in March 2026, cutting the Selic rate to 14.75%. 
+*   **Controlled but Watched IPCA:** Inflation (IPCA) has cooled slightly to around 3.90% over a 12-month period, though mid-April IPCA-15 readings showed a slight uptick, keeping it near the upper bounds of the Central Bank's target.
+*   **Ibovespa Record Highs:** Driven by heavy foreign capital inflows and the anticipation of rate cuts, the Ibovespa surged to historic record highs in early 2026, repeatedly crossing the 190,000-point threshold.
+
+**The Credibility Test:** If your precursor generates a generic qualitative narrative about "navigating a high interest rate environment," Brazilian advisors will immediately flag it as outdated or boilerplate. Without market data, the qualitative framing *must* be structured around **sensitivities to this current easing cycle**. For example, framing the fixed income sleeve around "duration exposure as the Selic begins to compress" or the equity sleeve around "participation in the recent Ibovespa rally driven by foreign capital."
+
+### 2. Standard Brazilian Reporting with Structural Data Only
+When Brazilian reports lack explicit time-series return data, they rely heavily on **"Structural Proxying"** rather than estimated returns. 
+*   **The CDI Gravity Well:** Brazilian advisors conceptually view all investments as a spread over the CDI. Reports frame structural data by yield profiles rather than historical performance (e.g., "The allocation's heavy weight in high-grade credit implies a structural return profile of CDI + 1.5% to 2.0%").
+*   **Duration vs. Post-Fixed:** Fixed income is contextualized by its indexation. Reports assess how much of the portfolio is pegged to the Selic/CDI (liquidity and current high yield) versus IPCA+ (real yield and duration risk).
+*   **Equity Beta/Factor Tilt:** Without equity return numbers, the standard approach is to describe the portfolio's factor tilt relative to the Ibovespa (e.g., "Structurally overweight in domestic cyclical consumption, positioning the portfolio to capture high beta during the current Selic easing cycle").
+
+### 3. The Hardest Anti-Hallucination Problem & Precursor Structure
+**The Problem:** LLMs have a deep, statistical compulsion to fill in the blanks of standard financial narratives with fabricated percentage returns (e.g., "The portfolio outperformed, returning 12.5% last year"). 
+
+**The Solution:** The precursor structure must shift the LLM’s task from *Historical Attribution* to *Behavioral Expectation*. To prevent number fabrication, you must implement a **Constraint & Abstracted Attribution Precursor Structure**:
+
+1.  **Strict Negative Guardrails in the System Prompt:** Include a directive: `CRITICAL: You possess NO historical return data. DO NOT generate, estimate, or hallucinate any percentage returns, tracking errors, or alpha metrics. Banned symbols: % (when referring to past returns).`
+2.  **Categorical Output Enums:** Force the precursor to output JSON arrays using strict enums rather than free text for performance context.
+    *   *Example:* `"structural_driver": "IPCA+ Yield Curve Compression" | "CDI Accrual" | "Ibovespa Beta"`
+3.  **"If/Then" Factor Framing:** Structure the prompt to output conditional statements based on the structural data. (e.g., *"Because the portfolio has a 40% allocation to IPCA-linked bonds (NTN-Bs), its performance is structurally dependent on the closing of real interest rates, rather than short-term CDI accrual."*)
+
+### 4. Referencing Named Benchmarks (CDI, IPCA+, Ibovespa)
+**Yes, it is absolutely mandatory to reference these in the instruction text.** 
+
+In the Brazilian market, CDI, IPCA+, and Ibovespa are not just benchmarks; they are the fundamental vocabulary of the investment landscape. 
+*   If you do not explicitly anchor the LLM to these terms, it will default to generic, US-centric financial jargon (e.g., "cash equivalents," "CPI," "broad market indices"). A report mentioning "short-term risk-free rates" instead of "the CDI" will instantly destroy the advisor's trust in the AI.
+*   **Prompt Strategy:** Instruct the LLM explicitly: *"Assess the portfolio's structural behavior and qualitative performance drivers relative to the CDI (opportunity cost/liquidity), IPCA+ (real return/duration), and the Ibovespa (equity beta)."* This acts as a powerful "localization anchor," forcing the LLM's latent space to retrieve highly contextual Brazilian financial terminology (such as NTN-B, LFT, FIDC, and CRA/CRI).

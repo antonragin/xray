@@ -1,0 +1,44 @@
+Here is the synthesis of the Tax Precursor, integrating CLOE’s logic-driven requirements with DIANA’s 2026 real-world legal context and risk assessment.
+
+### 1. Conflict Resolution (CLOE vs. DIANA)
+*   **The Conflict:** CLOE recommends using literal rate tables directly in the instructions for precision. DIANA warns this is a high-risk maintenance liability due to the volatility of Brazilian tax law (e.g., the near-miss of MP 1.303/2025), which could lead to hallucinated or legally inaccurate net-return calculations if laws change mid-year.
+*   **The Resolution: Parameterized Tax Injection.** We will decouple the *tax logic* from the *literal tax values*. The static prompt instructions will define the strict mathematical derivation (how and when to apply IOF, IR, Come-Cotas), but the exact percentages will be passed dynamically as context variables (e.g., `{{TAX_RATES_JSON}}`) at runtime. 
+    *   *Why this works:* It prevents the LLM from hallucinating outdated data or assuming MP 1.303 passed, satisfying CLOE’s need for strict brackets while satisfying DIANA’s requirement for maintainability and risk mitigation.
+
+### 2. Final Checklist for Tax Processing
+Before finalizing any net-yield calculation, the system must validate the following parameters against the asset profile:
+- [ ] **Holding Period Verification:** Calculate the exact holding duration in days (critical for both IOF and Regressive IR).
+- [ ] **IOF Trigger:** Is the holding period less than 30 days? (If yes, calculate IOF *before* IR).
+- [ ] **Asset Class Exemption Check:** Is the asset an LCI, LCA, CRI, CRA, or Debênture Incentivada held by a Pessoa Física (Individual)? (If yes, apply 100% IR exemption on yield).
+- [ ] **FII / Fiagro Differentiation:** Separate dividends (currently exempt for PF) from capital gains on quota sales (flat 20% IR).
+- [ ] **Come-Cotas Flag:** Is the asset an open-end investment fund (excluding stock funds/FIIs)? (If yes, model the May/November semiannual anticipated IR deduction).
+- [ ] **Tax Base Validation:** Ensure IR and IOF are calculated strictly on the *yield/profit*, never on the principal.
+
+### 3. Final Instruction Templates
+*To be embedded into the system prompt or agent logic, utilizing dynamic variables.*
+
+**[SYSTEM_INSTRUCTION: BRAZILIAN_TAX_ENGINE]**
+> "You are evaluating Brazilian financial assets. Calculate net returns by applying tax burdens strictly according to the following logic, using the rates provided in the `{{TAX_RATES_JSON}}` payload to ensure current-year compliance.
+> 
+> **A. IOF (Imposto sobre Operações Financeiras):** 
+> If the holding period is between 1 and 29 days, apply the IOF regressive rate found in `{{TAX_RATES_JSON.IOF}}`. Apply IOF strictly to the gross yield. IOF goes to 0% on day 30.
+> 
+> **B. IR (Imposto de Renda) - Fixed Income:**
+> Unless explicitly exempt (e.g., LCI/LCA/CRI/CRA for individuals), apply the Regressive IR Table. Match the holding period in days against the brackets in `{{TAX_RATES_JSON.IR_REGRESSIVE}}`. 
+> *Mathematical Order:* Deduct IOF from gross yield first. Then apply the IR percentage strictly to the *remaining yield*.
+> 
+> **C. Come-Cotas (Fundos de Investimento):**
+> If `asset.type == "open_fund"`, apply the Come-Cotas rule. Deduct the anticipated IR rate (`{{TAX_RATES_JSON.COME_COTAS}}`) from the accrued yield on the last business day of May and November. When the asset is finally redeemed, calculate the remaining IR owed based on the Regressive Table, subtracting the IR already paid via Come-Cotas.
+> 
+> **D. FIIs and Fiagros:**
+> For Real Estate and Agribusiness funds, treat monthly dividends/yields as 100% exempt for individuals. If calculating the sale of the asset, apply a flat rate (`{{TAX_RATES_JSON.FII_CAPITAL_GAINS}}`) to the capital gain."
+
+### 4. Ordering of Execution
+To ensure mathematical and legal accuracy, the LLM must execute the tax cascade in this strict chronological order:
+
+1.  **Gross Yield Calculation:** Calculate total accrued profit (Gross Principal - Initial Principal).
+2.  **Exemption Gate:** If asset is PF-exempt (LCI/LCA/CRI/CRA/Dividends), skip to Step 6.
+3.  **IOF Phase:** If Holding Period < 30 days, apply IOF to Gross Yield. Calculate `Yield_After_IOF`.
+4.  **Come-Cotas Phase (If Applicable):** Deduct May/Nov anticipations from the yield if the asset is an open-end fund.
+5.  **IR Phase:** Apply the correct IR bracket (based on total days held) to the `Yield_After_IOF` (or remaining yield after Come-Cotas). 
+6.  **Net Yield Calculation:** Principal + Final Profit (after all deductions).

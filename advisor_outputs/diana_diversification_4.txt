@@ -1,0 +1,96 @@
+Here is the finalized diversification precursor design, resolving the conflicts between structural rigor (Cloe) and localized Brazilian market pragmatism (Diana), optimized specifically for deterministic downstream LLM generation.
+
+### 1. Conflict Resolution (Optimizing for Deterministic AI Output)
+
+**Conflict A: HHI/Effective-N (Cloe) vs. Simple Top-X Framing (Diana)**
+*   **Resolution:** **Diana’s approach (Top-1, Top-3, Top-5)** is the primary choice, augmented by Cloe’s machine-readable thresholds.
+*   **Justification for AI Output:** LLMs are notoriously poor at reliable, complex zero-shot arithmetic like calculating HHI (sum of squared market shares). Requesting HHI calculations increases hallucination risk. Summing the Top-1, Top-3, and Top-5 positions is computationally simple, deterministic, and maps directly to how Brazilian advisors actually communicate. We will retain *Effective N* only as a background metric for internal systemic triggers, not for LLM natural language generation.
+
+**Conflict B: Detailed Vehicle Taxonomy (Cloe) vs. Practical BDR/Feeder Cases (Diana)**
+*   **Resolution:** **Diana’s practical approach** combined with Cloe’s `lookthrough_level` boolean flags.
+*   **Justification for AI Output:** Overly granular taxonomies confuse LLMs (e.g., struggling to differentiate between a "structured note" and a "certificate of deposit" if metadata overlaps). A shallow taxonomy anchored to concrete Brazilian vehicles (e.g., *FIC FI*, *BDR*, *ETF*) paired with an explicit, deterministic `lookthrough_required: TRUE/FALSE` flag forces the AI to check underlying assets without guessing vehicle mechanics based on abstract definitions.
+
+**Conflict C: Abstract Format (Cloe) vs. Brazil-Specific Anchoring (Diana)**
+*   **Resolution:** **Cloe’s structure populated strictly with Diana’s content.** 
+*   **Justification for AI Output:** LLMs drift when given abstract rules (e.g., "Warn if concentration is high"). They become deterministic when given structured, numerical anchors (e.g., "Warn if bank concentration > 20% per CVM 175"). Using Cloe’s `[Scope][Use for][Interpret carefully][Do not infer]` format prevents instruction-following drift, but injecting Diana's exact Brazilian parameters (FGC, CVM, Tesouro) prevents cultural hallucination (like an AI flagging a 50% *Tesouro Nacional* position as a dangerous concentration, which is false in Brazil).
+
+---
+
+### 2. Final Checklist (Priority Order for Implementation)
+
+For an implementer to verify completeness of the diversification precursor, it must contain the following blocks:
+
+1.  **Applicability & Coverage Matrix**
+    *   [ ] Each dimension (Issuer, Exposure, Country) explicitly mapped as `covered`, `unknown`, or `not_applicable`.
+2.  **Top-X Concentration Metrics**
+    *   [ ] Computed `top_1`, `top_3`, and `top_5` concentration percentages per dimension.
+3.  **Entity Resolution & FGC Mapping**
+    *   [ ] Exact issuer mapped to Parent Conglomerate (CPF/CNPJ level).
+    *   [ ] FGC eligibility flag (`eligible` / `ineligible`).
+    *   [ ] FGC limit threshold calculation (Warn if > R$250k per conglomerate, hard cap at R$1M).
+4.  **CVM 175 & Asset Allocation Heuristics**
+    *   [ ] Concentration flag: Bank/Financial Institution > 20% (Trigger warning).
+    *   [ ] Concentration flag: Corporate/Credit > 10% (Trigger warning).
+    *   [ ] Sovereign Debt baseline flag: Tesouro Nacional mapped to "Normal Baseline" (Do not warn up to 60%).
+5.  **Lookthrough & Country Mechanics**
+    *   [ ] `lookthrough_level` flag indicating if the vehicle is a wrapper (e.g., BDR, FIC).
+    *   [ ] Country risk split into: `vehicle_domicile` (e.g., BR), `listing_venue` (e.g., B3), `country_of_risk` (e.g., US).
+6.  **Behavioral/Tax Bias Flag**
+    *   [ ] Tax-exempt vehicle flag (LCI/LCA/CRI/CRA) explicitly tagged as "Monitor for tax-driven over-concentration."
+
+---
+
+### 3. Final Instruction Text Templates (The Patterns)
+
+These templates merge Cloe’s structure with Diana’s Brazilian parameters. Operators will fill in the `{placeholder}` variables for specific records.
+
+**1. instrument_template (Vehicle Mechanics)**
+> **[Scope]** Brazilian Wrapper & Mechanics. Defines how the asset is structured legally. pt-BR label: `{pt_br_label}` (e.g., BDR, FIC FI).
+> **[Use for]** Determining if a lookthrough is required to assess true diversification. `lookthrough_status`: `{lookthrough_boolean}`.
+> **[Interpret carefully]** Ensure a distinction between local wrapper and underlying risk. A local ticker does not mean local economic risk.
+> **[Do not infer]** Do not infer that `{pt_br_label}` guarantees liquidity or local sovereign backing. 
+
+**2. economic_exposure (What Risk)**
+> **[Scope]** Underlying Asset Class Risk. pt-BR label: `{pt_br_label}` (e.g., Renda Fixa Pós-Fixada, Renda Variável).
+> **[Use for]** Evaluating macro portfolio allocation against Brazilian baselines.
+> **[Interpret carefully]** If `{pt_br_label}` is Sovereign Debt (Tesouro Direto/Nacional), allocations up to `{safe_limit}%` (e.g., 60%) are standard in Brazil and MUST NOT be flagged as dangerous concentration.
+> **[Do not infer]** Do not infer correlation between different economic exposures without checking the `issuer_type`.
+
+**3. issuer_type (Issuer Family / Sector)**
+> **[Scope]** Broad category of the entity issuing the risk. pt-BR label: `{pt_br_label}` (e.g., Instituição Financeira, Empresa Privada).
+> **[Use for]** Applying CVM 175 concentration heuristics. Warn if concentration in `{issuer_type}` exceeds `{cvm_limit}%` (e.g., 20% for Banks, 10% for Corporates).
+> **[Interpret carefully]** High concentration in a single issuer type implies sector risk, even if individual issuers are diversified.
+> **[Do not infer]** Do not infer FGC guarantee based purely on issuer type; evaluate at the specific instrument and issuer level.
+
+**4. issuer (Exact Entity / Conglomerate)**
+> **[Scope]** The exact legal entity or financial conglomerate responsible for the payout. pt-BR label: `{pt_br_label}`.
+> **[Use for]** FGC (Fundo Garantidor de Créditos) tracking. Aggregating all exposures to `{conglomerate_name}`.
+> **[Interpret carefully]** Warn immediately if exposure to `{conglomerate_name}` exceeds R$250.000 per CPF, up to the R$1.000.000 global cap, for FGC-eligible assets.
+> **[Do not infer]** Do not treat subsidiaries of `{conglomerate_name}` as separate entities for diversification purposes.
+
+**5. tax_profile (Tax Bucket & Behavioral Bias)**
+> **[Scope]** Tax treatment of the asset for Brazilian individuals. pt-BR label: `{pt_br_label}` (e.g., Isento de IR, Tributado).
+> **[Use for]** Identifying tax-driven behavioral biases. If `{pt_br_label}` is "Isento" (LCI/LCA/CRI/CRA), analyze if the investor has sacrificed diversification to chase tax exemptions.
+> **[Interpret carefully]** Tax exemption often masks high issuer concentration. Highlight this trade-off to the advisor.
+> **[Do not infer]** Do not infer that tax-exempt assets are lower risk; they are purely a tax mechanism.
+
+---
+
+### 4. Recommended Ordering for Prompt Concatenation
+
+To optimize against LLM "Lost in the Middle" syndrome and build logical context hierarchically, the instruction blocks should be concatenated into the precursor in this exact order:
+
+**1. `instrument_template` (The Wrapper)**
+*   *Why First?* It dictates how the LLM should read the rest of the data. If the asset is a BDR or Feeder Fund (FIC), the LLM immediately knows to look through the domestic shell to the data below. It sets the `country_of_risk` vs `vehicle_domicile` context immediately.
+
+**2. `issuer` (The Exact Entity & FGC)**
+*   *Why Second?* Issuer collapse is the most acute risk. Placing the exact conglomerate name and the hard FGC limits (R$250k/R$1M) early ensures the LLM's attention is captured by the most critical legal and capital-loss guardrails.
+
+**3. `issuer_type` (The Sector / CVM Limits)**
+*   *Why Third?* Broadens the lens from the specific entity to the sector. Applies the CVM 175 regulatory limits (10% / 20%).
+
+**4. `economic_exposure` (The Macro Risk)**
+*   *Why Fourth?* Establishes the overarching asset class (e.g., Sovereign vs Corporate). It is placed here so the LLM can apply the "Tesouro Nacional exception" (allowing 40-60% concentration) after understanding the specific vehicles.
+
+**5. `tax_profile` (The Behavioral Bias)**
+*   *Why Last?* This is the "narrative" layer. Once the AI understands *what* the instrument is, *who* issued it, and its *macro risk*, the tax profile gives the AI the "why" (e.g., "The client is highly concentrated in Bank X's credit risk [Issuer/Issuer Type] because they chased tax-free yield [Tax Profile]"). Placing it last perfectly sets up the LLM to generate the final advisory narrative.

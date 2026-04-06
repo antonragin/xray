@@ -1,0 +1,506 @@
+Yes. In this setup, the precursor can compute **structural / mechanical risk** well, but not **probabilistic risk**.
+
+## 1) Mechanical risk metrics the precursor can compute
+
+I’d split them into **exact**, **proxy**, and **conditional** metrics.
+
+### A. Exact from your current fields
+
+Using `economic_exposures` as look-through weights, this portfolio’s exposure inventory is:
+
+- `fi_cdi_br`: **30.0%**
+- `fi_ipca_br`: **18.8%**
+- `eq_br`: **15.0%**
+- `eq_international`: **14.2%**
+- `re_br`: **8.0%**
+- `fi_prefixado_br`: **5.0%**
+- `fi_international`: **5.0%**
+- `crypto`: **4.0%**
+
+From that, the precursor can compute:
+
+#### Exposure-group concentration
+- **CR1** = top exposure-group weight = **30.0%**
+- **CR2** = top 2 groups = **48.8%**
+- **CR3** = top 3 groups = **63.8%**
+- **HHI** = **0.181**
+- **Effective number of exposure groups** = `1 / HHI` ≈ **5.52**
+
+Those are useful because they show how much of the portfolio is driven by a small number of economic buckets.
+
+#### Single-issuer max weight
+Using `issuer_code` only where mapped:
+- `tesouro_nacional`: **22.0%**
+- `banco_itau`: **10.0%**
+- `banco_bradesco`: **8.0%**
+- `petrobras`: **5.0%**
+
+So:
+- **Max mapped issuer weight** = **22.0%** (`tesouro_nacional`)
+- **Max mapped private issuer weight** = **10.0%** (`banco_itau`)
+- **Issuer mapping coverage** = **45.0%**
+- **Unmapped issuer weight** = **55.0%**
+
+That last line matters a lot: issuer concentration is only partially observable here.
+
+#### Maturity profile / tenor proxy
+This is **not true duration**. It is a **tenor proxy** based on bucket midpoints.
+
+If you map:
+- `<1y` → 0.5
+- `1-3y` → 2.0
+- `3-5y` → 4.0
+- `5-10y` → 7.5
+- `>10y` → 12.0
+
+Then for the bucketed positions:
+- Bucketed weight = **45.0%**
+- `<1y` = **18.0%**
+- `1-3y` = **10.0%**
+- `5-10y` = **17.0%**
+- Unknown maturity = **55.0%**
+
+Weighted-average maturity proxy on mapped positions:
+- **3.48 years**
+
+So the precursor can say:
+- there is **meaningful long-tenor BR fixed-income exposure**
+- but maturity observability is incomplete, because **55% has no maturity bucket**
+
+#### FGC metrics
+Best practice is to separate:
+
+1. **FGC-eligible ratio**
+2. **Potentially covered ratio**
+3. **Verified covered ratio**
+
+From your sample:
+- `cdb_cdi_generic` 10%
+- `lci_generic` 8%
+
+So:
+- **FGC-eligible ratio = 18.0%**
+
+In Brazil, ordinary FGC coverage includes instruments such as **CDB** and **LCI**, while **Tesouro Direto**, **debentures**, and **fixed-income funds** are outside ordinary FGC coverage. The standard limit is **R$250 mil per CPF/CNPJ per institution or conglomerate**, subject to an aggregate cap of **R$1 milhão per 4-year period**. ([fgc.org.br](https://fgc.org.br/sobre-garantia-fgc))
+
+So the precursor can compute:
+
+- **Exact now:** `fgc_eligible_ratio = 18.0%`
+- **Conditional if portfolio BRL value is known:**  
+  `fgc_potential_covered_ratio = sum(min(position_brl_per_conglomerate, 250k)) / portfolio_value_brl`, subject to the rolling 4-year cap
+- **Not fully verifiable from current feed:** actual guaranteed ratio, because you lack:
+  - portfolio market value in BRL
+  - issuer/conglomerate grouping
+  - holder-level prior FGC payouts in the rolling 4-year window
+
+### B. Good additional mechanical metrics
+
+You didn’t ask, but I’d include these too:
+
+- **Listed-market share**: direct B3-traded wrapper share
+- **Direct fixed-income share** vs **fund share**
+- **Country / FX-sensitive economic exposure**
+- **Known non-FGC private credit share**
+- **Look-through opacity ratios**
+  - issuer unknown ratio
+  - maturity unknown ratio
+  - fund look-through partial ratio
+
+For this file:
+- `instrument_kind=fixed_income`: **45%**
+- `instrument_kind=fund`: **18%**
+- `instrument_kind=listed`: **33%**
+- `instrument_kind=crypto`: **4%**
+- economic international exposure (`eq_international + fi_international`) = **19.2%**
+
+---
+
+## 2) Risk vs diversification: how to delineate them
+
+Use this rule:
+
+- **Risk** asks: **“Where can losses come from?”**
+- **Diversification** asks: **“How balanced is the allocation across independent drivers?”**
+
+### Risk section
+Should focus on:
+- loss channels
+- concentration that worsens downside
+- protection / lack of protection
+- maturity sensitivity
+- FX sensitivity
+- listed-market mark-to-market / liquidity channels
+- opaque areas where losses are hard to localize
+
+Examples from your sample:
+- **17% in 5–10y fixed-income buckets** → rate / mark-to-market risk
+- **18% FGC-eligible bank credit** vs non-FGC credit elsewhere
+- **19.2% international economic exposure** → likely BRL FX sensitivity unless hedged
+- **4% crypto** → distinct tail-risk bucket
+- **22% mapped sovereign issuer concentration** → large single issuer, though of a different quality than corporate concentration
+
+### Diversification section
+Should focus on:
+- spread across exposure groups
+- issuer breadth
+- country breadth
+- wrapper breadth
+- maturity dispersion
+- dependence on one regime
+
+Examples:
+- CR1 = **30%**
+- CR2 = **48.8%**
+- issuer coverage only **45%**
+- maturity coverage only **45%**
+- effective exposure-group count ≈ **5.5**
+
+### Important design rule
+Some metrics are **shared primitives** but used differently.
+
+Example:
+- **Exposure-group concentration ratio** is primarily a **diversification** metric.
+- It becomes a **risk** metric only after you interpret what that concentrated bucket can lose under stress.
+
+So I’d keep:
+- `risk_section`
+- `diversification_section`
+
+as **siblings**, not merged.
+
+---
+
+## 3) Should the precursor include a “risk factor inventory”?
+
+**Yes — absolutely.**  
+In this setup, it should be one of the core outputs.
+
+Because you have no vol, no VaR, and no return history, the most honest thing the precursor can do is say:
+
+> “These are the risk factors that are mechanically present, and this is how much portfolio weight is tied to each.”
+
+That is:
+- auditable
+- stable
+- explainable
+- easy to QA
+- easy to compare across portfolios
+
+### What the inventory should contain
+Each factor should have:
+- `factor_id`
+- `present`
+- `exposure_weight`
+- `source_fields`
+- `loss_channel`
+- `protection_or_modifier`
+- `confidence`
+- `notes`
+
+### For this portfolio, the inventory should at least flag
+- `selic_cdi_br` → **30.0%**
+- `inflation_linked_br` → **18.8%**
+- `prefixado_br` → **5.0%**
+- `equity_br` → **15.0%**
+- `equity_international` → **14.2%**
+- `real_estate_br_listed` → **8.0%**
+- `fixed_income_international` → **5.0%**
+- `crypto` → **4.0%**
+- `fgc_eligible_bank_credit` → **18.0%**
+- `listed_market_channel_br` → about **37.0%** if you include the crypto ETF wrapper
+- `issuer_concentration_mapped_sovereign` → **22.0%**
+- `issuer_unknown` → **55.0%**
+- `maturity_unknown` → **55.0%**
+
+---
+
+## 4) Brazilian context: what factors belong
+
+### Yes: Selic risk
+But name it carefully.
+
+I’d use:
+- `cdi_selic_regime_exposure`
+- not just `selic risk`
+
+Why:
+- CDI / Selic-linked assets are not mainly “price crash” assets
+- the relevant risk is more:
+  - carry/reinvestment regime risk
+  - opportunity-cost risk versus falling/rising rates
+  - some mark-to-market if sold early in market-priced wrappers
+
+Tesouro Direto states that early resale is at market value, prices reflect secondary-market conditions and interest-rate expectations, and higher market rates reduce bond prices. Tesouro Selic is also described by Tesouro Direto as having relatively low volatility and being suitable for emergency reserves. ([tesourodireto.com.br](https://www.tesourodireto.com.br/es/sobre-o-tesouro/regras-e-regulamento))
+
+### Yes: inflation risk
+Use:
+- `inflation_linked_br`
+- plus a separate modifier: `real_rate_duration`
+
+Why:
+- IPCA-linked bonds hedge inflation if held to maturity
+- but they still have mark-to-market sensitivity to real-yield moves before maturity
+
+So for risk, don’t stop at “IPCA exposure”; also ask:
+- how much is in longer maturities?
+- how much is subject to early-sale mark-to-market?
+
+### Yes: credit risk, but split it properly
+Don’t model “FGC vs non-FGC” as the risk factor itself.
+
+Better split into:
+
+#### Credit factor
+- `sovereign_credit_br`
+- `bank_credit_br`
+- `corporate_credit_br`
+- `international_credit`
+
+#### Protection modifier
+- `fgc_eligible`
+- `fgc_limit_verified`
+- `unprotected`
+- `unknown_protection`
+
+That is cleaner, because FGC is a **loss mitigant**, not a primary economic driver.
+
+For this sample:
+- **FGC-eligible bank credit** = **18%**
+- **direct known non-FGC private credit** = at least **5%** (`debenture_infra`)
+- plus whatever private credit is inside funds, if any, which is not observable here
+
+### Yes: currency risk
+Definitely.
+
+But compute it from **economic exposure**, not just `country_bucket`.
+
+Reason:
+- `mixed_global_fund` is domiciled in Brazil, but its exposure is partly international
+- so country bucket is about wrapper domicile, not true economic sensitivity
+
+I’d use:
+- `fx_sensitive_weight`
+- `fx_hedged_weight`
+- `fx_unhedged_weight`
+- `fx_status_unknown_weight`
+
+With current data, absent hedge instructions:
+- international economic exposure = **19.2%**
+- likely treat that as **FX-sensitive by default**, unless instruction text says hedged
+
+### “B3 listing risk”: yes, but rename it
+I would **not** use `b3_listing_risk` as a fundamental factor.
+
+Better names:
+- `listed_market_liquidity_br`
+- `secondary_market_mark_to_market_br`
+- `exchange_traded_wrapper_risk_br`
+
+Reason:
+- being listed on B3 is not an economic factor like inflation or FX
+- it is a **transmission channel**:
+  - daily price discovery
+  - gap risk
+  - liquidity risk
+  - premium/discount behavior in wrappers
+  - trading-halt / market-stress behavior
+
+B3 itself frames stocks, ETFs and debentures through liquidity/risk criteria and revisable limits, which supports treating listing as a market/liquidity channel rather than a standalone macro factor. ([b3.com.br](https://www.b3.com.br/pt_br/produtos-e-servicos/compensacao-e-liquidacao/clearing/administracao-de-riscos/garantias/limites-de-renda-variavel-e-fixa/))
+
+---
+
+## 5) Sketch of an ideal risk section JSON schema
+
+I’d keep it like this:
+
+```json
+{
+  "risk_section": {
+    "methodology": {
+      "mode": "mechanical_precursor",
+      "uses_historical_returns": false,
+      "uses_volatility": false,
+      "uses_var": false,
+      "lookthrough_source": "economic_exposures",
+      "maturity_proxy_method": "bucket_midpoint_years",
+      "bucket_midpoints_years": {
+        "<1y": 0.5,
+        "1-3y": 2.0,
+        "3-5y": 4.0,
+        "5-10y": 7.5,
+        ">10y": 12.0
+      }
+    },
+    "data_coverage": {
+      "weight_sum": 1.0,
+      "issuer_code_coverage_ratio": 0.45,
+      "maturity_bucket_coverage_ratio": 0.45,
+      "instruction_text_coverage_ratio": 0.00,
+      "fund_partial_lookthrough_ratio": 0.18
+    },
+    "mechanical_metrics": {
+      "exposure_group_weights": {
+        "fi_cdi_br": 0.300,
+        "fi_ipca_br": 0.188,
+        "fi_prefixado_br": 0.050,
+        "eq_br": 0.150,
+        "eq_international": 0.142,
+        "re_br": 0.080,
+        "fi_international": 0.050,
+        "crypto": 0.040
+      },
+      "exposure_group_concentration": {
+        "cr1": 0.300,
+        "cr2": 0.488,
+        "cr3": 0.638,
+        "hhi": 0.181008,
+        "effective_group_count": 5.5246
+      },
+      "issuer_concentration": {
+        "max_mapped_issuer_weight": 0.220,
+        "max_mapped_issuer_code": "tesouro_nacional",
+        "max_mapped_private_issuer_weight": 0.100,
+        "max_mapped_private_issuer_code": "banco_itau",
+        "mapped_issuer_weight": 0.450,
+        "unmapped_issuer_weight": 0.550
+      },
+      "maturity_proxy": {
+        "name": "weighted_average_maturity_bucket_midpoint_years",
+        "value": 3.4778,
+        "bucketed_weight": 0.450,
+        "unknown_weight": 0.550,
+        "bucket_weights": {
+          "<1y": 0.180,
+          "1-3y": 0.100,
+          "5-10y": 0.170
+        }
+      },
+      "fgc": {
+        "fgc_eligible_weight": 0.180,
+        "fgc_potentially_covered_weight": null,
+        "fgc_verified_covered_weight": null,
+        "requires_portfolio_value_brl": true,
+        "requires_conglomerate_mapping": true,
+        "requires_holder_level_4y_window_info": true
+      }
+    },
+    "risk_factor_inventory": [
+      {
+        "factor_id": "cdi_selic_regime_br",
+        "present": true,
+        "exposure_weight": 0.300,
+        "loss_channel": "carry_reinvestment_and_rate_regime",
+        "confidence": "high"
+      },
+      {
+        "factor_id": "inflation_linked_br",
+        "present": true,
+        "exposure_weight": 0.188,
+        "loss_channel": "real_rate_mark_to_market",
+        "confidence": "high"
+      },
+      {
+        "factor_id": "prefixado_br",
+        "present": true,
+        "exposure_weight": 0.050,
+        "loss_channel": "nominal_rate_mark_to_market",
+        "confidence": "high"
+      },
+      {
+        "factor_id": "equity_br",
+        "present": true,
+        "exposure_weight": 0.150,
+        "loss_channel": "equity_drawdown",
+        "confidence": "high"
+      },
+      {
+        "factor_id": "equity_international",
+        "present": true,
+        "exposure_weight": 0.142,
+        "loss_channel": "foreign_equity_and_fx",
+        "confidence": "high"
+      },
+      {
+        "factor_id": "real_estate_br_listed",
+        "present": true,
+        "exposure_weight": 0.080,
+        "loss_channel": "listed_real_estate_drawdown_and_liquidity",
+        "confidence": "high"
+      },
+      {
+        "factor_id": "fixed_income_international",
+        "present": true,
+        "exposure_weight": 0.050,
+        "loss_channel": "foreign_rates_credit_and_fx",
+        "confidence": "high"
+      },
+      {
+        "factor_id": "crypto",
+        "present": true,
+        "exposure_weight": 0.040,
+        "loss_channel": "high_gap_and_regime_risk",
+        "confidence": "high"
+      }
+    ],
+    "modifiers_and_protections": {
+      "fgc_eligible_weight": 0.180,
+      "listed_market_weight": 0.370,
+      "international_economic_exposure_weight": 0.192,
+      "currency_hedge_status": "unknown",
+      "instruction_overrides": []
+    },
+    "flags": [
+      {
+        "flag_id": "issuer_mapping_incomplete",
+        "severity": "high",
+        "weight_affected": 0.550
+      },
+      {
+        "flag_id": "maturity_mapping_incomplete",
+        "severity": "high",
+        "weight_affected": 0.550
+      },
+      {
+        "flag_id": "long_tenor_fixed_income_present",
+        "severity": "medium",
+        "weight_affected": 0.170
+      },
+      {
+        "flag_id": "international_fx_sensitive_exposure_present",
+        "severity": "medium",
+        "weight_affected": 0.192
+      }
+    ],
+    "narrative": {
+      "summary": "Structural risk is driven by BR CDI/Selic exposure, meaningful inflation-linked BR fixed income, material BR and international listed-market exposure, and incomplete issuer/maturity mapping.",
+      "main_loss_channels": [
+        "real_rate_and_nominal_rate_mark_to_market",
+        "equity_drawdown",
+        "international_fx_sensitivity",
+        "listed_market_liquidity",
+        "private_credit_without_full_protection_visibility"
+      ]
+    }
+  }
+}
+```
+
+## My strongest design recommendations
+
+1. **Call it a precursor, not a risk model.**
+2. **Use raw ratios, not a black-box scalar score.**
+3. **Separate factor, modifier, and protection.**
+   - factor = inflation, Selic/CDI, equity, FX, crypto
+   - modifier = maturity, issuer concentration, listing/liquidity
+   - protection = FGC, hedge, guarantee text
+4. **Track coverage gaps explicitly.**
+   - unknown issuer weight
+   - unknown maturity weight
+   - unknown hedge status
+5. **Keep diversification as a sibling section.**
+
+If you want, I can turn this into a **production-ready JSON contract** with:
+- field definitions,
+- exact formulas,
+- nullable behavior,
+- and threshold rules for flags.

@@ -1,0 +1,107 @@
+### 1. Are the Round 1 fixes correctly implemented?
+
+**Yes, exceptionally well done.** You successfully hit all the mapping adjustments. 
+- The split allocation logic for COEs and Hashdex works exactly as intended and distributes the value correctly.
+- The distinction between real estate equity (IFIX) and real estate credit (IDA-DI) is properly handled.
+- NTNB maturity branching (IMA-B 5 vs IMA-B 5+) is clean.
+- The `try/except` around the efficient frontier generation prevents full crashes, and the addition of `block` bootstrapping makes the Monte Carlo much more realistic for macro regime persistence.
+
+***
+
+### 2. Remaining Issues & New Concerns
+
+There are a few subtle bugs introduced by the new features that need to be patched before running this in production:
+
+#### A. Weight Normalization Leak in Simulations (`simulate_clients.py`)
+Currently, you compute allocations like this:
+```python
+allocs = {}
+for idx_key, brl in acct_data["allocations"].items():
+    if brl > 0 and idx_key in data["indices"]:
+        allocs[idx_key] = brl / total
+```
+**The bug:** If any asset is dropped (e.g., a mapped index goes missing, or an allocation evaluates to `< 0`), the sum of `allocs` will be **less than 1.0**. OryxMC will simulate the remaining weight as earning a 0% return, which artificially drags down the client's simulated performance. 
+
+**Fix:** Normalize the weights *after* filtering to ensure they strictly sum to 1.0.
+```python
+allocs = {k: v for k, v in acct_data["allocations"].items() if v > 0 and k in data["indices"]}
+alloc_sum = sum(allocs.values())
+
+if alloc_sum == 0:
+    continue
+
+# Re-normalize to 100%
+allocs = {k: v / alloc_sum for k, v in allocs.items()}
+```
+
+#### B. Split Allocation Notes Bug (`map_positions.py`)
+In the Excel summary, the Notes column ("≈ proxy") works perfectly for single assets, but for split assets (like COEs), it only tags the *primary* index. 
+Because you append `primary_idx` to `acct["details"]`, your `_get_index_notes()` helper only sees "CDI" and misses "SP500TR". Thus, SP500TR won't get the "≈ proxy" warning in the spreadsheet.
+
+**Fix:** Track the notes directly in the `accounts` dictionary during aggregation, rather than trying to reverse-engineer them from `details` later.
+
+```python
+# 1. Update your defaultdict definition:
+accounts = defaultdict(lambda: {
+    "total_brl": 0.0,
+    "allocations": defaultdict(float),
+    "details": [],
+    "warnings": [],
+    "index_notes": defaultdict(set)  # <-- Add this
+})
+
+# 2. In aggregate_by_account, apply notes to ALL keys in the split:
+is_approx = "[APPROX]" in note or "unclassified" in note.lower()
+
+if isinstance(mapping, dict):
+    primary_idx = max(mapping, key=mapping.get)
+    for idx_key, weight in mapping.items():
+        acct["allocations"][idx_key] += valor * weight
+        if is_approx:
+            acct["index_notes"][idx_key].add("≈ proxy")
+    acct["details"].append((mercado, display, valor, primary_idx, note))
+else:
+    acct["allocations"][mapping] += valor
+    if is_approx:
+        acct["index_notes"][mapping].add("≈ proxy")
+    acct["details"].append((mercado, display, valor, mapping, note))
+```
+*(You can then remove `_get_index_notes` entirely and just use `idx_note = ", ".join(data["index_notes"].get(idx_key, []))` when building the Excel).*
+
+#### C. NTNB Brazilian Date Formats
+You added string fallback parsing for NTNBs, which is great, but `%Y-%m-%d` will fail if Excel spits out a local Brazilian date string like `15/05/2035`, causing the script to silently default to general `IMA-B`.
+
+**Fix:** Loop through common formats:
+```python
+elif isinstance(vencimento, str):
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d/%m/%y"):
+        try:
+            venc_date = datetime.strptime(vencimento[:10], fmt).date()
+            break
+        except ValueError:
+            pass
+```
+
+***
+
+### 3. Anything else I'd change? (Polish)
+
+* **Brazilian String Floats:** Your `_safe_float` catches `None` and `TypeErrors`, but if openpyxl reads a cell as text containing `"1.234,56"`, `float()` will crash and return `0.0`. You can make `_safe_float` bulletproof by adding a string cleanup step:
+  ```python
+  def _safe_float(val, default=0.0):
+      if val is None or val == "": return default
+      try:
+          if isinstance(val, str):
+              # Crude but effective for BR formats: 1.234,56 -> 1234.56
+              clean = val.strip()
+              if "," in clean and "." in clean:
+                  clean = clean.replace(".", "").replace(",", ".")
+              elif "," in clean:
+                  clean = clean.replace(",", ".")
+              return float(clean)
+          return float(val)
+      except (ValueError, TypeError):
+          return default
+  ```
+* **Summary Zero-Division Guard:** In `print_mapping_summary`, `amt/total_all*100` will throw a `ZeroDivisionError` if the spreadsheet happens to be completely empty. Wrap the percentage print loop in `if total_all > 0:` to make it invincible.
+* **HTML Exports:** I love that you added `.write_html()` for interactive charts. If you're going to generate those, you might want to consider automatically generating a tiny `index.html` file in the `client_simulations` directory that contains a list of hyperlinks to each client's interactive chart. It makes presenting to clients out of that folder infinitely easier.

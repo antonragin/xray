@@ -1,0 +1,78 @@
+Here is the synthesized **Risk Precursor** for the Brazilian Portfolio X-Ray, integrating CLOE’s foundational framework with DIANA’s Brazilian-specific, zero-market-data structural proxies.
+
+### 1. Conflict Resolution (Generic vs. Brazilian Proxies)
+To merge standard risk models with Brazil's unique environment without live market data, we must resolve the following structural conflicts:
+*   **Conflict:** *Generic Duration vs. Indexation Mismatch.* Generic duration relies on live yield curves. 
+    *   **Resolution:** Replace quantitative duration (modified duration/convexity) with **Structural Indexation Mismatch** (Bucketing into CDI, IPCA, PRE). Use a qualitative duration proxy (Short/Medium/Long) based strictly on maturity dates, not rate sensitivity.
+*   **Conflict:** *Standard Credit Tiers vs. Brazilian Counterparty Risk.* Global ratings (AAA/BBB) are subjective without market spreads.
+    *   **Resolution:** Prioritize deterministic Brazilian credit rules. Map assets first by **FGC coverage per conglomerate** and **FIDC subordination levels** (Sênior/Mezanino/Subordinada). Generic credit tiers become a secondary, optional metadata tag.
+*   **Conflict:** *Standard Liquidity vs. Regulatory Red Tape.* Volume-based liquidity models fail in Brazilian funds.
+    *   **Resolution:** Discard trading volume metrics. Strictly use the **D+N redemption timeline** (e.g., D+1, D+30) and map the penalizing tax clocks (IOF under 30 days, highest IR bracket under 180 days).
+
+---
+
+### 2. Final Checklist (Anti-Hallucination Risk Inventory)
+Ensure the final extraction engine captures the following structural risk metrics using only deterministic data (no VaR, Volatility, or Yield projections):
+
+- [ ] **Indexation & Interest Rate Proxy**
+  - [ ] Tag the primary driver: **CDI** (Floating), **IPCA/IGP-M** (Inflation), or **PRE** (Fixed).
+  - [ ] Qualitative Maturity Proxy (e.g., `<1 yr`, `1-3 yrs`, `3+ yrs`).
+- [ ] **Tax & Regulatory Friction**
+  - [ ] Identify tax status: **Isento** (LCI, LCA, CRI, CRA, Deb. Incentivadas) vs. **Tributável**.
+  - [ ] Identify structural tax drag: **Come-Cotas** (Open-ended funds) vs. **IR Regressivo** scale.
+  - [ ] Flag **IOF Risk**: Is the asset under 30 days old? (Massive penalty on early exit).
+- [ ] **Liquidity Red Tape (Resgate)**
+  - [ ] Capture the precise **D+N** cotization and settlement timeline.
+- [ ] **Credit & Counterparty Defenses**
+  - [ ] **FGC Exposure:** Group assets by issuing conglomerate to flag R$ 250k limit breaches.
+  - [ ] **Structured Risk:** Identify FIDC/CRI/CRA tranches (Sênior, Mezanino, Subordinada).
+- [ ] **Currency Flags**
+  - [ ] Domestic (BRL) vs. Offshore (USD, EUR, etc.) vs. FX-Hedged funds.
+
+---
+
+### 3. Templates (System Instruction & Output Schema)
+
+**System Instruction Text:**
+> *"You are analyzing a Brazilian investment portfolio. You do not have access to live market data, yield curves, or covariance matrices. DO NOT hallucinate Yield to Maturity (YTM), Volatility, Value at Risk (VaR), or correlations. You must evaluate risk strictly through deterministic structural proxies: Tax treatment (Come-Cotas/IR), Redemption liquidity (D+N), Indexation type (CDI/IPCA/PRE), FGC conglomerate limits, and structured tranche subordination."*
+
+**JSON Extraction Template:**
+```json
+{
+  "asset_risk_profile": {
+    "asset_name": "string",
+    "indexation_proxy": {
+      "type": "enum [CDI, IPCA, IGP-M, PRE, EQUITY, FX]",
+      "maturity_bucket": "enum [Under 1Y, 1-3Y, 3-5Y, 5Y+]"
+    },
+    "tax_and_regulatory": {
+      "is_tax_exempt": "boolean",
+      "come_cotas_exposure": "boolean",
+      "iof_risk_active": "boolean",
+      "ir_regressivo_bracket": "enum [22.5%, 20.0%, 17.5%, 15.0%, Exempt, N/A]"
+    },
+    "liquidity_profile": {
+      "redemption_cotization": "string (e.g., D+30)",
+      "redemption_settlement": "string (e.g., D+2)"
+    },
+    "credit_and_structure": {
+      "fgc_covered": "boolean",
+      "fgc_conglomerate_name": "string or null",
+      "structured_subordination": "enum [Senior, Mezzanine, Subordinated, N/A]",
+      "issuer_tier_proxy": "string (e.g., Sovereign, High Grade, High Yield)"
+    },
+    "currency_flag": "string [BRL, USD, EUR]"
+  }
+}
+```
+
+---
+
+### 4. Ordering (Pipeline Execution)
+To build the risk profile without triggering AI hallucination, process the portfolio in this strict sequence:
+
+1.  **Tax & Asset Classification (The Friction Layer):** First, map the asset type to its Brazilian tax reality. Identify if it is tax-exempt, suffers from *Come-Cotas*, or follows the *IR Regressivo*. This establishes the true net-return friction.
+2.  **Liquidity Extraction (The Trap Layer):** Extract the D+N rules. Combine this with the tax layer (specifically IOF and high short-term IR brackets) to calculate the "True Cost of Liquidity" (i.e., how penalized the user is if they sell today).
+3.  **Credit Counterparty Mapping (The Ruin Layer):** Group assets by issuer. Sum the total exposure per financial conglomerate to check against the R$ 250k FGC limit. Check FIDCs for Subordinated/Mezzanine risks. 
+4.  **Indexation Bucketing (The Macro Layer):** Group the portfolio by CDI, IPCA, and PRE. This creates a proxy for macro-economic vulnerability (e.g., "70% of this portfolio loses real value if inflation spikes because it is tied to PRE").
+5.  **Currency & Global Flags (The Offshore Layer):** Finally, separate domestic BRL risk from unhedged FX exposures.

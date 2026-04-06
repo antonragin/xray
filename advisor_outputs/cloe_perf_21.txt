@@ -1,0 +1,688 @@
+Yes — and the key design choice is this:
+
+**Do not make a “performance” precursor. Make a `performance_context` precursor.**
+
+Because with zero returns, zero benchmarks, and zero price history, the system cannot talk about realized performance.  
+What it *can* talk about is:
+
+1. **what economically drives returns**,  
+2. **what rate/inflation/equity/FX regimes matter**,  
+3. **where maturity/mark-to-market sensitivity sits**,  
+4. **which market proxies are the right contextual lens in Brazil**.
+
+---
+
+## Short answers to your 5 questions
+
+### 1. How should precursor be structured?
+Use **4 layers**:
+
+1. **Data availability / limitations**
+   - explicitly say there is no realized performance data
+   - no benchmark series
+   - no market prices
+   - only composition, exposures, maturity, instructions
+
+2. **Aggregated return-driver exposures**
+   - aggregate instrument rows into portfolio-level economic drivers
+   - e.g. `fi_cdi_br`, `fi_ipca_br`, `eq_br`, `eq_international`, etc.
+   - this becomes the core of the section
+
+3. **Maturity / sensitivity context**
+   - summarize known tenor buckets
+   - identify where mark-to-market sensitivity is likely higher
+   - distinguish short CDI carry vs long IPCA+/prefixado duration risk
+
+4. **Narrative guardrails**
+   - what the writer/model may say
+   - what it must not say
+   - how proxies should be framed
+
+---
+
+### 2. Should it include “return driver descriptions”?
+**Yes — absolutely.**  
+That is the most useful thing this precursor can provide.
+
+Without returns, the performance section should basically answer:
+
+> “If this portfolio performs well or poorly, what will most likely explain it?”
+
+So each driver should have:
+- a **human-readable description**
+- a **Brazilian contextual proxy/reference**
+- a **plain-language behavior statement**
+- optional **sensitivity flags** like inflation, real rates, nominal rates, FX, risk appetite, credit spread
+
+---
+
+### 3. Should it explicitly state “DO NOT include specific return numbers”?
+**Yes. Strongly yes.**
+
+And not just in prose — make it **machine-readable**.
+
+You want explicit rules like:
+- do not state realized return
+- do not state benchmark return
+- do not state excess return / alpha
+- do not imply backfilled performance
+- do not say “outperformed” or “underperformed”
+- do not attach numeric return assumptions to proxies
+
+Important nuance:
+
+- **Forbidden:** return numbers, benchmark numbers, alpha, Sharpe, drawdown
+- **Allowed:** weights, maturity buckets, years to expiry, exposure percentages
+
+So the rule is really:
+
+> **Do not include specific performance numbers. Exposure and maturity numbers are allowed.**
+
+---
+
+### 4. Brazilian context: CDI, IPCA+, Ibovespa, S&P 500 in BRL?
+**Mostly yes, with one important refinement: treat them as contextual proxies, not formal benchmarks unless you actually know the benchmark.**
+
+Recommended mapping:
+
+- `fi_cdi_br` → **CDI / Selic**
+- `fi_ipca_br` → **IPCA + real rate curve**  
+  contextual lens: Tesouro IPCA+, NTN-B, IMA-B-style family
+- `fi_prefixado_br` → **nominal pre-fixed curve**
+- `eq_br` → **Ibovespa**  
+  pragmatic default in Brazil
+- `eq_international` → **S&P 500 in BRL terms** *if US-heavy exposure*  
+  otherwise use “global equities + FX” framing
+- `re_br` → **IFIX**
+- `crypto` → **Bitcoin in BRL**
+- `fi_international` → **global bonds + FX (if unhedged/hedge unknown)**
+
+### Important nuance on CDI
+In Brazil, **CDI is the universal opportunity-cost reference**, but it should **not** be treated as the natural benchmark for every asset class.
+
+So:
+- good as the main lens for `fi_cdi_br`
+- okay as a “cash baseline” for the whole portfolio
+- **not ideal** as the primary driver proxy for equities, FIIs, crypto, or international assets
+
+---
+
+## What your current CSV is missing
+
+Your current `angle_performance.csv` is useful as a **raw ingredient**, but not yet a strong precursor for narrative generation.
+
+It has:
+- instrument rows
+- weights
+- economic exposure tags
+- partial maturity
+- instruction text
+
+What it lacks:
+1. **portfolio-level aggregation by driver**
+2. **human-readable driver dictionary**
+3. **contextual reference/proxy per driver**
+4. **clear “known vs unknown” coverage**
+5. **explicit guardrails against fake performance language**
+
+---
+
+# What the ideal precursor should contain
+
+## A. Data limitations block
+This should be first-class, not implicit.
+
+Example:
+```json
+"data_availability": {
+  "has_realized_returns": false,
+  "has_benchmark_returns": false,
+  "has_market_prices": false,
+  "has_exposure_composition": true,
+  "has_partial_maturity_profile": true
+}
+```
+
+And:
+```json
+"section_intent": {
+  "type": "performance_context",
+  "purpose": "Explain likely return drivers and sensitivities without reporting realized performance."
+}
+```
+
+---
+
+## B. Portfolio-level aggregated driver exposures
+From your sample, the portfolio-level driver weights are:
+
+- `fi_cdi_br` = **30.0%**
+- `fi_ipca_br` = **18.8%**
+- `eq_br` = **15.0%**
+- `eq_international` = **14.2%**
+- `re_br` = **8.0%**
+- `fi_prefixado_br` = **5.0%**
+- `fi_international` = **5.0%**
+- `crypto` = **4.0%**
+
+These are the actual backbone of the section.
+
+So instead of narrating row-by-row instruments, the precursor should aggregate to:
+```json
+"driver_exposures": [
+  {"driver_code": "fi_cdi_br", "portfolio_weight": 0.3000},
+  {"driver_code": "fi_ipca_br", "portfolio_weight": 0.1880},
+  {"driver_code": "eq_br", "portfolio_weight": 0.1500},
+  {"driver_code": "eq_international", "portfolio_weight": 0.1420},
+  {"driver_code": "re_br", "portfolio_weight": 0.0800},
+  {"driver_code": "fi_prefixado_br", "portfolio_weight": 0.0500},
+  {"driver_code": "fi_international", "portfolio_weight": 0.0500},
+  {"driver_code": "crypto", "portfolio_weight": 0.0400}
+]
+```
+
+---
+
+## C. Driver dictionary with human-readable descriptions
+Yes, you should absolutely add this.
+
+Recommended Brazilian mapping:
+
+```json
+"driver_dictionary": {
+  "fi_cdi_br": {
+    "label": "Renda fixa pós-fixada local",
+    "return_driver_description": "Tende a acompanhar o CDI/Selic, com desvios por spread, risco de crédito, impostos e taxas.",
+    "context_reference": {
+      "type": "proxy",
+      "code": "CDI",
+      "label": "CDI"
+    },
+    "sensitivity_axes": ["CDI/Selic", "spread de crédito", "liquidez"],
+    "default_narrative": "Funciona como bloco de carrego pós-fixado e tende a ser mais estável quando o prazo é curto."
+  },
+  "fi_ipca_br": {
+    "label": "Renda fixa indexada à inflação",
+    "return_driver_description": "Combina inflação realizada com exposição à curva de juros reais; prazos longos aumentam a sensibilidade a marcação a mercado.",
+    "context_reference": {
+      "type": "proxy",
+      "code": "IPCA_REAL_RATE",
+      "label": "IPCA + juros reais"
+    },
+    "sensitivity_axes": ["IPCA", "juros reais", "duração"],
+    "default_narrative": "Pode se beneficiar do carrego de inflação + taxa real, mas oscila com mudanças na curva real."
+  },
+  "fi_prefixado_br": {
+    "label": "Renda fixa prefixada local",
+    "return_driver_description": "É sensível ao nível e à direção da curva nominal de juros.",
+    "context_reference": {
+      "type": "proxy",
+      "code": "PRE_CURVE_BR",
+      "label": "Curva prefixada nominal"
+    },
+    "sensitivity_axes": ["juros nominais", "duração"],
+    "default_narrative": "Tende a ganhar contexto quando juros futuros caem e a sofrer quando juros sobem."
+  },
+  "eq_br": {
+    "label": "Ações Brasil",
+    "return_driver_description": "Depende de lucros, valuation, ciclo doméstico e apetite a risco local.",
+    "context_reference": {
+      "type": "proxy",
+      "code": "IBOV",
+      "label": "Ibovespa"
+    },
+    "sensitivity_axes": ["lucros", "valuation", "risco local", "juros"],
+    "default_narrative": "Representa a parcela mais diretamente ligada ao mercado acionário brasileiro."
+  },
+  "eq_international": {
+    "label": "Ações internacionais",
+    "return_driver_description": "Depende do desempenho das bolsas externas e, para o investidor em reais, também do câmbio.",
+    "context_reference": {
+      "type": "proxy",
+      "code": "SP500_BRL",
+      "label": "S&P 500 em BRL"
+    },
+    "sensitivity_axes": ["bolsas globais", "USD/BRL", "liquidez global"],
+    "default_narrative": "Para um investidor brasileiro, esse bloco costuma refletir tanto a bolsa externa quanto o efeito cambial."
+  },
+  "re_br": {
+    "label": "Fundos imobiliários listados",
+    "return_driver_description": "Depende de dividend yield, juros reais, valuation e percepção sobre imóveis comerciais/logísticos/shoppings.",
+    "context_reference": {
+      "type": "proxy",
+      "code": "IFIX",
+      "label": "IFIX"
+    },
+    "sensitivity_axes": ["juros reais", "yield", "ocupação", "cap rates"],
+    "default_narrative": "É uma exposição híbrida entre renda e risco de mercado, sensível ao nível de juros e ao humor com FIIs."
+  },
+  "crypto": {
+    "label": "Criptoativos",
+    "return_driver_description": "É altamente sensível ao preço do Bitcoin/cripto, liquidez global e apetite a risco.",
+    "context_reference": {
+      "type": "proxy",
+      "code": "BTC_BRL",
+      "label": "Bitcoin em BRL"
+    },
+    "sensitivity_axes": ["liquidez global", "sentimento", "volatilidade"],
+    "default_narrative": "É a parcela mais volátil do portfólio."
+  },
+  "fi_international": {
+    "label": "Renda fixa internacional",
+    "return_driver_description": "Depende de juros globais, spreads de crédito e, se não houver hedge, também do câmbio.",
+    "context_reference": {
+      "type": "proxy",
+      "code": "GLOBAL_BONDS_BRL",
+      "label": "Renda fixa global em BRL"
+    },
+    "sensitivity_axes": ["juros globais", "spreads", "USD/BRL"],
+    "default_narrative": "Acrescenta diversificação, mas seu comportamento depende do tipo de mandato e do tratamento cambial."
+  }
+}
+```
+
+---
+
+## D. Maturity / tenor context
+This is the second-most important part after driver exposures.
+
+From your sample, **explicit maturity data exists for 45%** of the portfolio:
+
+- `<1y` = **18%**
+- `1-3y` = **10%**
+- `5-10y` = **17%**
+- unknown / not applicable = **55%**
+
+That is very useful because it tells you:
+
+- there is a **short-duration post-fixed sleeve**
+- there is also a **meaningful long IPCA+ sleeve**
+- so the portfolio has both **carry** and **real-rate duration sensitivity**
+
+This should become a structured block like:
+
+```json
+"maturity_context": {
+  "coverage_weight": 0.45,
+  "bucket_weights_total_portfolio": {
+    "<1y": 0.18,
+    "1-3y": 0.10,
+    "5-10y": 0.17,
+    "unknown_or_not_applicable": 0.55
+  },
+  "interpretation": [
+    "Há concentração curta em pós-fixados locais.",
+    "Há exposição relevante a vencimentos mais longos em IPCA+, o que aumenta sensibilidade a juros reais.",
+    "Grande parte dos ativos de risco e fundos não possui vencimento explícito aplicável."
+  ]
+}
+```
+
+---
+
+# Strong recommendation: use “proxy” or “context_reference”, not “benchmark”
+
+This matters a lot.
+
+If you do not actually know the benchmark, **don’t call it benchmark**.  
+Call it one of:
+
+- `context_reference`
+- `market_proxy`
+- `return_driver_proxy`
+- `reference_lens`
+
+Why?
+
+Because “benchmark” implies:
+- a formal mandate benchmark
+- or a valid performance comparison series
+
+You do **not** have that.
+
+So the correct language is:
+
+- **CDI is the reference lens for the CDI-linked sleeve**
+- **Ibovespa is the contextual market proxy for Brazilian equities**
+- **S&P 500 in BRL is a contextual proxy for US-heavy offshore equity exposure**
+
+Not:
+- “the benchmark is CDI”
+- “the portfolio underperformed Ibovespa”
+- “returns should match S&P 500 in BRL”
+
+---
+
+# Yes: include explicit anti-hallucination instructions
+
+I would make these part of schema, not just prompt prose.
+
+Example:
+
+```json
+"generation_rules": {
+  "must_include_limitations": true,
+  "must_use_qualitative_language": true,
+  "must_frame_references_as_proxies": true,
+  "forbidden_claims": [
+    "realized_return",
+    "benchmark_return",
+    "excess_return",
+    "alpha",
+    "sharpe",
+    "tracking_error",
+    "outperformed",
+    "underperformed",
+    "since inception return",
+    "YTD return"
+  ],
+  "forbidden_patterns": [
+    "rendeu X%",
+    "performou X%",
+    "superou o CDI",
+    "abaixo do benchmark",
+    "retorno acumulado"
+  ],
+  "allowed_numeric_fields": [
+    "portfolio_weight",
+    "maturity_bucket_weight",
+    "years_to_expiry",
+    "coverage_weight"
+  ],
+  "preferred_verbs": [
+    "tende a",
+    "costuma",
+    "é sensível a",
+    "reflete",
+    "é influenciado por"
+  ]
+}
+```
+
+---
+
+# Ideal JSON schema
+
+Here is a clean version I’d use.
+
+```json
+{
+  "section_code": "performance_context",
+  "version": "1.0",
+  "locale": "pt-BR",
+  "market_context": "BR",
+  "base_currency": "BRL",
+  "as_of_date": "YYYY-MM-DD",
+
+  "data_availability": {
+    "has_realized_portfolio_returns": false,
+    "has_benchmark_returns": false,
+    "has_market_price_history": false,
+    "has_exposure_composition": true,
+    "has_partial_maturity_profile": true
+  },
+
+  "section_intent": {
+    "title": "Contexto de performance",
+    "purpose": "Descrever motores de retorno e sensibilidades prováveis sem reportar performance realizada."
+  },
+
+  "coverage": {
+    "exposure_mapping_weight": 1.0,
+    "maturity_mapping_weight": 0.45
+  },
+
+  "driver_dictionary": {
+    "fi_cdi_br": {
+      "label": "Renda fixa pós-fixada local",
+      "return_driver_description": "Tende a acompanhar o CDI/Selic, com desvios por spread, crédito, impostos e taxas.",
+      "context_reference": {
+        "type": "proxy",
+        "code": "CDI",
+        "label": "CDI"
+      },
+      "sensitivity_axes": ["CDI/Selic", "spread de crédito", "liquidez"],
+      "fx_sensitive": false,
+      "maturity_sensitive": true
+    },
+    "fi_ipca_br": {
+      "label": "Renda fixa indexada à inflação",
+      "return_driver_description": "Combina IPCA com exposição à curva de juros reais.",
+      "context_reference": {
+        "type": "proxy",
+        "code": "IPCA_REAL_RATE",
+        "label": "IPCA + juros reais"
+      },
+      "sensitivity_axes": ["IPCA", "juros reais", "duração"],
+      "fx_sensitive": false,
+      "maturity_sensitive": true
+    },
+    "fi_prefixado_br": {
+      "label": "Renda fixa prefixada local",
+      "return_driver_description": "Sensível à curva nominal de juros.",
+      "context_reference": {
+        "type": "proxy",
+        "code": "PRE_CURVE_BR",
+        "label": "Curva prefixada nominal"
+      },
+      "sensitivity_axes": ["juros nominais", "duração"],
+      "fx_sensitive": false,
+      "maturity_sensitive": true
+    },
+    "eq_br": {
+      "label": "Ações Brasil",
+      "return_driver_description": "Depende do mercado acionário doméstico, lucros, valuation e risco local.",
+      "context_reference": {
+        "type": "proxy",
+        "code": "IBOV",
+        "label": "Ibovespa"
+      },
+      "sensitivity_axes": ["lucros", "valuation", "risco local", "juros"],
+      "fx_sensitive": false,
+      "maturity_sensitive": false
+    },
+    "eq_international": {
+      "label": "Ações internacionais",
+      "return_driver_description": "Depende do mercado acionário externo e do câmbio para o investidor em reais.",
+      "context_reference": {
+        "type": "proxy",
+        "code": "SP500_BRL",
+        "label": "S&P 500 em BRL"
+      },
+      "sensitivity_axes": ["ações globais", "USD/BRL", "liquidez global"],
+      "fx_sensitive": true,
+      "maturity_sensitive": false
+    },
+    "re_br": {
+      "label": "Fundos imobiliários listados",
+      "return_driver_description": "Sensível a juros reais, yield, valuation e condições do mercado imobiliário listado.",
+      "context_reference": {
+        "type": "proxy",
+        "code": "IFIX",
+        "label": "IFIX"
+      },
+      "sensitivity_axes": ["juros reais", "yield", "ocupação", "cap rates"],
+      "fx_sensitive": false,
+      "maturity_sensitive": false
+    },
+    "crypto": {
+      "label": "Criptoativos",
+      "return_driver_description": "Altamente sensível ao preço do Bitcoin/cripto e à liquidez global.",
+      "context_reference": {
+        "type": "proxy",
+        "code": "BTC_BRL",
+        "label": "Bitcoin em BRL"
+      },
+      "sensitivity_axes": ["liquidez global", "sentimento", "volatilidade"],
+      "fx_sensitive": true,
+      "maturity_sensitive": false
+    },
+    "fi_international": {
+      "label": "Renda fixa internacional",
+      "return_driver_description": "Depende de juros globais, spreads e eventualmente câmbio.",
+      "context_reference": {
+        "type": "proxy",
+        "code": "GLOBAL_BONDS_BRL",
+        "label": "Renda fixa global em BRL"
+      },
+      "sensitivity_axes": ["juros globais", "spreads", "USD/BRL"],
+      "fx_sensitive": true,
+      "maturity_sensitive": true
+    }
+  },
+
+  "portfolio_driver_exposures": [
+    {
+      "driver_code": "fi_cdi_br",
+      "portfolio_weight": 0.3000,
+      "top_contributors": [
+        {"template_code": "cdb_cdi_generic", "weight": 0.1000},
+        {"template_code": "lci_generic", "weight": 0.0800},
+        {"template_code": "tesouro_selic", "weight": 0.0500}
+      ]
+    },
+    {
+      "driver_code": "fi_ipca_br",
+      "portfolio_weight": 0.1880
+    },
+    {
+      "driver_code": "eq_br",
+      "portfolio_weight": 0.1500
+    },
+    {
+      "driver_code": "eq_international",
+      "portfolio_weight": 0.1420
+    },
+    {
+      "driver_code": "re_br",
+      "portfolio_weight": 0.0800
+    },
+    {
+      "driver_code": "fi_prefixado_br",
+      "portfolio_weight": 0.0500
+    },
+    {
+      "driver_code": "fi_international",
+      "portfolio_weight": 0.0500
+    },
+    {
+      "driver_code": "crypto",
+      "portfolio_weight": 0.0400
+    }
+  ],
+
+  "maturity_context": {
+    "coverage_weight": 0.45,
+    "bucket_weights_total_portfolio": {
+      "<1y": 0.18,
+      "1-3y": 0.10,
+      "5-10y": 0.17,
+      "unknown_or_not_applicable": 0.55
+    },
+    "by_driver": [
+      {
+        "driver_code": "fi_cdi_br",
+        "known_weight": 0.23,
+        "weighted_avg_years_to_expiry_known_only": 1.16
+      },
+      {
+        "driver_code": "fi_ipca_br",
+        "known_weight": 0.17,
+        "weighted_avg_years_to_expiry_known_only": 8.26
+      },
+      {
+        "driver_code": "fi_prefixado_br",
+        "known_weight": 0.05,
+        "weighted_avg_years_to_expiry_known_only": 2.24
+      }
+    ]
+  },
+
+  "narrative_guidance": {
+    "opening_rule": "Start by stating that no realized performance data is available and the section is contextual only.",
+    "ordering_rule": "Discuss drivers from highest to lowest portfolio weight.",
+    "must_mention": [
+      "main return drivers",
+      "maturity/rate sensitivity where known",
+      "Brazilian contextual proxies",
+      "limitations of inference"
+    ],
+    "preferred_language": [
+      "tende a",
+      "costuma refletir",
+      "é mais sensível a",
+      "serve como referência contextual"
+    ]
+  },
+
+  "generation_rules": {
+    "must_include_limitations": true,
+    "must_avoid_specific_return_numbers": true,
+    "must_not_claim_realized_performance": true,
+    "must_not_use_formal_benchmark_language_when_unknown": true,
+    "allowed_numeric_fields": [
+      "portfolio_weight",
+      "bucket_weights_total_portfolio",
+      "years_to_expiry",
+      "coverage_weight"
+    ],
+    "forbidden_claims": [
+      "realized_return",
+      "benchmark_return",
+      "excess_return",
+      "alpha",
+      "sharpe",
+      "tracking_error",
+      "outperformed",
+      "underperformed"
+    ]
+  }
+}
+```
+
+---
+
+# My opinionated recommendation
+
+## Best naming
+Use:
+- **`performance_context`**
+or
+- **`return_drivers_context`**
+
+Not:
+- `performance`
+
+That alone will reduce hallucinations.
+
+---
+
+## Best practice for Brazil
+Use **two reference layers**:
+
+### Layer 1: asset-class-specific context proxies
+- CDI
+- IPCA + real rates
+- prefixado curve
+- Ibovespa
+- IFIX
+- S&P 500 in BRL
+- BTC in BRL
+
+### Layer 2: whole-portfolio baseline
+- CDI as **Brazilian opportunity-cost baseline**
+
+This is much better than trying to force CDI as the “benchmark” for every sleeve.
+
+---
+
+## Best output style
+The generated section should sound like:
+
+> “Sem histórico de rentabilidade, este bloco não descreve performance observada, mas sim os principais motores de retorno do portfólio. A carteira tem maior exposição a renda fixa pós-fixada ligada ao CDI/Selic, seguida por inflação + juros reais, ações Brasil e ações internacionais. Na parcela com vencimento explícito, há predominância de prazos curtos em pós-fixados e uma fatia relevante de IPCA+ mais longo, sugerindo combinação de carrego com sensibilidade à curva real. As referências citadas abaixo são proxies de contexto, não benchmarks formais nem retornos realizados da carteira.”
+
+That is exactly the kind of section this precursor should enable.
+
+---
+
+If you want, I can also do **one more step**: convert your current `angle_performance.csv` into a **fully populated example JSON precursor** using your sample rows.

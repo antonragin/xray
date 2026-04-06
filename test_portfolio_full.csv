@@ -1,0 +1,15 @@
+instrument_template_code,weight,expiry_date,issuer_code,issuer_type_code
+cdb_cdi_generic,0.10,2027-03-15,banco_itau,
+lci_generic,0.08,2026-09-20,banco_bradesco,
+tesouro_selic,0.05,2029-01-01,,
+tesouro_ipca_generic,0.12,2035-05-15,,
+tesouro_prefixado,0.05,2028-07-01,,
+debenture_infra,0.05,2032-06-30,,br_infrastructure
+bova11,0.10,,,
+petr4,0.05,,,
+ivvb11,0.10,,,
+fii_xpml11,0.08,,,
+mixed_global_fund,0.07,,,
+previdencia_rf,0.06,,,
+bitcoin_etf,0.04,,,
+bond_intl_fund,0.05,,,

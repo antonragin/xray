@@ -1,0 +1,69 @@
+Abaixo estão os rascunhos em formato **[Scope][Use for][Interpret carefully][Do not infer]**, em pt-BR e já orientados para análise de taxas.
+
+---
+
+### **fi_cdi_br (economic_exposure)**
+**[Scope]** Use este texto para ativos e fundos com exposição econômica predominantemente atrelada ao **CDI** ou a caixa pós-fixado no Brasil, em que a taxa tem efeito direto e relevante sobre o retorno líquido.  
+**[Use for]** Compare a taxa cobrada com pares da mesma **categoria ANBIMA** (ex.: DI, renda fixa simples, caixa), preferencialmente usando **faixas de taxa** e, quando houver mais de uma classe ou veículo comparável, **média ponderada por patrimônio**.  
+**[Interpret carefully]** Em estratégias CDI, diferenças aparentemente pequenas de taxa podem consumir parcela relevante do excesso de retorno; se o veículo for fundo, considere também o efeito do **come-cotas** como custo implícito adicional no resultado líquido ao longo do tempo.  
+**[Do not infer]** Não presuma que toda exposição CDI é “naturalmente barata”, nem compare diretamente com estratégias de crédito, duration, alavancagem ou produtos bancários sem taxa explícita.
+
+---
+
+### **eq_international (economic_exposure)**
+**[Scope]** Use este texto para ativos e fundos com exposição econômica principal a **ações internacionais**, inclusive mandatos globais, regionais ou passivos via índice.  
+**[Use for]** Avalie a taxa em relação a pares com mandato semelhante, distinguindo gestão **ativa vs. passiva**, grau de concentração, hedge cambial e **categoria comparável** antes de classificar a cobrança como baixa, média ou alta.  
+**[Interpret carefully]** Em renda variável internacional, taxas mais altas podem refletir gestão ativa, acesso a mercados específicos ou estrutura operacional mais complexa; ainda assim, a comparação deve considerar **buckets de taxa** e, quando fizer sentido, média ponderada entre classes comparáveis.  
+**[Do not infer]** Não conclua que todo produto internacional é caro apenas por investir fora do Brasil, e não misture ETFs de índice, fundos ativos globais e estruturas com proteção cambial como se fossem equivalentes.
+
+---
+
+### **general (tax_profile)**
+**[Scope]** Use este texto para o atributo **tax_profile** quando houver incidência de **come-cotas**, tratada como um custo implícito relevante para o investidor, ainda que não apareça como taxa contratual do produto.  
+**[Use for]** Sinalize que a eficiência líquida deve considerar não só taxa de administração e performance, mas também a antecipação periódica de IR via come-cotas, especialmente em comparações entre fundos tributados e alternativas sem esse mecanismo.  
+**[Interpret carefully]** O come-cotas não é “taxa” em sentido jurídico, mas funciona como **fricção econômica recorrente**, reduzindo o capital que permanece investido e podendo afetar a comparação com produtos isentos ou sem antecipação de imposto.  
+**[Do not infer]** Não some come-cotas mecanicamente à taxa de administração como se fosse o mesmo tipo de cobrança, e não assuma sua incidência em produtos isentos, ações, ETFs ou títulos que não seguem essa regra tributária.
+
+---
+
+### **tax_exempt (tax_profile)**
+**[Scope]** Use este texto para ativos com **isenção de IR para pessoa física** ou perfil tributário favorecido, quando a discussão de taxa precisa ser balanceada contra o benefício fiscal.  
+**[Use for]** Oriente a leitura de taxa líquida considerando o **trade-off entre isenção tributária e custo explícito**, especialmente em comparações com produtos tributados que possam aparentar taxa menor, mas entreguem retorno líquido inferior após impostos.  
+**[Interpret carefully]** A ausência ou menor peso do imposto pode justificar taxa aparente mais alta em alguns casos, desde que o benefício fiscal seja estrutural e comparável ao horizonte e risco do investimento.  
+**[Do not infer]** Não conclua automaticamente que todo produto isento comporta qualquer nível de taxa, nem trate benefício fiscal como substituto de análise de risco, liquidez, crédito ou qualidade do emissor/gestor.
+
+---
+
+### **br_bank (issuer_type)**
+**[Scope]** Use este texto para produtos de **emissor bancário brasileiro**, especialmente quando a estrutura de remuneração não aparece como taxa explícita ao investidor final.  
+**[Use for]** Ajude a interpretar casos em que o custo econômico está embutido no **spread de captação**, na taxa contratada abaixo do referencial, na distribuição ou em condições comerciais, e não em uma taxa de administração formal.  
+**[Interpret carefully]** Em produtos bancários, a comparação de “fee” deve reconhecer que o custo muitas vezes é **implícito**, o que exige cuidado para não comparar de forma literal com fundos ou veículos com taxa aberta; quando possível, use benchmarks de retorno líquido versus CDI ou pares semelhantes.  
+**[Do not infer]** Não infira taxa explícita inexistente apenas por o produto ser bancário, e não assuma que ausência de taxa contratual significa ausência de custo econômico para o investidor.
+
+---
+
+### **cdb_cdi_generic (instrument_template)**
+**[Scope]** Use este texto para **CDB genérico atrelado ao CDI**, em que o investidor normalmente não paga taxa de administração, gestão ou performance de forma destacada.  
+**[Use for]** Oriente que a avaliação de custo deve focar principalmente no **percentual do CDI oferecido**, prazo, liquidez e risco de crédito do emissor, e não em fee explícita como em fundos.  
+**[Interpret carefully]** A remuneração do distribuidor e do banco tende a estar embutida no preço do produto e no spread da captação, de modo que o “custo” aparece indiretamente em uma taxa ofertada menor do que poderia existir em condições ideais.  
+**[Do not infer]** Não registre taxa explícita onde ela não existe contratualmente, e não trate CDB como fundo sujeito a taxa de administração, taxa de performance ou come-cotas.
+
+---
+
+### **mixed_global_fund (instrument_template)**
+**[Scope]** Use este texto para **fundo global misto** com cobrança combinada de **taxa anual** e **taxa de performance**, especialmente quando investe em múltiplas classes de ativos e geografias.  
+**[Use for]** Avalie a taxa total dentro da categoria comparável, separando o componente **fixo** do componente **variável**, e posicionando o fundo em buckets de taxa versus pares com mandato semelhante e mesma referência de performance.  
+**[Interpret carefully]** A taxa anual impacta o retorno em qualquer cenário, enquanto a taxa de performance depende de regra de cálculo, benchmark, linha d’água e periodicidade; em fundos locais, o efeito do **come-cotas** também pode reduzir a eficiência líquida e deve entrar no contexto.  
+**[Do not infer]** Não some taxa anual e performance como se ambas fossem sempre integralmente incorridas, e não compare esse fundo diretamente com ETF passivo, multimercado local ou fundo sem performance fee sem ajustar o contexto.
+
+---
+
+### **ivvb11 (instrument_template)**
+**[Scope]** Use este texto para o **IVVB11** como ETF de exposição internacional listada no Brasil, normalmente associado a **baixa taxa explícita** dentro do universo de fundos e veículos de acesso a bolsa americana.  
+**[Use for]** Enquadre o produto como referência de **fee baixo** em comparação com fundos de gestão ativa internacional e estruturas distribuídas com taxa de administração mais elevada.  
+**[Interpret carefully]** A leitura de custo deve considerar que ETFs tendem a ser mais eficientes em taxa, mas ainda podem existir diferenças entre taxa do veículo, tracking difference, custos operacionais e efeitos tributários da estrutura.  
+**[Do not infer]** Não trate “baixo fee” como sinônimo de melhor retorno em qualquer cenário, e não extrapole a característica de ETF passivo para concluir ausência total de custos, risco de mercado ou variações de aderência ao índice.
+
+---
+
+Se quiser, eu também posso converter isso para um formato mais **padronizado de configuração** (por exemplo JSON/YAML ou tabela com `key`, `dimension`, `instruction_text`).

@@ -1,0 +1,44 @@
+While the prior review accurately identified structural gaps in your generic data model, it evaluated the precursor through a strictly North American/Global lens. For a Brazilian investment context, relying on that review alone will result in your downstream AI agents producing reports that sound like translated Wall Street analysis rather than practical advice from a local CPA-20 or CEA-certified professional.
+
+Here is the alternative, Brazil-specific perspective on your system.
+
+### 1. What the Prior Review Missed: Brazilian Market Specifics
+The precursor entirely misses the structural idiosyncrasies of the Brazilian financial system. If an AI writes a report based on this CSV, it will fail on these specific local realities:
+
+*   **The FGC "Conglomerate" Blindspot:** The precursor tracks `issuer_code` (e.g., `banco_itau`), but the *Fundo Garantidor de Créditos* (FGC) limits coverage to R$ 250,000 per CPF/CNPJ **per financial conglomerate**, capped at R$ 1 million every four years. If a client holds a CDB from Itaú Unibanco and an LCI from Itaú BBA, they share the same R$ 250k limit. Your system needs a `conglomerate_code` mapping, otherwise, the AI cannot accurately warn about uninsured credit risk.
+*   **CVM 175 Limits as Heuristics:** In Brazil, competent advisors anchor their concept of "concentration" to CVM Resolution 175 (formerly CVM 555) limits. The standard rule of thumb is a maximum of **20%** exposure to a single financial institution and **10%** to a corporate issuer. Your AI lacks the deterministic flags to compare portfolio allocations against these standard regulatory thresholds.
+*   **Sovereign Debt Dominance ("Risco Soberano"):** The CSV treats `tesouro_nacional` just like any other issuer. In US/Europe, having 40% of a portfolio in one issuer is a catastrophic concentration risk. In Brazil, holding 40-60% in sovereign debt is standard conservative practice. Without explicit flags, the LLM will hallucinate that the client is dangerously concentrated in `tesouro_nacional`.
+*   **The "Isenção de IR" Trap:** Your `coverage_summary.json` mentions `tax_profile_coverage`, but there is no tax column in the CSV. Brazilian investors chronically over-concentrate in LCIs, LCAs, CRIs, CRAs, and *Debêntures Incentivadas* purely to dodge income tax. The AI needs a `tax_profile` field (Isento vs. Tributável) to address this behavioral bias.
+
+### 2. Splitting "Country" – Necessary or Over-engineering?
+For a Brazilian investor, **this is absolutely necessary, not over-engineering.** 
+
+The Brazilian market is highly financialized through local wrappers. Without splitting the country fields, the AI will completely misinterpret diversification.
+*   **Practical Case (BDRs):** Look at row 9: `ivvb11`. It is an S&P 500 ETF traded in Reais on the B3. The `listing_venue` is Brazil, the `vehicle_domicile` is Brazil, but the `country_of_risk` is the USA. 
+*   **Practical Case (Offshore Funds via Local Feeders):** Many Brazilians access global markets via local *FIC FI* (Fundo de Investimento em Cotas) structures. The CNPJ is Brazilian, but the underlying assets are global. 
+
+If you use a single `country` column, the LLM will see a portfolio of Tesouro Direto, IVVB11, and a global fund wrapped in a local CNPJ, and incorrectly scold the client for having a "100% home bias in Brazil."
+
+### 3. Are HHI and Effective-N the Right Metrics?
+**No.** A Brazilian financial advisor has never used the words "Herfindahl-Hirschman Index" in a client meeting. These metrics are too academic and will result in a report that feels artificial and confusing to a retail client.
+
+A competent CEA/CPA-20 advisor uses simpler, threshold-based heuristics. The precursor should output these metrics instead:
+*   **Top 3 Private Exposures (%):** How much of the portfolio relies on the top 3 non-government issuers?
+*   **CVM Ceiling Breaches:** Boolean flags if any single financial issuer exceeds 20% or corporate issuer exceeds 10% of the non-sovereign portfolio.
+*   **FGC Uninsured Exposure (%):** What percentage of the fixed-income portfolio sits *outside* the FGC conglomerate limits or in non-covered assets (like debentures/CRIs)?
+
+### 4. Instruction Text Design for AI Compliance
+The `[Scope][Use for][Interpret carefully][Do not infer]` format is excellent for constraining AI logic, but it misses one vital component for deterministic prompts: **[Local Baseline]**.
+
+LLMs are trained predominantly on US financial logic (e.g., "A 60/40 portfolio is standard. 80% fixed income is for 80-year-olds"). In Brazil's high-interest-rate (Selic) environment, keeping 70-80% in fixed income is entirely normal for moderate profiles. 
+
+You must add a **[Local Baseline]** to the instructions to overwrite the LLM's geographical biases. 
+*   *Example for Tesouro:* `[Local Baseline] Up to 100% allocation to Brazilian sovereign debt is standard and considered the risk-free baseline; do not flag this as a concentration risk.`
+
+### 5. Minimum Necessary Precursors for a Brazilian Advisor Report
+To ensure a downstream AI writes a report that passes the "embarrassment test" for a CEA-certified professional, the precursor CSV *must* include:
+
+1.  **`conglomerate_id`**: Essential to accurately calculate FGC risk limits.
+2.  **`tax_treatment`** (`isento` | `tributavel`): Essential for explaining tax-driven concentration risks (e.g., holding too much LCI/LCA).
+3.  **`liquidity_profile / grace_period`** (`carencia`): Brazilian fixed income is riddled with lock-ups. A classic CEA exam trap is the "falsa liquidez" of having 60% of a portfolio mapped to `fi_cdi_br` (seemingly safe), but locked in LCIs with a 9-month *carência*.
+4.  **`credit_tier`**: Row 1 (CDB Banco Itaú) and Row 3 (Tesouro Selic) both map to `fi_cdi_br: 1.0`. They share the same indexer, but one is private FGC-backed credit and the other is sovereign risk. The AI needs a tiering system (`sovereign`, `fgc_covered`, `corporate_high_yield`) to differentiate credit concentration from indexer concentration.

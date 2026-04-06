@@ -1,0 +1,229 @@
+Yes — but **split “explicit recurring fees” from “tax/timing/transaction costs.”** That separation is the key design choice.
+
+## 1) What should the precursor compute?
+
+**Yes, compute these core outputs:**
+
+1. **Weighted average explicit annual fee (%)**
+   - Formula: `sum(weight * yearly_fee_pct)`
+   - This is your main portfolio fee number.
+
+2. **Same number in bps**
+   - Formula: `sum(weight * yearly_fee_pct * 100)`
+   - If `yearly_fee_pct` is stored as percent (e.g. `0.2300` = `0.23%`), then bps = pct × 100.
+
+3. **Fee contribution by holding / category**
+   - Better than “fee-weighted allocation.”
+   - Formula per holding: `weight * yearly_fee_pct`
+   - This tells you which positions drive fee drag.
+
+4. **Fee distribution data**
+   - By **allocation bucket**: e.g. 0 bps, 1–25 bps, 26–50 bps, 51–100 bps, 101–150 bps, 150+ bps.
+   - By **instrument_kind**
+   - By **tax_profile_code**
+   - By **known-fee vs blank-fee coverage**
+
+5. **Performance-fee exposure, separately**
+   - `performance_fee_exposed_weight`
+   - `weighted_avg_performance_fee_pct_on_exposed_weight`
+   - Do **not** add performance fees into the annual fee estimate; under CVM 175 they are conditional, benchmark-linked, charged after expenses, and generally no more frequently than semiannually. ([conteudo.cvm.gov.br](https://conteudo.cvm.gov.br/cvm_institucional/export/sites/cvm/legislacao/resolucoes/anexos/100/resol175.pdf))
+
+6. **Coverage stats**
+   - `weight_with_yearly_fee_populated`
+   - `weight_with_blank_yearly_fee`
+   - `weight_with_performance_fee`
+   - This is mandatory, because blank does **not** always mean costless.
+
+### On your sample CSV
+Using your data as-is:
+
+- **Weighted avg explicit annual fee** = **0.3420%**
+- **Total estimated explicit annual fee** = **34.2 bps**
+- **Weight with populated yearly_fee_pct** = **50%**
+- **Weighted avg fee on fee-populated sleeve only** = **0.6840%**
+- **Performance-fee-exposed allocation** = **7%** at **20% performance fee**
+
+So I would show **both**:
+- **Captured explicit recurring fee:** 34.2 bps
+- **Fee coverage:** only 50% of allocation has a populated annual fee field
+
+That prevents false precision.
+
+---
+
+## 2) How should instructions handle direct bonds / treasury / implicit costs?
+
+The instruction text should say:
+
+> **Blank yearly_fee_pct does not necessarily mean “free.” It means no deterministic recurring template fee was encoded. Other costs may still exist and are not included in the portfolio annual fee estimate.**
+
+For Brazilian direct fixed income, distinguish 3 things:
+
+### A. **Recurring explicit charges**
+For **Tesouro Direto**, there is an explicit **B3 custody fee of 0.20% a.a.** on Tesouro Selic, Tesouro IPCA and Tesouro Prefixado; for **Tesouro Selic**, the first **R$10,000 per CPF is exempt**, and intermediaries may also charge their own administration fee, which is optional and varies by institution. ([tesourodireto.com.br](https://www.tesourodireto.com.br/es/sobre-o-tesouro/regras-e-regulamento))
+
+### B. **Transaction / market costs**
+Brokerage, B3 emoluments, spread, and mark-to-market on early sale are **not annual recurring product fees** and should not be forced into `yearly_fee_pct`. For Tesouro Direto, early sale also exposes the investor to market price variation. ([tesourodireto.com.br](https://www.tesourodireto.com.br/es/sobre-o-tesouro/regras-e-regulamento))
+
+### C. **Embedded economics**
+For CDB/LCI/debênture bought directly, the bank/dealer spread is usually embedded in the quoted rate/price; it is not an annual management fee.
+
+### Recommendation
+- Keep `yearly_fee_pct` focused on **explicit recurring product fee**
+- Use `instructions_fees` for **“other costs not included”**
+- For Tesouro templates specifically, add a note because the custody charge is real but not cleanly representable with one universal number
+
+A good template note would be:
+
+> “This template does not include all possible costs. In Tesouro Direto, B3 custody may apply (0.20% a.a.; Tesouro Selic has exemption up to R$10,000 per CPF on the exempt portion), and the intermediary may charge its own administration fee. Early sale may also involve spread/market-price effects and short-term taxes.”
+
+---
+
+## 3) Should the fees precursor include come-cotas interaction?
+
+**No, not in the fee number.**  
+Come-cotas is a **tax**, not a fee, and without returns, holding period, and fund tax classification you cannot convert it into a reliable annual fee-equivalent.
+
+What the fees precursor **should** do:
+
+- keep **fee metrics pure**
+- add a **tax interaction flag/note**
+- push actual modeling to the tax precursor
+
+Why:
+- Under current Receita guidance, periodic taxation happens on the **last business day of May and November** for funds under the general regime; long-term funds are generally taxed at **15%** in the periodic collection and short-term funds at **20%**, with complementary tax on exit where applicable. ([gov.br](https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/manuais/orientacao-tributaria/fundosdeinvestimento))
+- But **not every fund** is subject to periodic taxation. Receita states that **FIA**, and when they meet the relevant conditions **FIP, FIDC, and ETFs except fixed-income ETFs**, are outside periodic taxation; FII/Fiagro follow separate rules. ([gov.br](https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/manuais/orientacao-tributaria/fundosdeinvestimento))
+
+So **`tax_profile_code = general` is too coarse to infer come-cotas safely**.  
+I would add an enum like:
+- `come_cotas_status = applies | does_not_apply | unknown`
+
+But keep it **outside** the fee total.
+
+---
+
+## 4) What should Brazilian-specific instruction text convey?
+
+It should convey 4 things:
+
+### A. Your fee model is simplified
+ANBIMA’s transparency regime breaks fund remuneration into **gestão, administração, taxa máxima de distribuição**, and for previdência, **taxa de estruturação de previdência**; disclosure can be segregated or shown as a global fee with decomposition. ([anbima.com.br](https://www.anbima.com.br/data/files/F3/D2/96/96/70F6A9100414E6A9F82BA2A8/Regras_Procedimentos_Codigo_AGRT_v_10_11_2025_.pdf))
+
+So your `yearly_fee_pct` should be described as:
+
+> “simplified rolled-up recurring annual fee captured from the template, not a full regulatory decomposition.”
+
+### B. CVM 175 documents can show more than your model captures
+CVM 175 materials for FIFs include fields such as **taxa de performance**, **taxa máxima de custódia**, and a **taxa total de despesas** / expense simulation in disclosure materials. ([conteudo.cvm.gov.br](https://conteudo.cvm.gov.br/cvm_institucional/export/sites/cvm/legislacao/resolucoes/anexos/100/resol175.pdf))
+
+So instruction text should warn:
+
+> “Actual regulated fund documents may disclose additional fee components and total expense information beyond the two template fields used here.”
+
+### C. Performance fee is conditional
+CVM 175 sets specific constraints around performance fees, including reference-index rules, minimum charging periodicity, charging after expenses, and no charge below quota base. ([conteudo.cvm.gov.br](https://conteudo.cvm.gov.br/cvm_institucional/export/sites/cvm/legislacao/resolucoes/anexos/100/resol175.pdf))
+
+So instruction text should say:
+
+> “Performance fee percentages indicate possible contingent charges and are not included in the estimated annual recurring fee.”
+
+### D. IOF is tax, not fee
+For short-term exits, IOF applies to redemptions before 30 days and is charged on **gains**, not principal; in Tesouro Direto, the same short-term IOF logic applies. ([tesourodireto.com.br](https://www.tesourodireto.com.br/b/impostos-e-taxas-no-tesouro-direto))
+
+So instruction text should say:
+
+> “IOF on short-term exits is a tax on gains and is excluded from annual fee estimates.”
+
+---
+
+## 5) Sketch of an ideal fees section JSON schema
+
+```json
+{
+  "fees": {
+    "methodology_version": "1.0",
+    "scope": "explicit_recurring_product_fees_only",
+    "assumptions": {
+      "yearly_fee_pct_interpretation": "rolled_up_explicit_recurring_annual_fee_pct",
+      "performance_fee_included_in_annual_estimate": false,
+      "taxes_included_as_fees": false,
+      "transaction_costs_included": false,
+      "blank_fee_means": "no_template_fee_captured_not_necessarily_zero_total_cost"
+    },
+    "coverage": {
+      "portfolio_weight_total": 1.0,
+      "weight_with_yearly_fee_populated": 0.0,
+      "weight_with_blank_yearly_fee": 0.0,
+      "weight_with_performance_fee_populated": 0.0
+    },
+    "portfolio_metrics": {
+      "weighted_avg_explicit_yearly_fee_pct_all_holdings": 0.0,
+      "weighted_avg_explicit_yearly_fee_bps_all_holdings": 0.0,
+      "weighted_avg_explicit_yearly_fee_pct_known_fee_holdings_only": 0.0,
+      "estimated_explicit_annual_fee_brl": null,
+      "estimated_explicit_annual_fee_brl_requires_portfolio_value": true,
+      "performance_fee_exposed_weight": 0.0,
+      "weighted_avg_performance_fee_pct_exposed_weight": null
+    },
+    "distribution": {
+      "by_fee_bucket": [
+        {
+          "bucket_label": "0_bps_or_blank",
+          "min_bps": 0,
+          "max_bps": 0,
+          "weight": 0.0
+        }
+      ],
+      "by_instrument_kind": [],
+      "by_tax_profile_code": []
+    },
+    "top_fee_contributors": [
+      {
+        "template_code": "example",
+        "weight": 0.0,
+        "instrument_kind": "fund",
+        "yearly_fee_pct": 0.0,
+        "performance_fee_pct": null,
+        "annual_fee_contribution_bps": 0.0,
+        "share_of_total_explicit_fee_drag": 0.0
+      }
+    ],
+    "positions": [
+      {
+        "template_code": "example",
+        "weight": 0.0,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "fee_capture_status": "known|blank|not_applicable",
+        "other_cost_flags": [
+          "custody_may_apply",
+          "transaction_costs_not_included",
+          "taxes_not_included"
+        ],
+        "instruction_text": ""
+      }
+    ],
+    "tax_interaction_flags": {
+      "come_cotas_status": "applies|does_not_apply|unknown",
+      "iof_short_term_exit_possible": false
+    },
+    "warnings": [
+      "Annual fee estimate excludes performance fees, taxes, spreads and trading costs."
+    ]
+  }
+}
+```
+
+## Bottom line
+
+My recommendation:
+
+- **Yes**: weighted avg fee, bps, fee contribution, fee distribution, coverage
+- **No**: do **not** blend performance fees or come-cotas into annual fee bps
+- **Yes**: use instructions to explain Treasury custody, optional intermediary fees, IOF, spreads, and regulatory disclosure limits
+- **Best naming change**: replace “fee-weighted allocation” with **“fee contribution share”**
+
+If you want, I can turn this into a **precise precursor spec** with:
+1. formulas,  
+2. null/blank handling rules, and  
+3. ready-to-implement `instructions_fees` templates per instrument type.

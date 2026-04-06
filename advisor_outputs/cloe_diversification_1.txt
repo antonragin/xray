@@ -1,0 +1,779 @@
+Below is a design review focused on what a downstream AI would need to write a **defensible, non-speculative diversification section** for a **Brazilian investor**.
+
+## Short verdict
+
+Your current precursor is **good for broad economic-exposure commentary** and **not yet sufficient for robust concentration commentary**.
+
+Right now, a downstream AI can safely say things like:
+
+- the portfolio is split across CDI/IPCA/prefixado, Brazilian equities, international equities, Brazilian real estate, international bonds, and crypto;
+- there is some international exposure;
+- there is a mix of direct securities and pooled vehicles.
+
+But it **cannot safely** say, without qualification:
+
+- issuer concentration is good/bad;
+- fixed-income maturities are well laddered;
+- country diversification is strong;
+- FGC protection is adequate;
+- overlap inside ETFs/funds is low/high.
+
+The main fixes are:
+1. add **coverage-aware concentration metrics**,  
+2. split **country of risk** from **vehicle domicile/listing**,  
+3. add **applicability-aware coverage** (`unknown` vs `not_applicable`),  
+4. add **machine-readable guardrails**.
+
+---
+
+# 1) What is missing?
+
+## A. Applicability-aware coverage is missing
+Your current `coverage_summary.json` is directionally useful, but it will mislead the downstream AI unless you distinguish:
+
+- **covered**
+- **unknown**
+- **not applicable**
+
+### Why this matters
+Example: `maturity_coverage = 0.45`.
+
+That looks weak if read against the whole portfolio, but maturity is really relevant mainly for **fixed income with defined maturity**. If the portfolio has **45% in direct fixed income**, then `0.45` might actually mean **100% of applicable fixed income is covered**.
+
+Same issue for issuer:
+- funds/ETFs often do **not** have a meaningful single economic issuer for diversification analysis;
+- that is different from “issuer is missing due to bad mapping.”
+
+### Recommendation
+Replace each coverage metric with:
+
+```json
+{
+  "coverage_on_total": 0.45,
+  "applicable_weight": 0.50,
+  "coverage_on_applicable": 0.90,
+  "unknown_weight_within_applicable": 0.05,
+  "not_applicable_weight": 0.50,
+  "commentary_status": "partial"
+}
+```
+
+Do this for at least:
+- issuer
+- issuer_type
+- maturity
+- FGC eligibility
+- country of risk
+
+---
+
+## B. Concentration metrics are missing
+The downstream AI should not have to infer concentration from raw tables.
+
+## Must-have metrics
+For each dimension, provide:
+
+- **HHI**
+- **effective number of bets** (`1 / HHI`)
+- **top 1 / top 3 / top 5 concentration**
+- **largest bucket**
+- **unknown/not-applicable share**
+- **coverage basis used**
+
+### Dimensions
+At minimum:
+
+- positions
+- economic exposure
+- country of risk
+- issuer type
+- issuer
+- fixed-income maturity buckets
+- instrument kind / wrapper type
+
+### Why
+This lets the downstream AI say:
+- “economic exposure is moderately diversified”
+- “issuer concentration cannot be fully assessed”
+- “international exposure exists but remains secondary”
+without improvising.
+
+### Concrete example from your sample
+Using `allocation_by_economic_exposure.csv`, economic exposure HHI is about **0.181**, implying an effective diversification of roughly **5.5 buckets**.  
+That is useful and safe.
+
+But issuer HHI on total portfolio is **not useful unless coverage is handled properly**, because only **45%** is mapped to issuer.
+
+---
+
+## C. Unique counts are missing
+Counts matter a lot in diversification commentary.
+
+## Add:
+- `position_count`
+- `unique_economic_exposure_count`
+- `unique_country_of_risk_count`
+- `unique_issuer_count_known`
+- `unique_issuer_type_count_known`
+- `unique_issuer_count_on_applicable_universe`
+- `count_direct_positions`
+- `count_pooled_vehicles`
+
+### Why
+A portfolio with 14 positions can still be concentrated if exposures collapse into a few buckets.  
+Counts plus HHI give a much better picture.
+
+---
+
+## D. Country needs to be split into multiple dimensions
+Current `country_bucket` = `Brazil / Non-Brazil` is **too coarse** and also appears to mix **vehicle domicile** with **economic exposure**.
+
+### Example from your sample
+`mixed_global_fund` is marked as `country_bucket = Brazil`, but its economic exposures are:
+- `eq_international: 0.6`
+- `fi_cdi_br: 0.4`
+
+So if the downstream AI uses current `country_bucket`, it will understate international exposure.
+
+### In your sample
+- By current row-level country bucket: **Brazil 81% / Non-Brazil 19%**
+- By economic exposure look-through: about **Brazil 76.8% / Non-Brazil 23.2%**
+
+That is a meaningful difference.
+
+## Recommendation: separate these dimensions
+Use **three distinct fields**:
+
+1. **vehicle_domicile_country**
+   - where the wrapper is domiciled / regulated
+   - e.g. Brazil, Cayman, Luxembourg
+
+2. **listing_venue**
+   - e.g. B3, offshore, not listed
+
+3. **country_of_risk** or **economic_geography**
+   - where the underlying economic exposure lives
+
+For country of risk, Brazil / Non-Brazil is still too coarse. Prefer buckets like:
+- Brazil
+- US
+- Developed ex-US
+- Emerging Markets
+- Global / mixed
+- Stateless / non-sovereign geographic exposure (useful for crypto)
+- Unknown
+
+For a Brazilian investor, this is much more useful than a binary split.
+
+---
+
+## E. The economic exposure code is too “flat”
+`fi_cdi_br`, `fi_ipca_br`, `eq_international`, etc. are useful, but they compress multiple dimensions into one token.
+
+## Better: decompose economic exposure into orthogonal attributes
+For each exposure component, include:
+
+```json
+{
+  "code": "fi_cdi_br",
+  "weight": 1.0,
+  "asset_class": "fixed_income",
+  "subclass": "post_fixed",
+  "indexer": "CDI",
+  "inflation_linked": false,
+  "geography": "Brazil",
+  "currency_exposure": "BRL"
+}
+```
+
+Do similarly for:
+- IPCA-linked
+- prefixado
+- Brazilian equity
+- international equity
+- Brazilian real estate
+- international bonds
+- crypto
+
+### Why
+This allows the downstream AI to comment on:
+- asset-class diversification
+- rate-index diversification
+- inflation-link diversification
+- geographic diversification
+without parsing code strings.
+
+For Brazilian context, this is especially important because **CDI / IPCA / prefixado** are core diversification lenses.
+
+---
+
+## F. Fixed-income diversification fields are missing
+For a Brazilian portfolio, diversification is not just “fixed income vs equity”.  
+Within fixed income, the AI needs:
+
+- **allocation by indexer**: CDI / IPCA / prefixado / foreign fixed income
+- **allocation by maturity bucket**
+- **allocation by issuer type** within fixed income
+- **FGC-eligible vs non-FGC**
+- **FGC conglomerate concentration**
+- **covered vs uncovered fixed-income subset**
+
+## Add these aggregates
+- `allocation_by_fixed_income_indexer`
+- `allocation_by_fixed_income_maturity_bucket`
+- `allocation_by_fixed_income_issuer_type`
+- `allocation_by_fgc_eligibility`
+- `allocation_by_fgc_group`
+
+### Important Brazilian nuance
+FGC analysis is **amount-based**, not weight-only.  
+If you want the downstream AI to discuss FGC concentration meaningfully, you also need:
+
+- `portfolio_market_value_brl`
+- `position_market_value_brl`
+- `fgc_eligible_amount_brl`
+- `fgc_group_code`
+
+Without BRL amounts, the AI should **not** comment on whether FGC limits are sufficient.
+
+---
+
+## G. Allocation tables should include residual buckets
+Today:
+
+- `allocation_by_issuer_type.csv` sums to **50%**
+- `allocation_by_issuer.csv` sums to **45%**
+
+That is dangerous, because the downstream AI may read them as complete views.
+
+## Recommendation
+Every allocation table should sum to 100% of portfolio, using explicit buckets such as:
+
+- `unknown`
+- `not_applicable`
+- `lookthrough_unavailable`
+
+Example:
+
+```csv
+code,weight,pct,bucket_status
+tesouro_nacional,0.22,22.00,known
+banco_itau,0.10,10.00,known
+banco_bradesco,0.08,8.00,known
+petrobras,0.05,5.00,known
+lookthrough_unavailable,0.50,50.00,not_applicable_or_unavailable
+unknown_direct_issuer,0.05,5.00,unknown
+```
+
+This is one of the most important changes.
+
+---
+
+## H. Look-through level is missing
+The downstream AI must know whether an exposure is:
+
+- direct security
+- wrapper-level only
+- mandate-level estimate
+- actual holdings look-through
+
+## Add
+Per position:
+
+```json
+{
+  "lookthrough_level": "economic_exposure_only",
+  "exposure_precision": "template_estimated"
+}
+```
+
+### Why
+Otherwise the AI may overstate precision on funds/ETFs.
+
+---
+
+## I. Human-readable labels are missing
+The downstream AI only sees codes. That is brittle.
+
+## Add:
+- `label_pt_br`
+- `short_definition_pt_br`
+
+Examples:
+- `fi_cdi_br` → “Renda fixa Brasil pós-fixada ao CDI”
+- `fi_ipca_br` → “Renda fixa Brasil indexada ao IPCA”
+- `eq_br` → “Renda variável Brasil”
+- `re_br` → “Fundos/imóveis Brasil”
+- `br_bank` → “Bancos brasileiros”
+- `br_government` → “Governo brasileiro”
+
+---
+
+## J. Threshold flags should be precomputed, not improvised
+If you want the downstream AI to state “concentrated” or “balanced”, do not force it to invent thresholds.
+
+## Add policy-driven flags
+Examples:
+- single issuer above policy max
+- single economic exposure above policy max
+- crypto above policy max
+- international exposure below target range
+- fixed income overly concentrated in CDI
+- maturity concentration in short bucket
+
+These should be **config-driven**, not hard-coded as universal truths.
+
+Example flag object:
+
+```json
+{
+  "flag_code": "single_issuer_above_limit",
+  "dimension": "issuer",
+  "entity_code": "tesouro_nacional",
+  "observed_weight": 0.22,
+  "threshold": 0.20,
+  "severity": "medium",
+  "coverage_basis": "total_portfolio",
+  "message_pt_br": "Exposição ao Tesouro Nacional acima do limite configurado."
+}
+```
+
+---
+
+# 2) Merge instruction text or keep separate blocks?
+
+## Recommendation
+**Keep them as separate labeled blocks with source and priority.**  
+Optionally also generate a deterministic merged string for legacy prompt compatibility.
+
+## Do not
+Do **not** concatenate all five tables into one undifferentiated prose blob.
+
+That loses:
+- provenance,
+- specificity,
+- conflict visibility,
+- ordering control.
+
+## Best structure
+Per position:
+
+```json
+"instructions_diversification": [
+  {
+    "source_table": "instrument_template",
+    "source_code": "cdb_cdi_generic",
+    "priority": 100,
+    "label": "Template-specific guidance",
+    "text": "..."
+  },
+  {
+    "source_table": "economic_exposure",
+    "source_code": "fi_cdi_br",
+    "priority": 90,
+    "label": "Exposure role",
+    "text": "..."
+  },
+  {
+    "source_table": "issuer",
+    "source_code": "banco_itau",
+    "priority": 80,
+    "label": "Issuer-specific concentration note",
+    "text": "..."
+  },
+  {
+    "source_table": "issuer_type",
+    "source_code": "br_bank",
+    "priority": 70,
+    "label": "Issuer-type note",
+    "text": "..."
+  },
+  {
+    "source_table": "tax_profile",
+    "source_code": "general",
+    "priority": 40,
+    "label": "Tax nuance",
+    "text": "..."
+  }
+]
+```
+
+## Best reading order
+For downstream comprehension:
+
+1. **global guardrails**
+2. **coverage/limitations**
+3. **portfolio-level concentration flags**
+4. **position-level instructions**, ordered:
+   - instrument_template
+   - economic_exposure
+   - issuer
+   - issuer_type
+   - tax_profile
+
+### Why this order
+- template is most concrete;
+- exposure tells the portfolio role;
+- issuer/issuer type informs concentration;
+- tax is usually secondary for diversification.
+
+## If you also want a merged narrative
+Generate it deterministically with headings:
+
+```text
+[TEMPLATE]
+...
+
+[ECONOMIC EXPOSURE]
+...
+
+[ISSUER]
+...
+
+[ISSUER TYPE]
+...
+
+[TAX PROFILE]
+...
+```
+
+---
+
+# 3) Guardrails to prevent speculation
+
+The precursor should include **machine-readable guardrails**, not just prose instructions.
+
+## A. Topic permission flags
+Add:
+
+```json
+"analysis_permissions": {
+  "economic_exposure": "full",
+  "country_of_risk": "full",
+  "issuer": "partial",
+  "issuer_type": "partial",
+  "maturity": "partial",
+  "lookthrough_holdings": "forbidden",
+  "fgc_adequacy": "forbidden_without_amounts"
+}
+```
+
+---
+
+## B. Required qualifier rules
+Example:
+
+```json
+"qualifier_rules": [
+  {
+    "dimension": "issuer",
+    "if_coverage_below": 0.80,
+    "required_phrase": "No nível de emissor, a análise cobre apenas a parcela mapeada da carteira."
+  }
+]
+```
+
+Better yet, store:
+- required qualifier text in Portuguese,
+- minimum coverage for unqualified commentary.
+
+---
+
+## C. Explicit prohibited inferences
+Add a list like:
+
+```json
+"prohibited_inferences": [
+  "Do not infer fund or ETF underlying holdings unless lookthrough_level = holdings.",
+  "Do not infer sector concentration from ETF/fund names alone.",
+  "Do not infer FGC sufficiency without BRL amounts and FGC group mapping.",
+  "Do not treat vehicle domicile as country of economic risk.",
+  "Do not make issuer-level claims on not_applicable or lookthrough_unavailable positions.",
+  "Do not infer benchmark composition unless benchmark_label is explicitly provided."
+]
+```
+
+---
+
+## D. Unknown vs not applicable must be explicit
+This is critical. The AI should know whether something is:
+- truly missing,
+- or not meaningful for that instrument.
+
+Examples:
+- maturity for equities: `not_applicable`
+- issuer for look-through-unavailable ETF exposure: `lookthrough_unavailable`
+- issuer missing on a debenture: `unknown`
+
+These are not the same.
+
+---
+
+## E. Add denominator discipline
+Every concentration claim should be tied to a denominator:
+- total portfolio
+- covered subset
+- applicable universe
+
+Example:
+- good: “Tesouro Nacional representa 22% da carteira total e 48.9% da parcela com emissor identificado.”
+- bad: “Tesouro é quase metade da carteira.”
+
+---
+
+# 4) Ideal JSON schema sketch
+
+Below is a practical schema sketch for `report_input_bundle.json`.
+
+```json
+{
+  "diversification": {
+    "meta": {
+      "version": "1.0",
+      "as_of_date": "YYYY-MM-DD",
+      "base_currency": "BRL",
+      "portfolio_market_value_brl": null
+    },
+    "summary": {
+      "position_count": 14,
+      "weight_sum": 1.0,
+      "count_direct_positions": 8,
+      "count_pooled_vehicles": 5,
+      "count_other_positions": 1
+    },
+    "coverage": {
+      "economic_exposure": {
+        "coverage_on_total": 1.0,
+        "applicable_weight": 1.0,
+        "coverage_on_applicable": 1.0,
+        "unknown_weight_within_applicable": 0.0,
+        "not_applicable_weight": 0.0,
+        "commentary_status": "full"
+      },
+      "issuer": {
+        "coverage_on_total": 0.45,
+        "applicable_weight": 0.50,
+        "coverage_on_applicable": 0.90,
+        "unknown_weight_within_applicable": 0.05,
+        "not_applicable_weight": 0.50,
+        "commentary_status": "partial"
+      },
+      "issuer_type": {
+        "coverage_on_total": 0.50,
+        "applicable_weight": 0.50,
+        "coverage_on_applicable": 1.0,
+        "unknown_weight_within_applicable": 0.0,
+        "not_applicable_weight": 0.50,
+        "commentary_status": "partial"
+      },
+      "maturity": {
+        "coverage_on_total": 0.45,
+        "applicable_weight": 0.45,
+        "coverage_on_applicable": 1.0,
+        "unknown_weight_within_applicable": 0.0,
+        "not_applicable_weight": 0.55,
+        "commentary_status": "full_on_applicable_universe"
+      }
+    },
+    "analysis_permissions": {
+      "economic_exposure": "full",
+      "country_of_risk": "full",
+      "issuer": "partial",
+      "issuer_type": "partial",
+      "maturity": "full_on_applicable_universe",
+      "lookthrough_holdings": "forbidden",
+      "fgc_adequacy": "forbidden_without_amounts"
+    },
+    "allocations": {
+      "by_economic_exposure": [],
+      "by_asset_class": [],
+      "by_fixed_income_indexer": [],
+      "by_fixed_income_maturity_bucket": [],
+      "by_country_of_risk": [],
+      "by_vehicle_domicile": [],
+      "by_listing_venue": [],
+      "by_instrument_kind": [],
+      "by_issuer_type": [],
+      "by_issuer": [],
+      "by_fgc_eligibility": [],
+      "by_fgc_group": []
+    },
+    "counts": {
+      "unique_economic_exposure_count": 0,
+      "unique_country_of_risk_count": 0,
+      "unique_issuer_count_known": 0,
+      "unique_issuer_count_on_applicable_universe": 0,
+      "unique_issuer_type_count_known": 0
+    },
+    "concentration_metrics": {
+      "positions": {
+        "hhi": 0.0,
+        "effective_n": 0.0,
+        "top_1_weight": 0.0,
+        "top_3_weight": 0.0,
+        "top_5_weight": 0.0
+      },
+      "economic_exposure": {
+        "hhi": 0.0,
+        "effective_n": 0.0,
+        "top_1_weight": 0.0,
+        "top_3_weight": 0.0,
+        "top_5_weight": 0.0
+      },
+      "country_of_risk": {
+        "hhi": 0.0,
+        "effective_n": 0.0,
+        "top_1_weight": 0.0
+      },
+      "issuer_type": {
+        "hhi_on_total": 0.0,
+        "hhi_on_applicable": 0.0,
+        "effective_n_on_applicable": 0.0,
+        "largest_known_bucket_weight_on_total": 0.0,
+        "largest_known_bucket_weight_on_applicable": 0.0
+      },
+      "issuer": {
+        "hhi_on_total": 0.0,
+        "hhi_on_applicable": 0.0,
+        "effective_n_on_applicable": 0.0,
+        "largest_known_bucket_weight_on_total": 0.0,
+        "largest_known_bucket_weight_on_applicable": 0.0
+      }
+    },
+    "threshold_policy": {
+      "policy_version": "string",
+      "single_position_max": null,
+      "single_issuer_max": null,
+      "single_issuer_type_max": null,
+      "single_exposure_max": null,
+      "crypto_max": null,
+      "international_min": null
+    },
+    "threshold_flags": [],
+    "limitations": [
+      {
+        "dimension": "issuer",
+        "severity": "medium",
+        "message_pt_br": "A análise por emissor cobre apenas a parcela aplicável e mapeada da carteira."
+      }
+    ],
+    "positions": [
+      {
+        "row_number": 1,
+        "weight": 0.1,
+        "market_value_brl": null,
+        "short_name": "CDB CDI Generic",
+        "template_code": "cdb_cdi_generic",
+        "instrument_kind": "fixed_income",
+        "vehicle_type": "direct_security",
+        "listing_venue": "off_exchange",
+        "vehicle_domicile_country": "Brazil",
+        "lookthrough_level": "direct",
+        "exposure_precision": "exact_template_mapping",
+        "economic_exposures": [
+          {
+            "code": "fi_cdi_br",
+            "label_pt_br": "Renda fixa Brasil pós-fixada ao CDI",
+            "weight": 1.0,
+            "asset_class": "fixed_income",
+            "indexer": "CDI",
+            "geography": "Brazil",
+            "currency_exposure": "BRL"
+          }
+        ],
+        "issuer": {
+          "code": "banco_itau",
+          "label_pt_br": "Banco Itaú",
+          "known_status": "known",
+          "group_code": "itau_group",
+          "group_label_pt_br": "Conglomerado Itaú"
+        },
+        "issuer_type": {
+          "code": "br_bank",
+          "label_pt_br": "Banco brasileiro",
+          "known_status": "known"
+        },
+        "maturity": {
+          "expiry_date": "2027-03-15",
+          "days_to_expiry": 343,
+          "years_to_expiry": 0.94,
+          "maturity_bucket": "<1y",
+          "known_status": "known"
+        },
+        "fgc": {
+          "eligible": true,
+          "group_code": "itau_group"
+        },
+        "instructions_diversification": [
+          {
+            "source_table": "instrument_template",
+            "source_code": "cdb_cdi_generic",
+            "priority": 100,
+            "label": "Template-specific guidance",
+            "text": "..."
+          }
+        ]
+      }
+    ],
+    "prohibited_inferences": [
+      "Do not infer ETF/fund underlying holdings without holdings look-through.",
+      "Do not infer FGC adequacy without BRL amounts and group mapping.",
+      "Do not treat vehicle domicile as country of economic risk."
+    ]
+  }
+}
+```
+
+## How to read the key sections
+
+### `coverage`
+Tells the downstream AI what it may discuss confidently.
+
+### `analysis_permissions`
+Simple machine-readable gatekeeping.
+
+### `allocations`
+Should always sum to 100% using explicit `known / unknown / not_applicable / lookthrough_unavailable` buckets where needed.
+
+### `concentration_metrics`
+Precomputed, so the AI does not invent math.
+
+### `threshold_flags`
+Lets the AI say “above configured limit” instead of making subjective judgments.
+
+### `positions`
+Preserves row-level evidence and source instructions.
+
+---
+
+# Final practical recommendations
+
+## Highest-priority changes
+If you only do 5 things, do these:
+
+1. **Add applicability-aware coverage**  
+   (`coverage_on_total`, `coverage_on_applicable`, `not_applicable_weight`, `unknown_weight`)
+
+2. **Add concentration metrics**  
+   (HHI, effective N, top 1/3/5 for key dimensions)
+
+3. **Split country into**  
+   `country_of_risk`, `vehicle_domicile_country`, `listing_venue`
+
+4. **Make allocation tables sum to 100%**  
+   with explicit `unknown/not_applicable/lookthrough_unavailable`
+
+5. **Keep instructions as structured labeled blocks**  
+   not one merged unlabeled paragraph
+
+## Strongly recommended next
+6. Add fixed-income-specific diversification aggregates  
+7. Add FGC group + BRL amount fields  
+8. Add decomposed exposure attributes instead of only flat codes  
+9. Add machine-readable guardrails and prohibited inferences  
+10. Add `label_pt_br` for every code
+
+If you want, I can turn this into a **concrete implementation spec** with:
+- exact field names,
+- example CSV/JSON outputs,
+- and a recommended deterministic prompt contract for the downstream AI.

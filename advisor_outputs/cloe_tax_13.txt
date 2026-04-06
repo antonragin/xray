@@ -1,0 +1,329 @@
+Short answer: **yes to more metadata; no to treating `days_to_expiry` as the actual IR determinant.**
+
+**Design view (not legal/tax advice):**
+
+## 1) Compute applicable IR bracket from `days_to_expiry`?
+
+**No, not as `applicable_ir_rate`.**  
+For Brazilian fixed income, the regressive IR table is tied to **how long the money stayed invested**; official tables are 22.5% up to 180 days, 20% from 181–360, 17.5% from 361–720, and 15% above 720. Tesouro Direto’s own guidance says the longer you carry the title, the lower the IR. For funds under periodic taxation, the same logic applies to the application period, with complementary IR on exit if redeemed before the long-term threshold. ([gov.br](https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/tabelas/2025))
+
+So I’d recommend:
+
+- **Do not** derive `current_applicable_ir_rate` from `days_to_expiry`.
+- **Do** derive a separate field such as:
+  - `projected_ir_rate_if_held_to_maturity_from_today`
+  - or `projected_ir_bracket_at_expiry_assuming_no_sale_before_maturity`
+
+That keeps semantics clean:
+
+- `current_applicable_ir_rate` → needs `acquisition_date` / `days_held`
+- `projected_ir_rate_if_held_to_maturity_from_today` → can use `days_to_expiry`
+
+In other words: **`days_to_expiry` is good for projection, not for actual current tax applicability.**
+
+---
+
+## 2) Flag come-cotas? Add `subject_to_come_cotas`?
+
+**Yes. Definitely add it.**  
+Current official guidance after the fund-tax changes is that periodic taxation (“come-cotas”) happens on the **last business day of May and November** for funds under the periodic regime; long-term funds are periodically taxed at **15%** and short-term funds at **20%**, with complementary IR at redemption when needed. But not every fund follows the same rule: **fundos de ações** are taxed at **15% on redemption**, and **ETF/FIP/FIDC** can be outside periodic taxation when classified as **entidades de investimento**. ([gov.br](https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/manuais/orientacao-tributaria/fundosdeinvestimento))
+
+So the boolean is useful, but I’d go a bit richer:
+
+- `subject_to_come_cotas: true|false|null`
+- `come_cotas_regime: none|long_term|short_term|conditional`
+- `come_cotas_rate: 0.15|0.20|null`
+- `come_cotas_schedule: ["may_last_business_day","november_last_business_day"]|[]`
+- `fund_tax_classification: long_term|short_term|equity_fund|fii|etf|fidc|fip|fim|unknown`
+- `entity_of_investment_flag: true|false|null`
+
+That lets downstream logic distinguish “no come-cotas because equity fund” from “no come-cotas because ETF entity” from “unknown because classification missing.”
+
+---
+
+## 3) Tax profile cross-tab by instrument kind useful?
+
+**Yes — very useful for QA and reporting.**
+
+Why it helps: Brazil tax treatment often differs not just by “profile” but by **event and wrapper**. Two examples:
+
+- **Listed shares** can have the monthly exemption on spot sales up to **R$ 20k**, but the Receita guidance says that exemption **does not apply to ETF quotas**. ([gov.br](https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/pagamento/renda-variavel/bolsa-de-valores-1/isencoes?utm_source=openai))
+- **FII** is not simply “tax_exempt”: distributions to individuals **can be exempt if legal conditions are met**, while gains on sale/rescue are taxed at **20%**. ([caixa.gov.br](https://www.caixa.gov.br/fundos-investimento/imobiliarios/fii-caixa-carteira-imobiliaria/Paginas/default.aspx?utm_source=openai))
+
+So I’d add at least:
+
+- `allocation_by_tax_profile_and_kind.csv`
+- maybe also `allocation_by_tax_rule_code.csv`
+
+Suggested cross-tab grain:
+
+- rows: `tax_profile_code`
+- cols: `instrument_kind`
+- metrics: `weight`, `pct`, `count_positions`
+
+This is especially good for spotting coarse-bucket issues like:
+
+- ETFs mixed into `general`
+- FII treated as fully exempt
+- funds mixed without distinguishing `come-cotas`
+
+---
+
+## 4) IOF regressivo for exits <30 days — include?
+
+**Yes, but as conditional metadata, not as a universal computed tax.**  
+Official Tesouro guidance says IOF is charged only on investments redeemed **before 30 days**, only on the **yield**, and is **zero after 30 days**; the table is regressive over the first 30 days. Tesouro also gives the familiar illustration that a 15th-day redemption implies 50% IOF on the gain. ([tesourodireto.com.br](https://www.tesourodireto.com.br/en/b/impostos-e-taxas-no-tesouro-direto))
+
+Recommendation:
+
+- add `subject_to_iof_regressivo`
+- add `current_iof_rate` **only if** you know `acquisition_date` / `days_held`
+- otherwise expose only applicability/projection fields
+
+Good fields:
+
+- `subject_to_iof_regressivo: true|false|null`
+- `current_iof_rate: number|null`
+- `projected_iof_rate_if_exit_today: number|null`
+- `iof_tax_base: income_only|null`
+- `iof_window_days: 30`
+
+So: **include IOF in precursor, but don’t fake precision when lot-age is missing.**
+
+---
+
+## 5) Ideal tax section JSON schema
+
+I’d model this in **two layers**:
+
+1. **Coarse portfolio buckets**  
+   for allocation/reporting (`general`, `tax_exempt`, etc.)
+
+2. **Precise tax rule + tax events**  
+   for actual engine behavior
+
+### Suggested schema sketch
+
+```json
+{
+  "tax": {
+    "jurisdiction": "BR",
+    "as_of_date": "2026-04-06",
+    "rule_set_version": "br_tax_v1",
+    "profiles": [
+      {
+        "code": "general",
+        "label": "Taxable - general regime"
+      },
+      {
+        "code": "tax_exempt",
+        "label": "IR-exempt or conditionally exempt"
+      },
+      {
+        "code": "taxable_no_come_cotas",
+        "label": "Taxable without periodic come-cotas"
+      },
+      {
+        "code": "previdencia",
+        "label": "Previdência wrapper"
+      }
+    ],
+    "positions": [
+      {
+        "template_code": "cdb_cdi_generic",
+        "instrument_kind": "fixed_income",
+        "weight": 0.10,
+
+        "tax_profile_code": "general",
+        "tax_rule_code": "br_fixed_income_regressive",
+
+        "maturity_date": "2027-03-15",
+        "days_to_maturity": 343,
+
+        "acquisition_date": null,
+        "days_held": null,
+        "lot_level_required": true,
+        "tax_determinacy": "projected_only_without_lot_data",
+
+        "events": {
+          "redemption_or_maturity": {
+            "subject_to_ir": true,
+            "tax_base": "income_only",
+            "withholding_mode": "exclusive_at_source",
+            "rate_schedule_code": "br_rf_regressive_180_360_720",
+            "current_applicable_rate": null,
+            "projected_rate_if_held_to_maturity_from_today": 0.20
+          },
+          "come_cotas": {
+            "subject": false,
+            "regime": "none",
+            "rate": null,
+            "schedule": []
+          },
+          "early_exit_iof": {
+            "subject": true,
+            "tax_base": "income_only",
+            "window_days": 30,
+            "current_rate": null,
+            "projected_rate_if_exit_today": null
+          },
+          "sale_on_exchange": {
+            "subject_to_ir": false
+          },
+          "income_distribution": {
+            "subject_to_ir": false
+          }
+        },
+
+        "requirements_missing": [
+          "acquisition_date"
+        ]
+      },
+
+      {
+        "template_code": "mixed_global_fund",
+        "instrument_kind": "fund",
+        "weight": 0.07,
+
+        "tax_profile_code": "general",
+        "tax_rule_code": "br_fund_unknown_classification",
+
+        "fund_tax_classification": "unknown",
+        "entity_of_investment_flag": null,
+
+        "events": {
+          "come_cotas": {
+            "subject": null,
+            "regime": "unknown",
+            "rate": null,
+            "schedule": []
+          },
+          "redemption_or_maturity": {
+            "subject_to_ir": true,
+            "tax_base": "gain_or_distribution",
+            "withholding_mode": "depends_on_fund_classification",
+            "current_applicable_rate": null
+          }
+        },
+
+        "requirements_missing": [
+          "fund_tax_classification",
+          "entity_of_investment_flag"
+        ]
+      },
+
+      {
+        "template_code": "previdencia_rf",
+        "instrument_kind": "fund",
+        "weight": 0.06,
+
+        "tax_profile_code": "previdencia",
+        "tax_rule_code": "br_previdencia_unknown",
+
+        "previdencia": {
+          "plan_type": "unknown",
+          "tax_regime": "unknown",
+          "regime_choice_made": null,
+          "contribution_lot_aging_available": false,
+          "tax_base_scope": "unknown"
+        },
+
+        "events": {
+          "benefit_or_first_redemption": {
+            "subject_to_ir": true,
+            "withholding_mode": "depends_on_progressive_or_regressive",
+            "current_applicable_rate": null
+          }
+        },
+
+        "requirements_missing": [
+          "previdencia.plan_type",
+          "previdencia.tax_regime"
+        ]
+      }
+    ],
+
+    "aggregates": {
+      "allocation_by_tax_profile": [
+        { "code": "general", "weight": 0.54, "pct": 54.0 },
+        { "code": "tax_exempt", "weight": 0.21, "pct": 21.0 },
+        { "code": "taxable_no_come_cotas", "weight": 0.19, "pct": 19.0 },
+        { "code": "previdencia", "weight": 0.06, "pct": 6.0 }
+      ],
+      "allocation_by_tax_profile_and_kind": [
+        {
+          "tax_profile_code": "general",
+          "instrument_kind": "fixed_income",
+          "weight": 0.32,
+          "pct": 32.0
+        }
+      ],
+      "allocation_subject_to_come_cotas": [
+        { "subject_to_come_cotas": true, "weight": 0.00, "pct": 0.0 },
+        { "subject_to_come_cotas": false, "weight": 0.00, "pct": 0.0 },
+        { "subject_to_come_cotas": null, "weight": 0.00, "pct": 0.0 }
+      ],
+      "allocation_subject_to_iof_regressivo": [
+        { "subject_to_iof_regressivo": true, "weight": 0.00, "pct": 0.0 },
+        { "subject_to_iof_regressivo": false, "weight": 0.00, "pct": 0.0 },
+        { "subject_to_iof_regressivo": null, "weight": 0.00, "pct": 0.0 }
+      ],
+      "allocation_by_current_ir_bracket": [
+        { "bracket_code": "22_5", "weight": 0.00, "pct": 0.0 },
+        { "bracket_code": "20_0", "weight": 0.00, "pct": 0.0 },
+        { "bracket_code": "17_5", "weight": 0.00, "pct": 0.0 },
+        { "bracket_code": "15_0", "weight": 0.00, "pct": 0.0 },
+        { "bracket_code": "unknown", "weight": 1.00, "pct": 100.0 }
+      ],
+      "allocation_by_projected_ir_bracket_at_maturity": [
+        { "bracket_code": "22_5", "weight": 0.00, "pct": 0.0 },
+        { "bracket_code": "20_0", "weight": 0.00, "pct": 0.0 },
+        { "bracket_code": "17_5", "weight": 0.00, "pct": 0.0 },
+        { "bracket_code": "15_0", "weight": 0.00, "pct": 0.0 },
+        { "bracket_code": "na", "weight": 0.00, "pct": 0.0 }
+      ]
+    }
+  }
+}
+```
+
+---
+
+## What I’d add to your current precursor immediately
+
+### Per-position columns
+- `tax_rule_code`
+- `acquisition_date`
+- `days_held`
+- `current_applicable_ir_rate`
+- `projected_ir_rate_if_held_to_maturity_from_today`
+- `subject_to_come_cotas`
+- `come_cotas_regime`
+- `come_cotas_rate`
+- `subject_to_iof_regressivo`
+- `current_iof_rate`
+- `tax_determinacy`
+- `requirements_missing`
+
+### Aggregate outputs
+- `allocation_by_tax_profile_and_kind.csv`
+- `allocation_by_tax_rule_code.csv`
+- `allocation_subject_to_come_cotas.csv`
+- `allocation_subject_to_iof_regressivo.csv`
+- `allocation_by_current_ir_bracket.csv`
+- `allocation_by_projected_ir_bracket_at_maturity.csv`
+
+---
+
+## One more important modeling note
+
+Your current 4-profile taxonomy is useful for reporting, but it is **too coarse for engine-grade tax logic**. Previdência alone needs at least:
+- `plan_type = PGBL | VGBL`
+- `tax_regime = progressivo | regressivo | unknown`
+
+That’s because official guidance distinguishes **VGBL** (IR on earnings) from **PGBL** (IR on the full amount paid/rescued), and since **Law 14.803/2024** the participant can choose the taxation regime up to the benefit or first redemption event; the regressive previdência table is also a different schedule from ordinary fixed income, starting at 35% and potentially reaching 10% after 10 years. ([gov.br](https://www.gov.br/susep/pt-br/planos-e-produtos/previdencia-complementar-aberta/perguntas-e-respostas/previdencia-complementar-aberta-perguntas-e-respostas/?utm_source=openai))
+
+If you want, I can turn this into a **concrete v1 spec** with:
+1. revised CSV columns,  
+2. normalized JSON schema, and  
+3. rule-mapping examples for each of your sample instruments (`cdb`, `lci`, `tesouro`, `debênture infra`, `ETF`, `FII`, `previdência`).

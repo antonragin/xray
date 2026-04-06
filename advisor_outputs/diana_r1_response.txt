@@ -1,0 +1,48 @@
+Here is a comprehensive review of your client portfolio mapping and OryxMC integration logic. You have built a solid foundation, but there are some critical financial accuracy misclassifications, code robustness edge cases, and major hidden bugs inside the OryxMC engine that will distort your charts.
+
+### 1. Mapping Correctness & Financial Accuracy
+*Some of your proxy choices distort the true risk/return profile of the client portfolios.*
+
+* **Valor em Trânsito (Dividends/JCP) mapped to `Ibovespa`:** 
+  * **Issue:** Values in transit are already ex-dividend—they are simply BRL cash receivables waiting to settle. They have zero market risk. Mapping them to `Ibovespa` artificially subjects fixed cash to 20%+ annualized volatility.
+  * **Fix:** Map `Valor em Trânsito` to `CDI`.
+* **Criptoativos mapped to `CDI`:** 
+  * **Issue:** You acknowledge this is an approximation, but mapping highly volatile crypto to a risk-free proxy (`CDI`) severely understates portfolio risk. A 20% crypto portfolio will simulate as if it is in Treasury equivalents.
+  * **Fix:** Map crypto to a risk-on proxy like `SP500TR` or `URTH` so the simulation accounts for heavy tail risk, or request a crypto index.
+* **Corporate Bonds (CRI & Debêntures) missing in post-fixed logic:**
+  * **Issue:** Under the `Renda Fixa` block, you map post-fixed corporate debt to `IDA-DI` using `if prod_type in ("LFSN", "CDCA")` and `if prod_type == "CRA"`. However, if a `CRI` or `DEB` is post-fixed, it skips these blocks and falls back to `CDI` instead of `IDA-DI`.
+  * **Fix:** Expand your corporate tuple: `if prod_type in ("LFSN", "CDCA", "CRA", "CRI", "DEB"): return ("IDA-DI", ...)`
+* **Single Stocks mapped to `Ibovespa`:**
+  * **Issue:** Mapping an individual stock (e.g., `PETR4` or `WEGE3`) to a broad index assumes the stock has the diversification of the entire market. For highly concentrated client accounts, this significantly underestimates idiosyncratic tail risk.
+  * **Fix:** Add a disclaimer to the Excel warnings that single-stock risk is not modeled and is represented by broad systemic risk.
+* **COEs (Structured Products) mapped to Linear Indices:**
+  * **Issue:** COEs typically feature principal protection (non-linear payoff floored at 0%). Mapping them directly to `SP500TR` will vastly overstate the downside risk in the Monte Carlo (which will readily drop 30% in a bad simulated year). 
+
+### 2. Code Quality & Robustness
+*Several edge cases will cause crashes or silently hide unmapped assets.*
+
+* **Silenced "Unclassified" Fallbacks:**
+  * **Issue:** If a totally unrecognized fund falls to the bottom of `map_fund`, it returns `("CDI", "Fund unclassified → CDI")`. However, `aggregate_by_account` only adds a warning to the Excel file if the string contains `"[APPROX]"`. Unknown funds will silently become CDI without the wealth manager ever knowing!
+  * **Fix:** Update the condition: `if ("[APPROX]" in note or "unclassified" in note.lower()) and valor > 0:`
+* **Empty Float Parsing (`map_positions.py`):**
+  * **Issue:** You do `valor = pos.get("valor_bruto") ... valor = float(valor)`. If a CSV export yields an empty string `""` instead of `None` for a missing value, `float("")` throws a `ValueError` and crashes the entire pipeline.
+  * **Fix:** Wrap it in a `try/except (ValueError, TypeError): valor = 0.0`.
+* **NTNB Date Parsing:**
+  * **Issue:** `isinstance(vencimento, datetime)` fails if Excel cells are formatted as pure strings (e.g., `'2030-08-15'`). Valid NTNBs will silently bypass the duration bucketing and fall to the generic `IMA-B` fallback.
+  * **Fix:** Add an `elif isinstance(vencimento, str):` block and parse it with `datetime.strptime(vencimento[:10], "%Y-%m-%d").date()`.
+* **Lost Engine Substitution Warnings:**
+  * **Issue:** `engine.py` generates highly valuable substitution warnings (e.g., telling you it swapped 15 months of missing history with an alternative index). You capture this in `simulate_clients.py` via `sim["warnings"] = portfolio["warnings"]`, but you never print them or pass them to the Excel generator. This vital insight is completely lost.
+
+### 3. ORYXMC DEFICIENCIES (System-Level)
+*Please log the following critical mathematical bugs with the OryxMC maintenance team.*
+
+* **ORYXMC DEFICIENCY: Efficient Frontier Plotting Bug (`compute_portfolio_risk_return`)**
+  * *Impact:* The client's portfolio point (the red star) will be plotted entirely in the wrong place if they hold newer indices. 
+  * *Reason:* `compute_portfolio_risk_return` does **not** utilize the category fallback logic found in `build_portfolio_returns`. It blindly fills missing historical months with `0.0`. If a portfolio holds an index that was created in 2018, its historical return prior to 2018 is evaluated as 0%, artificially dragging down the client's calculated CAGR and volatility on the frontier chart.
+* **ORYXMC DEFICIENCY: Non-Monthly Rebalancing Silently Destroys Portfolios**
+  * *Impact:* If a user attempts to run a simulation with `rebalance_months != 1` (weight drift), the portfolio trajectory will be corrupted.
+  * *Reason:* In `engine.py`, `build_individual_returns` returns an array filled with `0.0` for missing history instead of substituted peer returns. When `rebalance_months != 1`, `run_monte_carlo` uses these raw individual returns instead of the properly substituted `portfolio_returns`. Assets with incomplete histories inject 0% returns during their missing periods. 
+* **ORYXMC DEFICIENCY: Lack of 0% Cash Proxy**
+  * *Impact:* You are forced to map `Conta Corrente` (uninvested checking account cash) to `CDI`. `CDI` yields ~10% annually. The simulator incorrectly assumes checking account cash compounds at risk-free market rates, vastly inflating the final expected wealth for cash-heavy clients.
+* **ORYXMC DEFICIENCY: Missing Asset Classes**
+  * *Impact:* OryxMC strictly needs a **Crypto Index** (given the hashed allocations) and a **Gold Index** to prevent wealth managers from forcing high-volatility assets into the risk-free `CDI` bucket.

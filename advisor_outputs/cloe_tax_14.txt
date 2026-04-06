@@ -1,0 +1,334 @@
+Below is a **ready-to-paste draft** for `instructions_tax`, assuming **Brazil-resident individual investor (pessoa física residente no Brasil)** and **current rules as of April 6, 2026**.
+
+---
+
+## `general` (`tax_profile`)
+
+**[Scope]**  
+Brazilian resident individual taxation for **domestic fixed-income funds subject to both regressive IR and come-cotas**.
+
+**[Use for]**  
+Use for Brazilian fund wrappers that are taxed like **fundos de renda fixa / DI / crédito / multimercado comuns**, when the fund is in the **general periodic-tax regime** and is **not** in an exempt or no-come-cotas category.
+
+**[Interpret carefully]**  
+- Classify the fund by **average maturity of the portfolio**, not by marketing label:
+  - **Long-term fund**: average maturity **over 365 days**
+  - **Short-term fund**: average maturity **365 days or less**
+- Apply the actual Brazilian IR tables below:
+
+**Long-term funds / fixed income in general**
+| Holding period | IR rate on gain |
+|---|---:|
+| Up to 180 days | 22.5% |
+| 181 to 360 days | 20.0% |
+| 361 to 720 days | 17.5% |
+| Over 720 days | 15.0% |
+
+**Short-term funds**
+| Holding period | IR rate on gain |
+|---|---:|
+| Up to 180 days | 22.5% |
+| Over 180 days | 20.0% |
+
+**Come-cotas**
+| Fund class | Semiannual rate | Collection timing |
+|---|---:|---|
+| Long-term fund | 15.0% | Last business day of **May** and **November** |
+| Short-term fund | 20.0% | Last business day of **May** and **November** |
+
+- Treat **come-cotas as an advance withholding**. On final redemption/resale, calculate any **complement** needed to reach the final regressive rate for the actual holding period.
+- Tax is generally on **earnings/gain**, not on principal. ([gov.br](https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/tabelas/2026))
+
+**[Do not infer]**  
+- Do **not** infer long-term vs short-term from benchmark names like **CDI**, **Selic**, **IPCA+**, “cash”, “conservative”, etc.  
+- Do **not** use this profile for **CDBs, Tesouro, LCI/LCA/CRI/CRA, debêntures incentivadas, previdência, FIA, FII, FIP, FIDC, or equity ETFs** unless the wrapper is explicitly a general periodic-tax fund. ([gov.br](https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/manuais/orientacao-tributaria/fundosdeinvestimento))
+
+---
+
+## `tax_exempt` (`tax_profile`)
+
+**[Scope]**  
+Brazilian resident individual taxation for **domestic instruments whose yield/distribution is tax-exempt (IR zero)** in the common retail case.
+
+**[Use for]**  
+Use for:
+- **LCI**
+- **LCA**
+- **CRI**
+- **CRA**
+- **debênture incentivada / debênture de infraestrutura (Lei 12.431 / 14.801 context)**
+- **FII distributions/dividend-like cash flows**, but only when the legal exemption conditions are met.
+
+**[Interpret carefully]**  
+- For **LCI, LCA, CRI and CRA**, treat the earnings as **IR-exempt (0%)** for Brazilian resident individuals.
+- For **debêntures incentivadas**, treat earnings as **IR 0% for resident individuals**.
+- For **FII distributions**, treat as **IR-exempt (0%) only if the statutory conditions are satisfied**. Current statutory conditions reflected in official sources include:
+  - quotas admitted to trading **exclusively on exchange or organized OTC**,
+  - fund with **at least 100 cotistas**,
+  - no linked group of PF holders representing **30% or more** of total quotas or rights to **more than 30%** of total fund income. ([gov.br](https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/preenchimento/manual-mir/rendimentos/rendimentos-do-capital?utm_source=openai))
+
+**[Do not infer]**  
+- Do **not** assume exemption for **capital gains on sale** just because the asset is yield-exempt; e.g. **FII sale gains are not exempt by default**.  
+- Do **not** auto-exempt FII distributions if the legal conditions are unknown and the system is expected to be conservative.  
+- Do **not** apply come-cotas here. ([gov.br](https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/pagamento/renda-variavel/fundos-de-investimento-no-brasil))
+
+---
+
+## `taxable_no_come_cotas` (`tax_profile`)
+
+**[Scope]**  
+Brazilian resident individual taxation for **listed equities and equity ETFs** where taxation is based on **realized gain on sale**, without come-cotas.
+
+**[Use for]**  
+Use for:
+- **listed equities (ações)**
+- **equity ETFs**
+- other stock-like listed exposures that follow the **renda variável gain-on-sale** logic rather than the fixed-income regressive table.
+
+**[Interpret carefully]**  
+- **MVP default**: use **15% IR on realized gain** in **common operations**.
+- Actual Brazilian rates:
+  - **15%** on **common operations**
+  - **20%** on **day trade**
+- **No come-cotas**.
+- Important actual exception: for **direct stocks only**, gains on spot-market sales can be **exempt** when the **total stock sales in the month do not exceed R$ 20,000**. This exemption **does not apply to equity ETFs**. ([gov.br](https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/pagamento/renda-variavel/bolsa-de-valores-1))
+
+**[Do not infer]**  
+- Do **not** apply the **R$ 20k/month exemption** to **ETFs**.  
+- Do **not** apply the fixed-income regressive table or come-cotas.  
+- Do **not** use this profile for **FII**; FII gains follow their own rule set. ([gov.br](https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/pagamento/renda-variavel/bolsa-de-valores-1/isencoes?utm_source=openai))
+
+---
+
+## `previdencia` (`tax_profile`)
+
+**[Scope]**  
+Brazilian resident individual taxation for **PGBL/VGBL and previdência complementar aberta/fechada**, simplified for MVP.
+
+**[Use for]**  
+Use for:
+- **PGBL**
+- **VGBL**
+- previdência plans/funds where tax is determined by the **previdência wrapper**, not by the portfolio benchmark.
+
+**[Interpret carefully]**  
+- Distinguish **plan type** first:
+  - **PGBL**: contributions may be deductible in the annual return **up to 12% of gross taxable income** when the taxpayer uses the **complete** return; taxation at withdrawal/benefit generally applies to the **full amount**.
+  - **VGBL**: no PGBL-style deduction; taxation at withdrawal/benefit applies only to the **earnings portion**.
+- Distinguish **tax regime** second:
+
+**Progressive regime (simplified MVP)**
+- For periodic benefit/renda, follow the current **IRPF progressive table**.
+- For resgates, there is typically **15% withholding at source as advance payment**, with final settlement in the annual return.
+
+**Current monthly IRPF table (from Jan/2026)**
+| Monthly tax base | Rate | Deduction |
+|---|---:|---:|
+| Up to R$ 2,428.80 | 0% | R$ 0.00 |
+| R$ 2,428.81 to R$ 2,826.65 | 7.5% | R$ 182.16 |
+| R$ 2,826.66 to R$ 3,751.05 | 15.0% | R$ 394.16 |
+| R$ 3,751.06 to R$ 4,664.68 | 22.5% | R$ 675.49 |
+| Above R$ 4,664.68 | 27.5% | R$ 908.73 |
+
+**Current annual IRPF table (exercise 2027 / calendar 2026)**
+| Annual tax base | Rate | Deduction |
+|---|---:|---:|
+| Up to R$ 29,145.60 | 0% | R$ 0.00 |
+| R$ 29,145.61 to R$ 33,919.80 | 7.5% | R$ 2,185.92 |
+| R$ 33,919.81 to R$ 45,012.60 | 15.0% | R$ 4,729.91 |
+| R$ 45,012.61 to R$ 55,976.16 | 22.5% | R$ 8,105.85 |
+| Above R$ 55,976.16 | 27.5% | R$ 10,904.66 |
+
+**Regressive regime**
+| Time since each contribution | IR rate |
+|---|---:|
+| Up to 2 years | 35% |
+| Over 2 to 4 years | 30% |
+| Over 4 to 6 years | 25% |
+| Over 6 to 8 years | 20% |
+| Over 8 to 10 years | 15% |
+| Over 10 years | 10% |
+
+- In the **regressive regime**, treat IR as **definitive/exclusive at source**.
+- Previdência does **not** use come-cotas; taxation is centered on **resgate/benefit events**. ([gov.br](https://www.gov.br/receitafederal/pt-br/acesso-a-informacao/perguntas-frequentes/imposto-de-renda/dirpf/declaracao/pgvl-vgbl?utm_source=openai))
+
+**[Do not infer]**  
+- Do **not** guess **PGBL vs VGBL**.  
+- Do **not** guess **progressive vs regressive** if unknown.  
+- Do **not** apply fixed-income fund come-cotas just because the portfolio holds bonds/CDI/IPCA assets. ([gov.br](https://www.gov.br/previdencia/pt-br/assuntos/previdencia-complementar/mais-informacoes/perguntas-frequentes-de-previdencia-complementar?utm_source=openai))
+
+---
+
+## `fi_cdi_br` (`economic_exposure`)
+
+**[Scope]**  
+Economic exposure flag for **Brazilian CDI-linked fund-like exposure**.
+
+**[Use for]**  
+Use when the asset economically behaves like **CDI / pós-fixado Brasil**, but the exact wrapper may be missing or incomplete.
+
+**[Interpret carefully]**  
+- **CDI exposure does not define the tax regime by itself**; the **wrapper** does.
+- If the wrapper is a **general domestic fixed-income fund**, use the **general regressive + come-cotas** logic:
+  - long-term/direct fixed income in general: **22.5% / 20% / 17.5% / 15%**
+  - short-term fund: **22.5% / 20%**
+  - come-cotas: **15% long-term**, **20% short-term**
+- If the wrapper is a **direct instrument** (e.g. CDB), do **not** apply come-cotas. ([gov.br](https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/tabelas/2026))
+
+**[Do not infer]**  
+- Do **not** infer **short-term** fund status just because the benchmark is CDI.  
+- Do **not** infer tax exemption from low-risk or cash-like marketing language.  
+- Do **not** override a known `instrument_template` or `tax_profile`. ([gov.br](https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/manuais/orientacao-tributaria/fundosdeinvestimento))
+
+---
+
+## `fi_ipca_br` (`economic_exposure`)
+
+**[Scope]**  
+Economic exposure flag for **Brazilian IPCA / IPCA+ fixed-income exposure**.
+
+**[Use for]**  
+Use when the asset economically behaves like **inflation-linked Brazilian fixed income**, but the exact wrapper may be missing or incomplete.
+
+**[Interpret carefully]**  
+- **IPCA+ exposure does not define the tax regime by itself**; the **wrapper** and **holding period** do.
+- If it is taxed as general Brazilian fixed income, apply:
+  - **22.5%** up to 180 days
+  - **20.0%** from 181 to 360 days
+  - **17.5%** from 361 to 720 days
+  - **15.0%** over 720 days
+- If held via a **general periodic-tax fund**, also apply **come-cotas**:
+  - **15%** for long-term funds
+  - **20%** for short-term funds
+- Longer holding often matters more for IPCA-linked positions because these are frequently held for longer horizons, but the lower **15% final bracket** still requires the actual time rule to be satisfied. ([gov.br](https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/tabelas/2026))
+
+**[Do not infer]**  
+- Do **not** assume **15%** only because the label contains **IPCA+**, **inflação**, **NTN-B**, or **real yield**.  
+- Do **not** assume no come-cotas unless the wrapper is known not to be a periodic-tax fund. ([gov.br](https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/manuais/orientacao-tributaria/fundosdeinvestimento))
+
+---
+
+## `eq_br` (`economic_exposure`)
+
+**[Scope]**  
+Economic exposure flag for **Brazilian equity / stock-market exposure**.
+
+**[Use for]**  
+Use when the asset behaves economically like **Brazilian equities**, but the wrapper is incomplete.
+
+**[Interpret carefully]**  
+- Default to the **renda variável gain-on-sale** logic, not fixed-income logic:
+  - **15%** on gains in **common operations**
+  - **20%** on gains in **day trade**
+  - **no come-cotas**
+- If later identified as an **equity ETF**, keep **15%/20%** and remember there is **no stock R$20k monthly exemption**.
+- If later identified as **direct stocks**, the **R$20k/month sales exemption** may apply. ([gov.br](https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/pagamento/renda-variavel/bolsa-de-valores-1))
+
+**[Do not infer]**  
+- Do **not** apply fixed-income regressive IR tables.  
+- Do **not** assume ETF exemption just because the underlying is stocks.  
+- Do **not** use this for **FII**; FII sale gains are a separate rule set. ([b3.com.br](https://www.b3.com.br/pt_br/produtos-e-servicos/negociacao/renda-variavel/ficha-do-produto-8AE490C99A099340019A852C8668303C.htm))
+
+---
+
+## `cdb_cdi_generic` (`instrument_template`)
+
+**[Scope]**  
+Tax treatment for a **generic Brazilian CDB linked to CDI** held directly by a resident individual.
+
+**[Use for]**  
+Use for direct bank-issued **CDB** instruments, not for fund wrappers.
+
+**[Interpret carefully]**  
+- Apply **fixed-income regressive IR on earnings only**:
+  - up to 180 days: **22.5%**
+  - 181 to 360 days: **20.0%**
+  - 361 to 720 days: **17.5%**
+  - over 720 days: **15.0%**
+- Apply **IOF regressivo on earnings** if redeemed in **less than 30 days**:
+
+| Day | IOF % of gain | Day | IOF % of gain |
+|---|---:|---|---:|
+| 1 | 96% | 16 | 46% |
+| 2 | 93% | 17 | 43% |
+| 3 | 90% | 18 | 40% |
+| 4 | 86% | 19 | 36% |
+| 5 | 83% | 20 | 33% |
+| 6 | 80% | 21 | 30% |
+| 7 | 76% | 22 | 26% |
+| 8 | 73% | 23 | 23% |
+| 9 | 70% | 24 | 20% |
+| 10 | 66% | 25 | 16% |
+| 11 | 63% | 26 | 13% |
+| 12 | 60% | 27 | 10% |
+| 13 | 56% | 28 | 6% |
+| 14 | 53% | 29 | 3% |
+| 15 | 50% | 30 | 0% |
+
+- Do **not** apply come-cotas: CDB is a **direct instrument**, not a fund. ([gov.br](https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/tabelas/2026))
+
+**[Do not infer]**  
+- Do **not** mark CDB as tax-exempt.  
+- Do **not** apply equity taxation.  
+- Do **not** apply fund-only rules such as semiannual come-cotas. ([gov.br](https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/tabelas/2026))
+
+---
+
+## `fii_xpml11` (`instrument_template`)
+
+**[Scope]**  
+Tax treatment template for **XPML11-style listed FII** held by a Brazilian resident individual.
+
+**[Use for]**  
+Use for **listed FIIs** where the intended default is:
+- **periodic distributions potentially exempt**
+- **capital gain on sale taxable**
+
+**[Interpret carefully]**  
+- Treat periodic **FII distributions/rendimentos** as **IR-exempt** for resident individuals **only when the legal listed-FII exemption conditions are met**, including exchange/organized OTC trading, **at least 100 cotistas**, and no linked PF group with **30%+** quota ownership or **30%+** income rights.
+- If exemption conditions are **not met or not assumed**, distributed income may be taxed at **20% at source**.
+- Treat **gains on sale or redemption of FII quotas** as taxed at **20%**.
+- Do **not** apply come-cotas. ([planalto.gov.br](https://www.planalto.gov.br/ccivil_03/_ato2023-2026/2023/lei/l14754.htm?utm_source=openai))
+
+**[Do not infer]**  
+- Do **not** apply the **R$20k stock exemption** to FII sales.  
+- Do **not** use the stock/ETF 15% default on sale; FII gains are **20%**.  
+- Do **not** assume exemption for every FII cash distribution unless the exemption logic is the intended business rule. ([gov.br](https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/pagamento/renda-variavel/fundos-de-investimento-no-brasil))
+
+---
+
+## `previdencia_rf` (`instrument_template`)
+
+**[Scope]**  
+Tax treatment template for a **previdência plan/fund with mostly fixed-income allocation**.
+
+**[Use for]**  
+Use when the economic exposure is fixed income, but the **legal wrapper is previdência**.
+
+**[Interpret carefully]**  
+- Tax follows the **previdência wrapper**, not the bond/CDI/IPCA sleeve inside the fund.
+- Therefore:
+  - **no come-cotas**
+  - tax happens on **resgate/benefit**
+  - apply either **progressive** or **regressive** previdência rules
+  - apply **PGBL vs VGBL** tax-base distinction
+- Regressive table:
+  - up to 2y **35%**
+  - 2–4y **30%**
+  - 4–6y **25%**
+  - 6–8y **20%**
+  - 8–10y **15%**
+  - over 10y **10%**
+- Progressive regime: use the current **IRPF progressive table**, with **15% withholding as advance** on resgates. ([gov.br](https://www.gov.br/previdencia/pt-br/assuntos/previdencia-complementar/mais-informacoes/perguntas-frequentes-de-previdencia-complementar?utm_source=openai))
+
+**[Do not infer]**  
+- Do **not** apply direct fixed-income tax tables merely because the portfolio is renda fixa.  
+- Do **not** apply CDB/Tesouro rules.  
+- Do **not** guess whether the plan is **PGBL or VGBL**, or **progressive or regressive**. ([gov.br](https://www.gov.br/previdencia/pt-br/assuntos/previdencia-complementar/mais-informacoes/perguntas-frequentes-de-previdencia-complementar?utm_source=openai))
+
+---
+
+If you want, I can also turn this into:
+1. a **JSON/YAML version**,  
+2. a **shorter production-safe version**, or  
+3. a version with **explicit precedence rules** between `tax_profile`, `economic_exposure`, and `instrument_template`.

@@ -1,0 +1,66 @@
+Below is draft instruction text for each `instructions_risk` key, using the requested format.
+
+### `fi_cdi_br`
+[Scope] Applies to Brazilian fixed-income exposures linked to CDI, including post-fixed products and funds that use CDI as benchmark or reference.  
+[Use for] Use this to explain that CDI-linked does not mean risk-free: future returns vary with the Selic/CDI cycle, spreads can compress or widen, and issuer/liquidity risk may still exist.  
+[Interpret carefully] Interpret low duration and daily accrual as lower sensitivity to interest-rate shocks than long fixed-rate or IPCA+ assets, but not as absence of volatility, especially in funds or instruments with mark-to-market, credit spread, or secondary-market exposure.  
+[Do not infer] Do not infer FGC coverage, principal guarantee, constant real return, or immunity to losses before maturity solely because the product references CDI.
+
+### `fi_ipca_br`
+[Scope] Applies to Brazilian inflation-linked fixed-income exposures, especially IPCA+ government bonds, debentures, credit instruments, and funds with real-rate sensitivity.  
+[Use for] Use this to explain that the key risk is mark-to-market driven by changes in real interest rates, even when the asset protects purchasing power if held to maturity under its contractual terms.  
+[Interpret carefully] Interpret “IPCA + spread” as inflation protection plus real-rate exposure, not as a stable price path: if real yields rise, the market value can fall materially before maturity, sometimes for extended periods.  
+[Do not infer] Do not infer short-term capital stability, guaranteed positive return on early sale, or perfect inflation hedge at all horizons just because the asset is indexed to IPCA.
+
+### `eq_br`
+[Scope] Applies to Brazilian equities, equity funds, ETFs, and other listed variable-income exposure concentrated in Brazil.  
+[Use for] Use this to describe exposure to earnings risk, valuation compression, liquidity changes, political and regulatory shifts, commodity and rate sensitivity, and governance risk in the local market.  
+[Interpret carefully] Interpret Brazilian equities as high-volatility assets that can be strongly affected by Selic expectations, fiscal credibility, exchange-rate moves, sector concentration, and domestic macro cycles.  
+[Do not infer] Do not infer capital protection, predictable dividends, broad diversification, or reduced risk simply because the issuer is large, state-linked, or part of a major Brazilian index.
+
+### `eq_international`
+[Scope] Applies to international equity exposure held by Brazilian investors, whether via offshore assets, BDRs, international ETFs, or local feeder funds.  
+[Use for] Use this to explain that the investor bears both equity-market risk and BRL foreign-exchange risk, which can amplify gains or losses in reais.  
+[Interpret carefully] Interpret diversification benefits carefully: foreign exposure can reduce concentration in Brazil, but it still carries valuation risk, geopolitical risk, sector concentration, and currency volatility that may dominate short- and medium-term results.  
+[Do not infer] Do not infer lower risk in BRL terms, currency neutrality, or automatic protection against Brazilian downturns just because the portfolio is invested abroad.
+
+### `crypto`
+[Scope] Applies to direct cryptoasset exposure and strategies economically linked to crypto prices, with emphasis on Bitcoin and other highly volatile digital assets.  
+[Use for] Use this to warn that crypto can experience extreme drawdowns, gap moves, rapid sentiment reversals, liquidity stress, and long periods of high volatility without cash-flow anchors.  
+[Interpret carefully] Interpret rallies, historical appreciation, or institutional adoption as insufficient to reduce core risk: crypto remains a speculative asset class with material market, operational, regulatory, and custody-related uncertainty.  
+[Do not infer] Do not infer suitability for reserve capital, short-term obligations, or conservative profiles solely from past returns, brand recognition, or exchange-listed wrappers.
+
+### `br_government`
+[Scope] Applies to risk discussions involving Brazilian federal government debt and the sovereign-risk context relevant to local portfolios.  
+[Use for] Use this to explain that sovereign exposure in Brazil is generally the domestic risk reference for BRL assets, but still depends on fiscal trajectory, inflation dynamics, monetary policy credibility, and market confidence.  
+[Interpret carefully] Interpret low sovereign default expectation in local currency separately from mark-to-market risk: government bonds can still suffer meaningful price volatility when inflation, real rates, or fiscal-premium expectations rise.  
+[Do not infer] Do not infer FGC protection, zero loss probability on sale before maturity, or complete immunity from restructuring, tax, liquidity, or policy risk just because the issuer is the federal government.
+
+### `br_bank`
+[Scope] Applies to deposits, notes, and other credit exposure to Brazilian banks, including the distinction between bank credit quality and protection mechanisms such as FGC where applicable.  
+[Use for] Use this to explain that a bank product primarily carries issuer credit risk, plus liquidity and operational risk, and that FGC can mitigate part of the loss risk only within legal scope, limits, and eligibility conditions.  
+[Interpret carefully] Interpret FGC as a credit backstop rather than immediate liquidity or universal guarantee: coverage may not apply to every structure, may be capped, and reimbursement timing matters if the investor needs cash quickly.  
+[Do not infer] Do not infer that all bank-issued investments are equivalent, that state-owned or large banks are riskless, or that FGC eliminates concentration risk above applicable coverage limits.
+
+### `general (tax_profile)`
+[Scope] Applies to Brazilian fund taxation analysis where come-cotas may affect the investor’s effective compounding and liquidity planning.  
+[Use for] Use this to explain that come-cotas is a periodic antecipation of income tax in certain Brazilian funds, which can force partial realization of gains even when the investor does not redeem.  
+[Interpret carefully] Interpret this as a tax-drag and cash-flow effect rather than an additional market loss: the mechanism reduces the invested principal available to keep compounding and may make comparisons with tax-deferred vehicles misleading.  
+[Do not infer] Do not infer that all funds are subject to come-cotas, that the tax burden is always higher in absolute terms, or that realized market loss occurred merely because quotas were reduced for tax collection.
+
+### `cdb_cdi_generic`
+[Scope] Applies to generic CDBs linked to CDI issued by Brazilian banks, including products distributed on local investment platforms.  
+[Use for] Use this to explain that the main risks are issuing-bank credit risk, limited liquidity before maturity, reinvestment risk if CDI falls, and partial reliance on FGC only when the instrument and investor qualify under applicable rules.  
+[Interpret carefully] Interpret higher %CDI offers as compensation for higher perceived risk, usually from smaller issuers, longer tenors, lower liquidity, or a combination of these factors.  
+[Do not infer] Do not infer that a CDB is risk-free, instantly redeemable, or fully protected in any amount merely because it is a bank deposit product benchmarked to CDI.
+
+### `bitcoin_etf`
+[Scope] Applies to ETFs that provide Bitcoin exposure, whether listed in Brazil or accessed abroad, including local wrappers that hold spot or regulated fund structures tied to Bitcoin.  
+[Use for] Use this to explain that the ETF wrapper reduces some operational friction versus direct custody, but the investor remains economically exposed to Bitcoin’s extreme price volatility and can also face tracking error, fee drag, liquidity differences, and market-structure effects.  
+[Interpret carefully] Interpret exchange listing and regulation as improvements in access and operational controls, not as reduction of the underlying asset’s core risk; in stress periods, spreads, premiums/discounts, and trading conditions may worsen.  
+[Do not infer] Do not infer principal protection, income generation, low volatility, or equivalence to fixed-income or diversified equity ETFs simply because the exposure is packaged in an ETF format.
+
+If you want, I can also convert these into:
+1. **shorter policy-style snippets**,  
+2. **Portuguese (pt-BR) versions**, or  
+3. **JSON-ready strings keyed by the exact identifiers**.

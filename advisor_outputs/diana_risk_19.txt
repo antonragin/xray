@@ -1,0 +1,67 @@
+Here is a systemic review of your RISK precursor for the Brazilian Portfolio X-Ray, specifically constrained by the lack of live market data. 
+
+### 1. Brazilian-Specific Risk Factors Missed
+Beyond your initial list, a Brazilian portfolio has deep structural risks that require **zero market data** to identify. You must add:
+
+*   **Indexation Mismatch (Risco de Indexador):** The split between **CDI** (floating), **IPCA/IGP-M** (inflation-linked), and **PRE** (fixed rate). A portfolio might be balanced in maturity but massively exposed if inflation spikes and it is 100% PRE.
+*   **Tax/Regulatory Risk (Risco Tributário):** 
+    *   *Come-Cotas:* Open-ended mutual funds suffer semi-annual tax bites (May/November) which destroy long-term compounding compared to tax-exempt assets.
+    *   *IOF & IR Regressivo:* The sliding scale of Brazilian income tax (22.5% to 15% over 720 days) and IOF (which zeroes out only after 30 days). Liquidating early is a massive structural risk.
+    *   *Isenção:* Exposure to tax-exempt assets for individuals (LCI, LCA, CRI, CRA, Debêntures Incentivadas).
+*   **Liquidity Red Tape (Risco de Resgate D+N):** Brazilian funds often have aggressive redemption mismatch (e.g., D+30, D+60, or even D+180 for Multimercados/Ações). 
+*   **FGC Conglomerate Limits:** The FGC (Credit Guarantee Fund) covers up to R$ 250k *per conglomerate*, capped at R$ 1MM globally across 4 years. If a portfolio has R$ 200k in Banco Itaú and R$ 100k in Itaú Corretora, it breaches the single conglomerate limit.
+*   **Structured Product Subordination:** For FIDC (Receivables Funds), the distinction between *Cotas Sênior* (safest), *Cotas Mezanino*, and *Cotas Subordinadas* (first-loss piece).
+
+### 2. Proxies to Prevent Hallucination (No Market Data)
+Without market data (no covariance matrices, no live DI curve, no current yield-to-maturity), the AI will try to invent risk numbers to fill the void. You must substitute quantitative metrics with **deterministic structural proxies**:
+
+| Traditional Metric (Requires Market Data) | Structural Proxy (No Market Data Needed) |
+| :--- | :--- |
+| **Volatility / VaR** | **Asset Class CVM Classification:** Group by CVM mandate (Renda Fixa Simples = Level 1, Multimercado = Level 3, Ações = Level 5). |
+| **Duration / Convexity** | **Weighted Average Days to Maturity (WAM):** Calculated purely from issuance metadata. Group into buckets: `<1yr`, `1-3yr`, `3yr+`. |
+| **Yield to Maturity / Expected Return** | **Contractual Indexation Matrix:** Output exact percentages: `60% CDI`, `30% IPCA+`, `10% PRE`. |
+| **Credit Spread / Default Prob.** | **FGC Coverage % + Issuer Concentration:** e.g., "40% Uninsured Credit, 25% concentrated in Issuer [X]". |
+| **Liquidity Risk / Bid-Ask Spread** | **Weighted Average D+N (Days to Cash):** The aggregate time it takes for cash to hit the account based on formal fund/asset rules. |
+
+### 3. Precursor Structure to make Hallucination IMPOSSIBLE
+Prompt engineering is not enough to stop an LLM from hallucinating a "12% volatility" if it sees the word "Risk". You must enforce this at the **schema/architecture level**:
+
+*   **Hardcoded "Null/Unavailable" Overrides:** In the JSON/data object passed to the downstream AI, explicitly include standard risk fields but hardcode their values to a string that acts as a directive. 
+    *   `"volatility_30d": "DATA_UNAVAILABLE_DO_NOT_ESTIMATE"`
+    *   `"var_95": "DATA_UNAVAILABLE_DO_NOT_ESTIMATE"`
+*   **Strict Categorical Enums:** Force the LLM to output its risk assessment via a strict JSON schema (using Pydantic, for example) that only accepts Enums, not floats.
+    *   *Allowed output:* `["LOW", "MODERATE", "HIGH"]`
+    *   *Disallowed output:* Any numerical float or string containing `%`.
+*   **Deterministic Fact-Feeding:** Provide a synthesized "Fact String" in the precursor that limits the AI's descriptive universe. 
+    *   *Precursor generates:* `"PORTFOLIO_FACT: 80% of assets are locked for >30 days (D+30). 15% of assets exceed FGC conglomerate limits. 45% exposed to IPCA."*
+    *   *System Prompt:* `"You are a structural risk reviewer. You may ONLY comment on the facts provided in PORTFOLIO_FACT. Do not mention yield, pricing, volatility, or market movements."*
+
+### 4. Final Risk Checklist (Precursor Generation)
+Implement this checklist into the data-processing layer *before* it reaches the LLM.
+
+**A. Indexation & Rate Risk (Risco de Mercado Estrutural)**
+- [ ] % Allocation to CDI (Floating Rate)
+- [ ] % Allocation to IPCA / IGP-M (Inflation)
+- [ ] % Allocation to PRE (Fixed Rate)
+- [ ] % Allocation to FX / Dollar / BDRs
+- [ ] Weighted Average Days to Maturity (Bucketed)
+
+**B. Credit & Counterparty (Risco de Crédito)**
+- [ ] Total % of portfolio with FGC coverage
+- [ ] Flag: Any FGC-eligible asset > R$ 250k per financial conglomerate?
+- [ ] Flag: Total FGC-eligible assets > R$ 1,000,000 global limit?
+- [ ] Issuer Concentration (% of portfolio held by top 3 issuers)
+- [ ] Sovereign Exposure (% in Tesouro Direto)
+- [ ] Private Credit Subordination (Senior vs. Subordinated flags for FIDCs/CRIs)
+
+**C. Liquidity Profile (Risco de Liquidez)**
+- [ ] % of portfolio available D+0 / D+1
+- [ ] % of portfolio locked in D+30, D+60, D+90+ redemption rules
+- [ ] % of portfolio in closed-end assets (no early redemption possible)
+
+**D. Tax & Regulatory Drag (Risco Tributário)**
+- [ ] % of portfolio subject to "Come-Cotas" (Open-ended funds)
+- [ ] % of portfolio inside the 30-day IOF penalty window (based on acquisition date)
+- [ ] % of portfolio in Tax-Exempt (Isento) vs. Taxable (Tributável) vehicles
+
+By strictly feeding these calculated metadata points into the downstream AI and banning numerical market metrics in the output schema, you guarantee a hallucination-free, structurally accurate Brazilian Portfolio X-Ray.

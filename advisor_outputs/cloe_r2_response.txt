@@ -1,0 +1,343 @@
+Overall: **much better than Round 1**. The important mapping changes are in place, and the new aggregate summary is internally consistent — the index totals sum exactly to total AUM, and the shifts you’d expect are visible (more IDA-DI, some SP500TR from gold/crypto/COEs, small standalone IDA-Infra bucket).
+
+## 1. Are the Round 1 fixes correctly implemented?
+
+### Yes — correctly implemented
+1. **Valor em Trânsito → CDI**  
+   Implemented in `map_position()`.
+
+2. **Inflation + infra → IDA-Infra**  
+   Implemented in `map_fund()`.
+
+3. **BTGP Crédito Imobiliário CDI → IDA-DI**  
+   Implemented via the real-estate-credit exception in `map_fund()`.
+
+4. **Gold fund → SP500TR [APPROX]**  
+   Implemented.
+
+5. **Crypto (POL) → SP500TR [APPROX]**  
+   Implemented via `mercado == "Criptoativos"` and crypto fund logic.
+
+6. **HASHDEX 20 → 80% CDI + 20% SP500TR**  
+   Implemented.
+
+7. **COEs → split allocations**  
+   Implemented with 60/40 and 50/50 logic.
+
+8. **Pre-fixed corporate credit → IRF-M [APPROX]**  
+   Implemented for `CRA/CRI/CDCA/DEB`.
+
+9. **USTK11 / XPBR31 / AURA33 → SP500TR [APPROX]**  
+   Implemented.
+
+10. **CRI, DEB added to corporate post-fixed tuple**  
+   Implemented.
+
+11. **Unclassified fallbacks now warn**  
+   Implemented in principle via note text + warning capture.
+
+14. **Summary merge A1:H1**  
+   Fixed.
+
+16. **Frontier chart exceptions logged**  
+   Fixed.
+
+17. **Block bootstrap (12-month)**  
+   Fixed.
+
+---
+
+### Partially implemented / still imperfect
+12. **Float parsing robustness**  
+   `_safe_float()` now handles empty strings, so that fix is real.  
+   **But** it still won’t handle Brazilian-formatted numeric strings like `"1.234,56"` if they ever appear as strings.
+
+13. **NTNB date string fallback**  
+   Implemented, but only for ISO-like strings (`YYYY-MM-DD...`).  
+   If the workbook ever gives `"28/05/2035"` as text, this still fails.
+
+15. **Notes column populated**  
+   Implemented, **but not fully correctly for split mappings**. More on that below.
+
+So my short verdict is:
+
+> **The Round 1 fixes are mostly implemented correctly.**  
+> The main remaining weakness is not the mapping math itself, but the **audit trail / robustness around split mappings and parsing**.
+
+---
+
+## 2. Remaining issues / new concerns
+
+### A. Split mappings are aggregated correctly, but displayed incorrectly
+This is the biggest remaining issue.
+
+In `aggregate_by_account()`, when `mapping` is a dict, you do this:
+
+- allocate amounts correctly across indices ✅
+- but store only a **single `primary_idx`** in `details` ❌
+
+That creates 3 problems:
+
+#### 1) Position details table is misleading
+A 60/40 COE is shown as only one index in `"→ OryxMC Index"`.
+
+#### 2) Notes column is wrong for split allocations
+`_get_index_notes()` reads from `details`, which only carries `primary_idx`.  
+So for a split like `{CDI: 0.6, SP500TR: 0.4}`, only CDI gets marked `≈ proxy`, while SP500TR may not.
+
+#### 3) Warnings are ugly for split allocations
+Warnings show the raw dict string:
+```python
+{'CDI': 0.6, 'SP500TR': 0.4}
+```
+Functionally okay, but not very client/audit-friendly.
+
+### Recommendation
+Store split mappings explicitly in details, e.g. as:
+
+- `"60% CDI + 40% SP500TR"` for display, or
+- one detail row per split leg, or
+- a structured object instead of `(mercado, display, valor, primary_idx, note)`.
+
+This is the one thing I’d fix next.
+
+---
+
+### B. Generic COE fallback is too aggressive
+This line is risky:
+
+```python
+return ({"CDI": 0.60, "SP500TR": 0.40},
+        "COE intl equity-linked → 60% CDI + 40% SP500TR [APPROX]")
+```
+
+That means **any COE not recognized by text** becomes US-equity-linked.  
+Your own summary suggests this is happening in live data:
+
+- `COE-BT7825DG3HN` got the generic fallback
+
+That may be okay if you manually verified that product. But as a default rule, it’s too strong.
+
+### Better default
+For unknown COEs, I’d prefer:
+
+- either explicit warning + manual review
+- or a more neutral fallback label like `"COE unclassified → manual review [APPROX]"`
+
+If you keep the 60/40 fallback, at least make it obvious that this is a default assumption, not an identified payoff.
+
+---
+
+### C. Input normalization is still brittle
+You normalize accents, but not consistently case.
+
+Example:
+```python
+mercado = strip_accents(...).strip()
+if mercado == "Renda Fixa":
+```
+
+This works only if casing matches exactly.  
+Safer would be:
+
+```python
+mercado = strip_accents(...).upper().strip()
+```
+
+and then compare against uppercase constants everywhere.
+
+Same issue for `produto`, `estrategia`, and `prod_type`.
+
+---
+
+### D. `_safe_float()` is still locale-fragile
+If Excel ever gives strings like:
+
+- `"1.234,56"`
+- `"123,45"`
+
+`float(val)` fails.
+
+If the workbook is always numeric, fine. But if not, you want a parser that handles BR-style numbers.
+
+---
+
+### E. NTNB date parsing is still narrow
+Current fallback handles ISO-like strings only:
+
+```python
+datetime.strptime(vencimento[:10], "%Y-%m-%d")
+```
+
+If the source changes to `dd/mm/yyyy`, this silently falls back to `IMA-B [APPROX]`.
+
+That’s not catastrophic, but it’s avoidable.
+
+---
+
+### F. Empty fund names do not currently trigger warnings
+This case returns:
+
+```python
+("CDI", "Empty fund name → CDI")
+```
+
+Since it has neither `[APPROX]` nor `"unclassified"`, it **won’t show up in warnings**.
+
+That’s inconsistent with your stated goal that silent fallbacks should no longer pass unnoticed.
+
+---
+
+### G. Missing-index handling in simulation can silently distort weights
+In `simulate_clients.py`:
+
+```python
+if brl > 0 and idx_key in data["indices"]:
+    allocs[idx_key] = brl / total
+```
+
+If some mapped index is absent from Oryx data, that piece just disappears from `allocs`.  
+You do **not** renormalize or warn.
+
+So you can simulate a portfolio with weights summing to less than 100% without noticing.
+
+### Recommendation
+Add:
+
+- a warning for dropped indices
+- either renormalize remaining weights
+- or skip simulation for that account
+
+---
+
+### H. Hard-coded `POSITION_DATE`
+This is okay for this run, but it will go stale.
+
+Since NTNB bucket selection depends on remaining maturity, this should ideally come from:
+
+- the file’s position date
+- or a CLI/config parameter
+
+---
+
+### I. One mapping nuance to reconsider: inflation-linked DEB
+In `Renda Fixa`:
+
+```python
+if "INFLACAO" in est:
+    if prod_type in ("CRA", "CRI", "CDCA"):
+        return ("IDA-IPCA", ...)
+    return ("IMA-B", ...)
+```
+
+So **inflation-linked DEB** goes to `IMA-B`, not `IDA-IPCA`.
+
+That may be okay if you want duration over credit. But conceptually, an IPCA-linked corporate debenture is closer to credit than sovereign NTN-B.
+
+Not necessarily a bug from Round 1, but I’d flag it as a possible next refinement.
+
+---
+
+## 3. Anything else I’d change?
+
+### Priority 1 — Fix split-mapping auditability
+This is the most important change now.
+
+I’d change the internal representation from:
+```python
+(mercado, display, valor, primary_idx, note)
+```
+to something like:
+```python
+{
+  "market": ...,
+  "display": ...,
+  "value": ...,
+  "mapping": {"CDI": 0.6, "SP500TR": 0.4},
+  "note": ...,
+  "approx": True,
+}
+```
+
+Then:
+
+- details table can show `60% CDI + 40% SP500TR`
+- notes column can mark **all affected indices**
+- warnings become readable
+
+---
+
+### Priority 2 — Add validation checks
+A few cheap assertions would materially improve reliability:
+
+- split weights sum to 1.0
+- no negative weights
+- all mapped indices exist in `INDEX_TO_CATEGORY`
+- all simulation indices exist in `data["indices"]`
+- post-filter simulation weights sum close to 1.0
+
+---
+
+### Priority 3 — Make normalization uniform
+Use a helper for normalized comparisons:
+
+- accent-stripped
+- uppercased
+- trimmed
+
+Then compare only normalized tokens.
+
+---
+
+### Priority 4 — Add regression tests
+At this point the mapping logic is important enough to deserve tests.
+
+I’d add test cases for exactly the 17 Round 1/2 rules, especially:
+
+- Valor em Trânsito
+- BTGP Crédito Imobiliário CDI
+- EMPIRICUS OURO
+- POL crypto
+- HASHDEX 20
+- 3 COE cases
+- CRA/CRI/CDCA/DEB pre/post
+- USTK11 / XPBR31 / AURA33
+- unclassified fallback warning
+- empty string value parsing
+- string vencimento parsing
+
+That would prevent re-breaking this later.
+
+---
+
+### Priority 5 — Add a mapping confidence summary
+Very useful operationally:
+
+Per account and overall, show:
+
+- exact-mapped %
+- approximate-mapped %
+- unclassified/manual-review %
+
+That gives you a quick “how trustworthy is this simulation?” metric.
+
+---
+
+## Bottom line
+
+### My assessment
+- **Mapping fixes:** largely correct
+- **Code quality fixes:** mostly correct
+- **Main remaining issue:** split mappings are **mathematically right but audit/display wrong**
+- **Main modeling concern:** generic unknown COEs are still being assigned too confidently
+
+### If I were approving this round
+I’d say:
+
+> **Yes, this is substantially improved and mostly correct.**  
+> Before calling it “done,” I would make one more pass on:
+> 1. split mapping representation in Excel/details/notes/warnings  
+> 2. unknown COE fallback behavior  
+> 3. parsing/normalization robustness
+
+If you want, I can do a **Round 3-style redline** with exact code edits for those remaining issues.

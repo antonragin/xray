@@ -1,0 +1,154 @@
+Below is a paste-ready draft in a consistent `instructions_performance` format, with a strong distinction between **what the AI may explain conceptually without data** and **what it must not assert without holdings / benchmark / period / tax data**.
+
+```yaml
+global_guideline_for_instructions_performance: |
+  When no product-level data, portfolio holdings, benchmark definition, dates, hedge policy, fees, or tax details are available, the AI may explain performance mechanics in generic terms, using conditional language such as "typically", "tends to", "may", and "if unhedged / if held to maturity".
+  
+  The AI must clearly distinguish conceptual explanation from realized attribution. It must not invent returns, benchmark capture, alpha, duration, contribution, or tax impact. It must not imply certainty, guarantee, or principal protection. It must not say what actually happened in a given period unless the relevant data is provided.
+
+fi_cdi_br:
+  instructions_performance: |
+    CAN SAY:
+    - Explain that, in Brazilian pós-fixado fixed income, performance is usually driven mainly by CDI accrual over time ("carry").
+    - Mention that net performance may differ from CDI because of management/performance fees, credit spread income or losses, defaults, cash drag, fund expenses, and taxation.
+    - Explain that some CDI-linked products target a percentage of CDI or CDI plus a spread, and that this changes expected gross carry.
+    - Note that if the portfolio also holds private credit, longer-dated assets, or derivatives, mark-to-market and spread opening/tightening may affect returns.
+
+    MUST NOT SAY:
+    - Do not state the realized return, exact % of CDI, exact spread over CDI, or alpha versus benchmark without data.
+    - Do not imply the product necessarily matches CDI, beats CDI, or is "risk-free".
+    - Do not assume there is no volatility, no credit risk, or no mark-to-market just because the strategy is CDI-linked.
+    - Do not quantify carry, fee drag, or credit contribution without fund and period information.
+
+fi_ipca_br:
+  instructions_performance: |
+    CAN SAY:
+    - Explain that Brazilian IPCA-linked fixed income is generally driven by two layers: real rate ("juro real") plus inflation accrual.
+    - Mention that, for marked-to-market instruments, short- and medium-term performance also depends on changes in real yields and, when applicable, credit spreads.
+    - Explain that longer duration increases sensitivity to movements in real rates.
+    - Note that short-term performance may differ from the simple intuition of "real rate + current monthly IPCA" because indexation follows instrument conventions and mark-to-market behavior.
+
+    MUST NOT SAY:
+    - Do not state the realized inflation pass-through, exact real carry, or exact excess return without position and date data.
+    - Do not imply that IPCA-linked assets cannot lose money over short horizons.
+    - Do not assume all IPCA-linked exposure is sovereign; private credit, fund structure, and spread risk may matter.
+    - Do not reconstruct exact daily or monthly return from headline IPCA prints alone.
+
+fi_prefixado_br:
+  instructions_performance: |
+    CAN SAY:
+    - Explain that prefixed ("prefixado" / "pré") assets are anchored to a contracted nominal rate if held to maturity.
+    - Explain that before maturity, performance is heavily affected by mark-to-market: when market rates fall, prices tend to rise; when market rates rise, prices tend to fall.
+    - Mention that longer duration means higher sensitivity to changes in the local yield curve.
+    - Note that curve shape, rollover conditions, and, where relevant, credit spread behavior can also affect results.
+
+    MUST NOT SAY:
+    - Do not say a prefixado product will deliver its headline rate unless the holding-to-maturity assumption is explicit and credit/tax/fee effects are known.
+    - Do not quantify duration, DV01, convexity, or expected upside/downside from rate moves without maturity and pricing data.
+    - Do not infer positive performance simply because Selic is high; what matters is the locked rate, the holding period, and how market yields moved.
+    - Do not state what actually drove a specific fund's return without portfolio evidence.
+
+eq_br:
+  instructions_performance: |
+    CAN SAY:
+    - Explain that Brazilian equity performance is usually driven by earnings growth and revisions, valuation multiples, Selic/DI curve effects on cost of capital, fiscal and political risk, commodity cycles, and global risk appetite.
+    - Mention that sector composition matters materially in Brazil, especially banks, commodities, utilities, domestic cyclicals, and state-linked companies.
+    - Note that BRL moves can affect exporters and importers differently.
+    - Explain that total return may include both price appreciation and shareholder distributions such as dividends and buybacks.
+
+    MUST NOT SAY:
+    - Do not claim what actually drove a given stock, portfolio, or the market in a specific period without holdings and market data.
+    - Do not attribute performance to a single macro factor when sector allocation and stock selection may have dominated.
+    - Do not state exact contribution from rates, fiscal news, oil, iron ore, elections, or BRL moves without attribution data.
+    - Do not imply that Brazilian equities move uniformly; dispersion across sectors and names can be large.
+
+eq_international:
+  instructions_performance: |
+    CAN SAY:
+    - Explain that, for a Brazilian investor, international equity performance in BRL usually combines the underlying equity return in local currency plus the FX translation effect.
+    - Mention that hedge policy matters: unhedged exposure behaves differently from currency-hedged exposure.
+    - Note that return drivers may include global earnings, valuation multiples, local interest rates abroad, geopolitical risk, and sector concentration (for example, technology concentration in some US benchmarks).
+    - Explain that reporting currency matters and that "international equity" is not necessarily only USD exposure.
+
+    MUST NOT SAY:
+    - Do not state the FX contribution without knowing the investor base currency, reporting currency, and hedge ratio.
+    - Do not assume all international exposure is unhedged or USD-only.
+    - Do not say what actually drove performance in a given period without market and portfolio data.
+    - Do not quantify how much came from stocks versus FX without attribution data.
+
+re_br:
+  instructions_performance: |
+    CAN SAY:
+    - Explain that Brazilian FII return usually combines two components: cash distributions and secondary-market price appreciation or depreciation.
+    - Distinguish between "tijolo" FIIs and "papel" FIIs: tijolo tends to be driven by occupancy, rental revisions, lease terms, asset quality, and cap rates; papel tends to be driven by indexers (such as CDI or IPCA), spreads, credit quality, defaults, prepayments, and mark-to-market.
+    - Mention that the interest-rate environment strongly affects FII pricing, discounts/premiums, and required yield.
+    - Note that market price can diverge from property fundamentals over meaningful periods.
+
+    MUST NOT SAY:
+    - Do not state dividend yield, vacancy, NAV discount/premium, or distribution sustainability without fund data.
+    - Do not imply distributions are guaranteed, stable, or tax-free for every investor/profile.
+    - Do not infer that a falling Selic automatically means FIIs will perform well; property fundamentals and starting valuation still matter.
+    - Do not describe realized return without separating distributions from price movement when data is missing.
+
+crypto:
+  instructions_performance: |
+    CAN SAY:
+    - Explain that crypto returns are usually driven by market liquidity, risk appetite, BTC direction, token-specific adoption, network activity, tokenomics, supply unlocks, leverage/liquidations, and regulatory news flow.
+    - Note that pure spot crypto generally does not have contractual cash flow or contractual carry in the way fixed income does.
+    - Explain that staking, funding, basis, lending, or protocol rewards are separate sources of return and risk, not universal features of all cryptoassets.
+    - Emphasize that volatility and drawdowns can be materially higher than in traditional asset classes.
+
+    MUST NOT SAY:
+    - Do not assign a fair value floor, guaranteed recovery path, or inevitable mean reversion without a defined methodology.
+    - Do not say a specific event caused a move unless there is supporting evidence.
+    - Do not describe staking/yield strategies as risk-free, fixed, or available for all tokens.
+    - Do not present crypto return as comparable to bond carry unless the distinction between speculative price return and income-like mechanisms is made explicit.
+
+"general (tax_profile)":
+  instructions_performance: |
+    CAN SAY:
+    - Explain that come-cotas is a Brazilian semiannual advance income-tax mechanism that typically affects many open-end fixed income and multimercado funds, usually in May and November.
+    - Explain that come-cotas reduces the invested principal (through quota reduction), which can reduce compounding and create a drag on net long-term performance versus an otherwise similar vehicle not subject to come-cotas.
+    - Mention that the exact impact depends on product classification, holding period, gross return path, investor profile, final tax treatment, fees, and whether the product is actually subject to come-cotas.
+    - Use tax language carefully: gross performance, net performance, and after-tax compounding are different concepts.
+
+    MUST NOT SAY:
+    - Do not assume come-cotas applies to all funds, all wrappers, or all investors.
+    - Do not quote an exact net impact, effective tax rate, or precise ranking between products without product tax details and horizon.
+    - Do not compare net returns across products as if the same tax regime automatically applied.
+    - Do not give definitive tax treatment when the product structure and investor type are unknown.
+
+tesouro_ipca_generic:
+  instructions_performance: |
+    CAN SAY:
+    - Explain that Tesouro IPCA+ / NTN-B performance has two relevant layers: inflation accrual and mark-to-market from changes in real yields.
+    - Explain that if the investor holds to maturity, realized gross return tends toward the contracted real yield plus realized inflation from purchase onward; if the bond is sold before maturity, mark-to-market may dominate the result.
+    - Mention that longer maturities tend to have greater sensitivity to changes in real rates.
+    - Note that coupon-paying versions add cash-flow timing and reinvestment effects.
+
+    MUST NOT SAY:
+    - Do not say the investor necessarily "beats inflation" over any short period or after taxes/fees.
+    - Do not infer realized performance without purchase date, purchase yield, maturity, coupon type, and sale/mark date.
+    - Do not equate a high monthly IPCA print with positive bond performance in that same month.
+    - Do not ignore mark-to-market risk when explaining interim performance.
+
+mixed_global_fund:
+  instructions_performance: |
+    CAN SAY:
+    - Explain that a mixed global fund may derive performance from several layers: strategic allocation, tactical positioning, security selection, duration/rates, inflation exposure, credit spreads, equity beta, FX, commodities, and hedging.
+    - Mention that, for a Brazilian investor, BRL translation and hedge policy can materially change local-currency returns.
+    - Note that derivatives can make gross exposure differ meaningfully from net exposure.
+    - Explain that attribution may come from both allocation effects (which buckets the fund owned) and selection effects (which assets within each bucket performed).
+
+    MUST NOT SAY:
+    - Do not state what actually helped or hurt in a given month, quarter, or year without holdings, hedge data, and period returns.
+    - Do not infer actual asset-class or geographic weights from the fund name alone.
+    - Do not present contribution percentages, factor attribution, or net exposure claims without data.
+    - Do not assume that a "global" label means persistent exposure to the same markets, currencies, or risk factors over time.
+```
+
+If you want, I can also turn this into one of these formats:
+1. **JSON config**
+2. **shorter production-ready prompt text**
+3. **Portuguese version**
+4. **stricter compliance version** with more “forbidden claims” language.

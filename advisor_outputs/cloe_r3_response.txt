@@ -1,0 +1,279 @@
+**Round 3 verdict:** much better, but I still would **not** call this production-done yet.
+
+## Must-fix before sign-off
+
+### 1) `simulate_clients.py` likely has a real chart bug with NumPy arrays
+In `make_trajectory_chart()`:
+
+```python
+x=time_years + time_years[::-1]
+y=pct[hi] + pct[lo][::-1]
+```
+
+If `time_years` / `pct[...]` are NumPy arrays, `+` does **elementwise addition**, not concatenation. That will silently produce the wrong fan-band polygon.
+
+Also these checks are unsafe for NumPy arrays:
+
+```python
+if stats.get("benchmark_median_path"):
+if not counts or not mids:
+```
+
+They can raise `ValueError: truth value of an array is ambiguous`.
+
+**Fix:** explicitly convert to lists and use length/None checks.
+
+Example pattern:
+```python
+time_vals = list(time_years)
+hi_vals = list(pct[hi])
+lo_vals = list(pct[lo])
+
+x_fill = time_vals + time_vals[::-1]
+y_fill = hi_vals + lo_vals[::-1]
+
+bm = stats.get("benchmark_median_path")
+if bm is not None and len(bm) > 0:
+    ...
+```
+
+**Severity:** blocker, because it can silently make the charts wrong.
+
+---
+
+### 2) Benchmark series may be misaligned with each portfolio series
+You build benchmark once:
+
+```python
+cdi_portfolio = engine.build_portfolio_returns(data, {"CDI": 1.0})
+```
+
+Then for each account you simulate using:
+
+```python
+portfolio["portfolio_returns"]
+portfolio["ipca"]
+benchmark_returns=cdi_portfolio["portfolio_returns"]
+```
+
+If `portfolio["months"]` is shorter/different from the full CDI series, the benchmark may be misaligned or length-mismatched.
+
+**Fix:** build or slice the CDI benchmark to the **same months** as the client portfolio.
+
+**Severity:** blocker for simulation correctness.
+
+---
+
+### 3) Silent dropping + renormalization is still financially dangerous
+You fixed renormalization after dropping unavailable indices, which is good mechanically.  
+But this is still not enough for production.
+
+Today the logic does this:
+
+- drop indices not in `data["indices"]`
+- renormalize remaining weights to 1.0
+- simulate using the **full account value**
+
+That means if 20% of the portfolio is unmapped/unavailable, you are effectively pretending the remaining 80% explains 100% of the money.
+
+**Minimum safe behavior:**
+- compute `coverage = covered_brl / total_brl`
+- record dropped indices and values
+- either:
+  - **skip simulation** if coverage is below a threshold (e.g. 95% / 98%), or
+  - simulate only covered amount and disclose that clearly
+
+Right now this can materially distort outputs while looking clean.
+
+**Severity:** blocker.
+
+---
+
+### 4) Direct fixed-income mapping still has a meaningful gap: inflation-linked debentures
+In `Renda Fixa`:
+
+```python
+if "INFLACAO" in est:
+    if prod_type in ("CRA", "CRI", "CDCA"):
+        return ("IDA-IPCA", ...)
+    return ("IMA-B", ...)
+```
+
+So an inflation-linked `DEB` falls to `IMA-B`, which is a **government real-rate proxy**, not a corporate inflation credit proxy.
+
+At minimum, `DEB` should probably join the corporate IPCA bucket:
+
+```python
+("CRA", "CRI", "CDCA", "DEB")
+```
+
+And infrastructure/incentivada debentures should have a path to `IDA-Infra`.
+
+**Severity:** high.  
+This is exactly the kind of misclassification that can overstate duration beta and understate credit spread risk.
+
+---
+
+### 5) You still rely too much on exact string matches / fixed schema
+A few examples:
+
+- `mercado == "Conta Corrente"`
+- `prod_type == "NTNB"`
+- `ativo == "IVVB11"`
+- fixed column order in `read_positions()`
+
+This is brittle.
+
+**Recommended minimum:**
+- normalize comparison fields to uppercase accent-free strings
+- keep raw values only for display
+- validate the header row instead of assuming fixed column positions
+- fail fast if required columns are missing/moved
+
+**Severity:** high for production robustness.
+
+---
+
+## Financial mapping accuracy: what still looks wrong or fragile
+
+### A) `IDA-DI` is still a catch-all bucket
+Your overall summary is:
+
+- **IDA-DI = 58.3%**
+- **Ibovespa = 0.1%**
+- **ACWI ≈ 0**
+
+That may be real, but it’s also the bucket absorbing many approximations:
+- crédito privado funds
+- pós corporate bonds
+- real-estate credit funds
+- some debenture-like assets
+- possibly DEBB11
+
+So I would **manually inspect the top 10–20 largest IDA-DI lines** before sign-off.  
+That’s the bucket most likely to hide residual mapping error.
+
+---
+
+### B) Direct infra / incentivada bond mapping is underdeveloped
+You handle infra well for funds, but for direct `Renda Fixa` instruments the logic is much thinner. If the source file contains:
+- debênture incentivada
+- debênture infraestrutura
+- IPCA+ infra bonds
+
+you likely won’t map them as well as you should.
+
+**Suggestion:** use `submercado`, `produto`, `ativo`, and maybe `emissor` text together for RF mapping, not just `estrategia`.
+
+---
+
+### C) Gold / crypto / uranium → `SP500TR` is still only acceptable as an explicit proxy
+This is fine only if everyone agrees it is a **risk proxy**, not an economic proxy.
+
+- Gold does **not** behave like S&P 500
+- Crypto does **not** behave like S&P 500
+- Uranium/miners do **not** behave like S&P 500
+
+I wouldn’t block launch over this if:
+- exposures are small
+- `[APPROX]` is visible
+- simulation coverage is disclosed
+- stakeholders accept proxy logic
+
+But if these sleeves are material, this remains too rough.
+
+---
+
+### D) Cash → CDI is a business assumption, not a fact
+For brokerage cash / transit values, `CDI` is a reasonable convenience proxy.  
+But if these balances are truly idle and non-remunerated, you are overstating expected return.
+
+Not a coding bug, but you should document the assumption.
+
+---
+
+## Other issues I’d fix soon
+
+### 6) Probabilities may be in the wrong units
+You do:
+
+```python
+loss_text = f"P(perda): {p_loss:.1f}%"
+beat_text = f"P(>CDI): {p_beat:.0f}%"
+```
+
+But for `cagr` and `vol` you explicitly multiply by 100. If `prob_loss` / `prob_beat_benchmark` are decimals in `[0,1]`, you’re underreporting by 100x.
+
+**Verify engine convention.**  
+If they are decimals, use `p_loss * 100` and `p_beat * 100`.
+
+**Severity:** medium-high, because labels can become misleading even if simulation math is fine.
+
+---
+
+### 7) `POSITION_DATE` is hard-coded
+```python
+POSITION_DATE = date(2026, 2, 28)
+```
+
+That affects NTNB bucketing and workbook labeling. This should come from:
+- the file contents, or
+- a CLI argument / config
+
+Hard-coding is okay for one-off analysis, not production.
+
+---
+
+### 8) Split mappings should be validated
+If a future rule accidentally returns weights summing to 0.9 or 1.1, the code will accept it silently.
+
+Add a guard:
+```python
+if isinstance(mapping, dict):
+    s = sum(mapping.values())
+    if abs(s - 1.0) > 1e-6:
+        raise ValueError(...)
+```
+
+---
+
+### 9) Filename / sheet-name sanitization
+`sheet_name = str(conta)[:31]` is not enough if:
+- two names truncate to the same 31 chars
+- account ids contain invalid filename characters
+
+Probably fine for numeric accounts, but production code should sanitize and deduplicate.
+
+---
+
+## Minimum bar to call this “done”
+
+If you want the shortest realistic checklist, I’d say:
+
+1. **Fix the NumPy/list chart bugs**
+2. **Align benchmark months to portfolio months**
+3. **Add simulation coverage check + disclose dropped indices**
+4. **Fix direct RF mapping for `DEB` / infra / incentivada / IPCA**
+5. **Normalize input matching and validate Excel schema**
+6. **Add a small test suite**
+
+That test suite should at least cover:
+- `_safe_float("1.234,56")`
+- NTNB date parsing for all 3 formats
+- COE split mapping
+- empty fund name warning
+- `DEB` inflation-linked mapping
+- `Previdencia` / `Previdência`
+- chart functions with NumPy arrays
+- split weights summing to 1.0
+
+If those are done, I’d be comfortable calling it **production-ready v1**.
+
+## Bottom line
+**Status:** close, but **not done yet**.
+
+The biggest remaining risks are:
+- **simulation correctness** (chart array handling, benchmark alignment, dropped-index coverage)
+- **fixed-income mapping quality** (especially debentures / infra / IPCA corporate paper)
+
+If you want, I can do **Round 4** as a redline patch list with exact code edits.

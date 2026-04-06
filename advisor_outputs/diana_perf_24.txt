@@ -1,0 +1,59 @@
+Here is the synthesis for the **PERFORMANCE precursor (FINAL ANGLE)** for the Brazilian Portfolio X-Ray, incorporating the inputs from CLOE (structural prompt components) and DIANA (April 2026 Brazilian macroeconomic inflection points), followed by the cross-cutting themes summary.
+
+---
+
+### 1. Resolve Conflicts
+**The Conflict:** CLOE’s requirement for "driver descriptions" and "benchmark context" traditionally assumes the presence of explicit, time-series return data. However, DIANA highlights that in the absence of exact performance data, Brazilian reporting relies on "Structural Proxying," and generating qualitative text about generic "high rates" will be flagged as boilerplate and outdated given the recent March 2026 Selic pivot.
+**The Resolution:** Shift the definition of "Performance Drivers" from *backward-looking trailing returns* to *forward-looking structural sensitivities*. 
+*   **Benchmarks become Anchors:** The CDI is not treated as a line on a chart, but as the "Gravity Well" (the universal hurdle rate). The Ibovespa is treated as the momentum gauge (currently at ~190k).
+*   **Drivers become Sensitivities:** Instead of "Asset X returned Y%," the precursor will instruct the system to evaluate "How Asset X is structurally positioned to capture the Selic compression from 15.00% to 14.75% and beyond." 
+
+### 2. Final Checklist (Performance Precursor)
+*   [ ] **Macro-Grounding Check:** Is the narrative explicitly anchored to the April 2026 environment (Selic at 14.75%, IPCA ~3.90%, Ibovespa ~190k)? 
+*   [ ] **CDI Gravity Well Check:** Are all performance proxies evaluated as a spread over, or an alternative to, the prevailing CDI rate?
+*   [ ] **Structural Proxying Check:** Does the output rely on the asset's structural role (e.g., "duration exposure," "inflation-linked proxy") rather than hallucinating absolute return figures?
+*   [ ] **Guardrail Enforcement:** Is there a strict prohibition against using generic phrases like "navigating a high-interest-rate environment" (which ignores the recent pivot) or hallucinating historical annualized returns?
+*   [ ] **Local Terminology Verification:** Are correct local index proxies used (IMA-B for inflation-linked bonds, IRF-M for fixed-rate, Ibovespa for equities)?
+
+### 3. Templates
+**System Instruction Template (The Prompt Precursor):**
+> **Role & Context:** You are an expert Brazilian portfolio analyst writing the "Performance Drivers" section of an investment X-Ray in April 2026. The Selic rate has just been cut to 14.75%, IPCA is hovering at 3.90%, and the Ibovespa has hit record highs near 190,000. 
+> 
+> **Task:** Analyze the provided portfolio holdings using "Structural Proxying." You do not have exact trailing return data. Instead, explain how the structural characteristics of these assets are driving performance in the current macroeconomic inflection point.
+> 
+> **Guardrails:** 
+> 1. DO NOT invent or hallucinate exact historical return percentages. 
+> 2. DO NOT use generic boilerplate like "we are in a high-rate environment." Acknowledge the beginning of the Copom easing cycle.
+> 3. ALWAYS frame fixed-income risk against the "CDI Gravity Well" (the opportunity cost of holding the risk-free overnight rate).
+> 
+> **Required Output Structure:**
+> *   **The CDI Spread Profile:** How the portfolio's fixed income sleeve is capturing premium over the CDI (focusing on duration / IMA-B exposure during the Selic pivot).
+> *   **Equity Participation:** How the portfolio's risk assets are participating in the historic Ibovespa rally fueled by foreign capital inflows.
+> *   **Inflation Shielding:** The portfolio's sensitivity to the IPCA-15 uptick via NTN-B proxies.
+
+### 4. Ordering
+When assembling the Performance section in the final report, the systemic ordering must follow the hierarchy of Brazilian market focus:
+1.  **The Opportunity Cost (CDI & Selic):** Open with the portfolio's positioning relative to the March 2026 Selic cut. Address the "CDI Gravity Well" first, as this is the baseline for every Brazilian investor.
+2.  **Duration & Inflation (IMA-B / Fixed Income Drivers):** Address how the fixed income sleeve (specifically NTN-Bs and pre-fixed rates) is structurally driving returns via mark-to-market gains as the easing cycle begins.
+3.  **Risk Asset Momentum (Ibovespa Equities):** Detail the structural participation in the early 2026 foreign-capital-driven equity rally. 
+4.  **Alternative / Offshore:** Conclude with the currency effect (BRL/USD) and offshore diversification drivers.
+
+---
+
+### 5. SUMMARY OF CROSS-CUTTING THEMES (All 6 Angles)
+Looking across the entire precursor design architecture (Macro, Asset Allocation, Risk, Income, Costs, and Performance), several universal themes must be embedded into the master system prompt:
+
+**A. The April 2026 Temporal Anchor**
+Every single module must act as if the clock is stopped in April 2026. The master guardrail must enforce awareness of the exact macro inflection: Copom's long-awaited pivot from 15.00% to 14.75%, the IPCA holding at ~3.90% but showing stickiness, and the Ibovespa breaking the 190k threshold. Reports lacking this temporal awareness will fail the advisor credibility test instantly.
+
+**B. "Structural Proxying" as the Default Engine**
+Because the system often operates without granular, real-time time-series data for every asset, all modules (Risk, Performance, Yield) must default to *Structural Proxying*. The system must evaluate the *DNA* of the portfolio (e.g., "This fund behaves like an IMA-B index proxy") rather than relying on absent raw data. 
+
+**C. The "CDI Gravity Well"**
+Across Asset Allocation, Risk, and Performance, the CDI is the absolute center of the Brazilian financial universe. It is the ultimate opportunity cost. Every risk taken, fee paid, or return generated must be structurally justified as a premium over the 14.75% risk-free rate. 
+
+**D. Hyper-Localization of Terminology**
+The system must inherently speak "Faria Lima" (the Brazilian financial district). Guardrails must enforce the use of local conventions: using *Copom* instead of "the central bank," *Selic/CDI* instead of "base rates," *NTN-Bs/IMA-B* instead of "inflation-linked bonds," and *Fundo Multimercado (FIM)* instead of "hedge funds." 
+
+**E. Anti-Boilerplate Guardrails**
+The most severe failure state for the LLM is generating generic Western financial advice (e.g., standard 60/40 logic) or static narratives. Brazilian fixed income is highly active, and the master system must actively suppress generic statements in favor of dynamic, inflection-point analysis.

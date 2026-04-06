@@ -1,0 +1,252 @@
+Below is the design I’d use if the downstream AI receives **all 5 instruction blocks concatenated together**.
+
+## 1. Unique role of each table
+
+The key rule is: **each table should answer a different diversification question**.  
+That prevents redundancy and reduces contradictory guidance.
+
+| Table | Core question it answers | What it should convey | What it should avoid |
+|---|---|---|---|
+| **economic_exposure** | **What underlying economic risk bucket is this?** | Macro/risk-driver similarity, country_of_risk, currency regime, asset-class behavior, overlap across exposures, when multiple holdings are economically similar even if implemented differently | Specific issuer concentration, tax incentives, wrapper mechanics unless needed to prevent a common misread |
+| **tax_profile** | **Is capital clustering because of tax treatment?** | Whether the tax regime creates a distinct implementation bucket, whether tax incentives can cause hidden concentration in a narrow market, whether same-tax holdings are not necessarily same-risk holdings | Claims about economic diversification, return superiority, or issuer risk reduction |
+| **issuer_type** | **What issuer family / sector / sovereign cluster is this?** | Sector-level common shock channels, regulatory/funding/common-guarantor linkage, why multiple names can still be one family concentration | Specific-name conclusions, instrument mechanics, broad asset-class conclusions |
+| **issuer** | **What exact obligor / guarantor / single name is this?** | Ultimate-name aggregation, parent/subsidiary/guarantee relationships, why multiple securities from the same name are not diversified specific-name risk | Sector-general statements that belong in issuer_type |
+| **instrument_template** | **How does this vehicle carry exposure?** | Single-name vs pooled, passive/index vs active, look-through relevance, overlap risk with similar templates, maturity/lockup/guarantee structure when relevant to concentration interpretation | Broad economic or issuer conclusions that belong elsewhere |
+
+### In one line each
+- **economic_exposure** = *what risk it is*  
+- **tax_profile** = *what tax bucket it sits in*  
+- **issuer_type** = *what issuer family it belongs to*  
+- **issuer** = *which exact name it depends on*  
+- **instrument_template** = *how the vehicle transmits that risk*
+
+---
+
+## Recommended writing pattern for every `instructions_diversification`
+
+Since you want structured labeled blocks, I’d standardize each text like this:
+
+- **[Scope]** what this row means  
+- **[Use for]** what concentration/diversification dimension it informs  
+- **[Interpret carefully]** the main nuance the model must not miss  
+- **[Do not infer]** one row-specific guardrail
+
+That gives consistency without making every row too long.
+
+---
+
+## 2. Copy-ready instruction text examples
+
+These are written to be put directly into the database.
+
+---
+
+### `economic_exposure.fi_cdi_br`
+
+```text
+[Scope] This row represents Brazilian local-currency fixed income whose primary economic driver is CDI/Selic post-fixed rates. [Use for] Use it to reason about how much of the portfolio depends on Brazilian short-rate and carry conditions rather than inflation-linked, fixed-rate, equity, or foreign-market drivers. [Interpret carefully] Multiple positions can be economically similar here even if they differ by issuer, tax wrapper, fund vehicle, or instrument form. [Interpret carefully] This row is about economic similarity, not issuer diversification; issuer spread should be evaluated in issuer_type and issuer. [Do not infer] Do not assume duration, guarantee coverage, or credit quality beyond the explicit position data.
+```
+
+---
+
+### `economic_exposure.eq_international`
+
+```text
+[Scope] This row represents international equity risk, classified by underlying country_of_risk rather than by local trading venue or wrapper domicile. [Use for] Use it to assess geographic, currency, and global equity-market diversification relative to Brazilian assets. [Interpret carefully] Different funds or ETFs may still have high overlap if they track the same benchmark, country, or mega-cap segment. [Interpret carefully] Treat the underlying exposure as the primary diversification signal and the local access vehicle as secondary. [Do not infer] Do not assume ex-US breadth, sector balance, or currency hedging unless the allocation data explicitly shows it.
+```
+
+---
+
+### `economic_exposure.crypto`
+
+```text
+[Scope] This row represents cryptoasset exposure as a distinct economic bucket with its own market structure and volatility regime. [Use for] Use it to assess how much portfolio risk may come from crypto beta, token concentration, and market-regime sensitivity rather than from traditional asset classes. [Interpret carefully] A portfolio can hold multiple crypto instruments and still be dominated by a few underlying tokens or by highly correlated crypto exposures. [Interpret carefully] Count of positions or wrappers is not a reliable proxy for diversification here; underlying token mix matters more. [Do not infer] Do not assume Bitcoin dominance, stablecoin exposure, DeFi exposure, or exchange diversification unless the underlying allocations show it.
+```
+
+---
+
+### `issuer_type.br_bank`
+
+```text
+[Scope] This row groups exposure to Brazilian banking issuers or explicit bank obligations into one issuer family. [Use for] Use it to assess concentration that remains even when exposure is spread across multiple bank names, products, or maturities. [Interpret carefully] Different banks can reduce single-name risk while still leaving the portfolio clustered in one sector, regulatory regime, and funding model. [Interpret carefully] Economic exposure such as CDI-linked carry is separate from bank-family concentration and should be evaluated elsewhere. [Do not infer] Do not assume sovereign backing or identical risk across all banks unless explicit guarantees or terms are provided.
+```
+
+---
+
+### `issuer_type.br_government`
+
+```text
+[Scope] This row groups exposure whose ultimate obligor or guarantor is the Brazilian sovereign or a directly sovereign-backed entity. [Use for] Use it to aggregate sovereign-name concentration across different bonds, funds, or wrappers. [Interpret carefully] Holding many Tesouro lines can diversify maturity, duration, or indexation, but the ultimate issuer family remains the same. [Interpret carefully] Separate sovereign concentration from the economic style of the bond, such as CDI-linked, prefixado, or IPCA-linked exposure. [Do not infer] Do not treat different wrappers or bond tickers as different ultimate issuers when the sovereign credit is the same.
+```
+
+---
+
+### `tax_profile.general`
+
+```text
+[Scope] This row represents the standard tax regime without a special exemption, previdência wrapper, or other dedicated tax treatment. [Use for] Use it as the baseline tax bucket when judging whether capital is concentrated in standard taxable implementations versus special tax regimes. [Interpret carefully] Assets sharing this tax profile may have completely different economic exposures, issuers, and structures. [Interpret carefully] Similarity here means tax treatment only; it is not evidence of economic diversification or concentration by itself. [Do not infer] Do not assume after-tax efficiency, holding period, or liquidity beyond the explicit instrument data.
+```
+
+---
+
+### `tax_profile.tax_exempt`
+
+```text
+[Scope] This row represents positions whose tax treatment can make them disproportionately attractive and can channel capital into a narrower eligible market. [Use for] Use it to detect concentration created by the tax incentive itself, especially when many positions draw from similar exempt structures, issuers, or sectors. [Interpret carefully] Several holdings can appear diversified by count while still depending on a limited exempt opportunity set. [Interpret carefully] Tax exemption is an implementation characteristic, not a substitute for economic, issuer, or liquidity diversification. [Do not infer] Do not treat the tax benefit as evidence of lower credit risk or lower portfolio concentration.
+```
+
+---
+
+### `instrument_template.cdb_cdi_generic`
+
+```text
+[Scope] This template represents a bank-issued CDB whose return is primarily linked to CDI and whose diversification behavior depends heavily on the issuing bank and maturity terms. [Use for] Use it to distinguish a single-issuer deposit instrument from a pooled fund or index vehicle. [Interpret carefully] Multiple CDB positions are not automatically diversified if they come from the same bank or from banks with similar sector exposure. [Interpret carefully] If guarantee-limit data is provided, use it as loss-absorption context rather than as proof of broad diversification. [Do not infer] Do not assume liquidity, callability, secondary-market exit, or guarantee coverage beyond the explicit position attributes.
+```
+
+---
+
+### `instrument_template.ivvb11`
+
+```text
+[Scope] This template represents a B3-listed ETF wrapper that provides look-through exposure to international equities rather than direct Brazilian equity risk. [Use for] Use it to analyze the diversification delivered by the underlying index exposure, currency exposure, and overlap with other international equity vehicles. [Interpret carefully] The vehicle is locally listed, but the economic risk should be attributed to the underlying foreign equities, not to Brazil as the country of risk. [Interpret carefully] As a pooled index vehicle, its specific-name concentration is driven more by the index constituents than by the ETF legal issuer. [Do not infer] Do not assume broad global equity coverage if the underlying benchmark is concentrated in one country, style, or market-cap segment.
+```
+
+---
+
+## 3. Should you include explicit “DO NOT” directives?
+
+### Short answer
+**Yes, but only sparingly and only for row-specific failure modes.**  
+Do **not** make every row a long list of prohibitions.
+
+### Best practice
+Use this mix:
+
+- **80–90% positive framing**
+  - “Use this row to assess…”
+  - “Treat this as…”
+  - “Separate X from Y…”
+
+- **10–20% targeted negative framing**
+  - One short **[Do not infer]** sentence for the most common mistake
+
+### Why this works better
+Positive framing tells the model what the block is *for*.  
+A short negative guardrail prevents the most damaging misread.
+
+### Good use of “DO NOT”
+Use it when the row has a **known recurrent confusion**, for example:
+- `ivvb11`: do not treat B3 listing as Brazilian economic exposure
+- `br_government`: do not count multiple Tesouro lines as multiple issuers
+- `crypto`: do not use coin count as proof of diversification
+- `tax_exempt`: do not treat tax benefit as lower risk
+
+### Bad use of “DO NOT”
+Avoid generic repeated rules like:
+- “Do not invent numbers”
+- “Do not make unsupported assumptions”
+- “Do not hallucinate returns”
+
+Those should live **once** in the global/system prompt or precursor wrapper, not repeated in every row.
+
+### My recommendation
+For each database row:
+- 3–5 sentences of positive guidance
+- 1 final sentence of row-specific **[Do not infer]**
+
+That’s the sweet spot.
+
+---
+
+## 4. Weighted exposures: include both? In what order?
+
+### Yes — include instructions from **all material economic exposures**
+If a position resolves to:
+- **60% `eq_international`**
+- **40% `fi_cdi_br`**
+
+then the precursor should include **both** economic exposure instruction blocks.
+
+Because they represent **real underlying risk drivers**.  
+If you include only one, the downstream AI will overread the position as “pure” instead of mixed.
+
+---
+
+### Recommended order within `economic_exposure`
+Use **descending resolved weight**:
+
+1. `eq_international` — 60%
+2. `fi_cdi_br` — 40%
+
+That gives the AI the right emphasis immediately.
+
+---
+
+### Strong recommendation: include the applied weight in the block header
+Example:
+
+```text
+[ECONOMIC_EXPOSURE | weight_within_position=60% | key=eq_international]
+...instruction text...
+
+[ECONOMIC_EXPOSURE | weight_within_position=40% | key=fi_cdi_br]
+...instruction text...
+```
+
+That is much better than concatenating unlabeled text, because it tells the downstream AI:
+- both exposures matter
+- they do not matter equally
+- the weight refers to the **position’s internal composition**
+
+---
+
+### If coverage is incomplete, include unresolved remainder explicitly
+If you only mapped 85% of a fund’s internal composition, add:
+
+```text
+[ECONOMIC_EXPOSURE_UNRESOLVED | weight_within_position=15%]
+This portion of the position has unresolved economic exposure. Use only the resolved share for exposure-specific reasoning and do not assume the unresolved share behaves like the mapped buckets.
+```
+
+That directly supports your earlier recommendation about `coverage_on_total` vs `coverage_on_applicable`.
+
+---
+
+## Recommended concatenation order across all 5 tables
+
+I’d use a **fixed broad-to-narrow order**:
+
+1. **economic_exposure**  
+   - one block per resolved exposure, sorted by descending weight
+2. **tax_profile**
+3. **issuer_type**
+4. **issuer**
+5. **instrument_template**
+
+### Why this order works
+It mirrors how diversification reasoning usually happens:
+
+- first: **what risk is it?**
+- then: **is tax treatment clustering it?**
+- then: **what family is it concentrated in?**
+- then: **what exact name is it concentrated in?**
+- finally: **how does the vehicle/wrapper affect interpretation?**
+
+You could move `instrument_template` earlier, but if you want the simplest stable design, the order above is clear and composable.
+
+---
+
+## Practical design rule for the database
+
+If you want these rows to compose cleanly, each `instructions_diversification` should satisfy this test:
+
+> “If I concatenate this with the other 4 tables, does this block still contribute one unique dimension of reasoning?”
+
+If the answer is yes, the row is well-scoped.  
+If it starts repeating issuer logic inside economic exposure, or tax logic inside instrument template, it will dilute compliance.
+
+---
+
+If you want, I can next produce:
+1. a **canonical template** for all five tables, or  
+2. a **full first-pass set of instruction texts** for every row in `economic_exposure`, `tax_profile`, and `issuer_type`.

@@ -1,0 +1,91 @@
+Here is the synthesis of the liquidity precursor design, integrating CLOE’s structural logic with DIANA’s deep Brazilian market realities. 
+
+### 1. Conflict Resolution (CLOE vs. DIANA)
+
+Before finalizing the design, three critical conflicts between the initial structure and Brazilian market realities must be explicitly resolved:
+
+*   **Conflict 1: The FGC Metric.** 
+    *   *Issue:* CLOE suggested `FGC_coverage_%` as a liquidity input. DIANA correctly identified this as a dangerous retail trap. FGC guarantees credit, not liquidity.
+    *   *Resolution:* **Decouple FGC from liquidity.** Move FGC strictly to the *Credit Risk Precursor*. Introduce an explicit anti-pattern instruction forbidding the LLM from conflating FGC coverage with early exit feasibility.
+*   **Conflict 2: Binary Mark-to-Market vs. Exit Reality.**
+    *   *Issue:* CLOE proposed a simple `mark_to_market` flag. DIANA noted that exiting a CRI/CDB incurs a massive broker spread/haircut, while exiting TD implies curve-driven MtM, and exiting a closed fund is impossible. 
+    *   *Resolution:* Upgrade the binary flag to `early_exit_penalty_type` with specific enumerations: `MTM_CURVE` (Tesouro), `PUNITIVE_SPREAD` (CDB/CRI/CRA), `NONE` (LFs/Overnight), `PROHIBITED` (Closed lock-ups).
+*   **Conflict 3: Fund D+N vs. Asset Carência.**
+    *   *Issue:* Measuring liquidity by settlement days (D+N) fails when the asset is completely locked. 
+    *   *Resolution:* Establish a **Liquidity Hierarchy Constraint**. `data_fim_carencia` (Lock-up End Date) overrides all settlement metrics. If `current_date < data_fim_carencia`, effective liquidity is hardcoded to 0 (Illiquid), and D+N is ignored.
+
+---
+
+### 2. Final Checklist for Liquidity Precursor Completeness
+
+To ensure the AI has sufficient proxies for real-time order books, the finalized schema must include the following fields:
+
+**Temporal & Constraint Fields**
+*   [ ] `data_fim_carencia`: Absolute lock-up end date.
+*   [ ] `data_repactuacao`: Next scheduled renegotiation date (pseudo-liquidity event at par).
+*   [ ] `settlement_rule`: Standardized D+N format (e.g., D+0, D+1, D+30).
+
+**Market Depth Proxies (Semi-Static)**
+*   [ ] `volume_emissao`: Total issue size (R$).
+*   [ ] `adv_tier`: Historical volume bracket (Tier 1: > R$ 10M/day, Tier 2: R$ 1M - 10M, Tier 3: < R$ 1M).
+*   [ ] `anbima_pricing_flag`: Boolean. True if ANBIMA provides daily indicative PU (signals base consensus).
+*   [ ] `issuer_tier`: Categorical (e.g., Top 5 Bank, Tier 2 Bank, Corporate, Sovereign).
+
+**Penalties & Risks**
+*   [ ] `circuit_breaker_risk`: Boolean (Primary flag for Tesouro Direto volatility windows).
+*   [ ] `early_exit_penalty_type`: Enum (MTM_CURVE, PUNITIVE_SPREAD, NONE, PROHIBITED).
+
+---
+
+### 3. Final Instruction Text Template Pattern (For the 5 Tables)
+
+Assuming the standard 5-table Brazilian wealth schema (Sovereign, Bank Debt, Corporate Debt, Funds, Equities/Listed), here is the finalized instruction text applying the requested `[Scope][Use for][Interpret carefully][Do not infer]` format.
+
+**Table 1: Sovereign Debt (Tesouro Direto / Títulos Públicos)**
+*   **[Scope]** Applies to Prefixado, Selic, and IPCA+ bonds issued directly by the National Treasury.
+*   **[Use for]** Baseline high-liquidity scoring, assuming standard D+0 (before 13:00) / D+1 settlement rules.
+*   **[Interpret carefully]** Early exits for Prefixado and IPCA+ carry severe mark-to-market (MtM) risk. A client needing immediate cash may realize significant principal loss depending on the current yield curve.
+*   **[Do not infer]** Do not infer guaranteed absolute liquidity. The Treasury implements automated circuit breakers during high volatility, halting all secondary trading.
+
+**Table 2: Bank Issuance (CDB, LCI, LCA, LF)**
+*   **[Scope]** Fixed income papers issued by financial institutions.
+*   **[Use for]** Assessing liquidity constraints based strictly on `data_fim_carencia` (lock-up end date). Follow CMN Res 5.215 (May 2025) logic for baseline LCI/LCA minimum lock-ups if explicit dates are missing.
+*   **[Interpret carefully]** Secondary market liquidity prior to maturity requires a broker buy-back, usually resulting in a punitive spread/haircut against the client.
+*   **[Do not infer]** Do not infer liquidity from FGC (Fundo Garantidor de Créditos) coverage. FGC is exclusively a default backstop, not a mechanism to cash out early.
+
+**Table 3: Private Credit (Debentures, CRI, CRA)**
+*   **[Scope]** Corporate debt instruments traded via CETIP/B3.
+*   **[Use for]** Evaluating secondary market viability using `volume_emissao`, `adv_tier`, and `anbima_pricing_flag` as proxies for market depth. Calculate exit horizons using `data_repactuacao` as primary exit-at-par windows.
+*   **[Interpret carefully]** This is a highly shallow market. A large holding in a restricted (CVM 476) or low-volume issuance cannot be liquidated quickly without crashing the unit price (PU).
+*   **[Do not infer]** Do not infer that "traded on B3" equates to "liquid." B3 registration for these assets is primarily for custody and settlement, not active order book matching.
+
+**Table 4: Investment Funds (FI, FIM, FIA)**
+*   **[Scope]** Quotas of Mutual Funds, Hedge Funds, and Equity Funds.
+*   **[Use for]** Calculating precise cash availability dates by summing quote conversion days (cotização) + settlement days (liquidação), denoted strictly as D+N.
+*   **[Interpret carefully]** Closed-end funds (Fundos Fechados) have zero liquidity until maturity or a formal amortization event. 
+*   **[Do not infer]** Do not infer that a fund with highly liquid underlying assets (like a D+0 Sovereign fund) offers D+0 liquidity to the client; the fund's specific administrative D+N rule always overrides asset-level liquidity.
+
+**Table 5: Equities & Listed Assets (Ações, FIIs, ETFs)**
+*   **[Scope]** Exchange-traded variable income assets.
+*   **[Use for]** Real-time/daily liquidity scoring utilizing `adv_tier` (Average Daily Volume) against the client's holding size (Days to Liquidate metric).
+*   **[Interpret carefully]** High-concentration positions require gradual offloading. Selling >15% of the ADV in a single day will cause severe slippage.
+*   **[Do not infer]** Do not infer uniform liquidity across FIIs (Real Estate Funds). High-yield, structurally complex FIIs often have shallow order books compared to standard index ETFs.
+
+---
+
+### 4. Recommended Ordering of Instruction Blocks
+
+To prevent the LLM from hallucinating liquidity where none exists, the processing logic must follow a rigid "funnel" approach, ordered from absolute blockers to marginal costs. 
+
+1.  **The Hard Constraints Block (Absolute Blockers):** 
+    *   *Evaluate First:* Is `data_fim_carencia` in the future? Is it a closed-end fund? If YES -> Halt evaluation. Liquidity = 0. Output locked horizon.
+2.  **The Anti-Pattern Filter Block (The Traps):** 
+    *   *Evaluate Second:* Purge FGC bias. Suppress the assumption that CETIP/B3 listing guarantees secondary buyers.
+3.  **The Timeline Block (Standard Settlement):** 
+    *   *Evaluate Third:* If the asset is free to trade, calculate the literal days to cash (D+N, D+0 cutoffs, or proximity to `data_repactuacao`).
+4.  **The Market Reality Block (Depth Proxies):** 
+    *   *Evaluate Fourth:* Apply the proxies. Check `adv_tier` and `volume_emissao`. Downgrade the liquidity score of technically available but practically illiquid assets.
+5.  **The Haircut & Penalty Block (The Cost of Cash):** 
+    *   *Evaluate Last:* Assign the `early_exit_penalty_type`. Calculate the qualitative cost of accessing the liquidity (MtM risk, spread risk, circuit breaker susceptibility).
+
+*This hierarchical execution ensures that a heavily penalized CDB isn't mistakenly classified as "Highly Liquid" simply because it technically allows for a broker buy-back.*

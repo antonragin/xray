@@ -1,0 +1,552 @@
+Here’s the review in plain terms:
+
+## Bottom line
+
+This is a **good first-pass pipeline**, and a lot of the vanilla mapping is sensible.  
+But I would **not call it production/audit-ready yet** for client-facing simulations.
+
+The biggest issues are:
+
+1. **Several materially wrong or too-coarse mappings**
+2. **Some important approximate mappings are not flagged as approximate**
+3. **The simulation assumptions are cleaner than the real holdings**  
+   especially for **COEs, private credit, FIDCs, infra credit, and short-maturity bonds**
+4. **A few code-level robustness bugs / design gaps**
+
+---
+
+# 1) Mapping correctness
+
+## What looks good
+
+These mappings are broadly appropriate:
+
+- **Conta Corrente / Tesouro Selic / DI reference funds → CDI**
+- **CDB / LCA / LCI pós-fixado → CDI**
+- **Pós-fixado crédito privado / FIDC / DI crédito privado funds → IDA-DI**
+- **NTN-B short vs long bucketed by maturity → IMA-B 5 / IMA-B 5+**
+- **Inflation-linked CRA/CRI/CDCA → IDA-IPCA**
+- **IVVB11 → SP500TR**
+- **Global equity BDR/FIA fund → ACWI**
+- **Brazilian equities default → Ibovespa** as a base proxy
+
+So the core mapping logic is directionally solid for plain-vanilla RF and equity products.
+
+---
+
+## Mappings I would change now
+
+### 1) **Valor em Trânsito → Ibovespa**
+**Current:** `Valor em Trânsito` mapped to `Ibovespa`  
+**Recommended:** map to **CDI / cash**
+
+Why:
+- Dividends/JCP receivable is **not equity market exposure anymore**
+- Economically it is a **short-dated cash receivable**
+- Mapping it to Ibovespa overstates equity beta
+
+This is a clear misclassification, even if amounts are small.
+
+---
+
+### 2) **Inflation + infrastructure funds are being sent to IDA-IPCA instead of IDA-Infra**
+Example:
+- `Upon Capital DI Inflacao Infra FICFIRF` currently maps to **IDA-IPCA**
+
+Because of rule order:
+```python
+if re.search(r"INFLAC", n) and "INFRA" in n:
+    return ("IDA-IPCA", ...)
+```
+
+**Recommended:** this should usually be **IDA-Infra**, not generic IDA-IPCA.
+
+Why:
+- You already have a dedicated OryxMC proxy for Brazilian infra debt
+- “Inflação + infra” is more specific than generic IPCA credit
+
+This is both a **mapping issue** and a **code-order bug**.
+
+---
+
+### 3) **Blanket `FII` rule is too aggressive**
+Current rule:
+```python
+if re.search(r"\bFII\b", n) or "IMOBILIARIO" in n or "IMOBILIARIA" in n:
+    return ("IFIX", ...)
+```
+
+This likely misclassifies:
+- `BTGP CREDITO IMOBILIARIO CDI - FII RL`
+
+I would **not automatically treat that as IFIX**.
+
+Why:
+- “Crédito Imobiliário CDI” behaves more like **credit / carry / spread** than listed equity-like FII beta
+- IFIX is a poor proxy for a real-estate credit vehicle whose economics are close to CDI + spread
+
+**Recommended:** treat this one as **manual override**, likely closer to **IDA-DI [APPROX]** than IFIX.
+
+This is important because your current rule is based on **legal wrapper words**, not economic exposure.
+
+---
+
+### 4) **COEs are not being modeled appropriately**
+Examples:
+- `Bolsa Americana - Máximo Retorno ou Cupom` → SP500TR
+- `Volvo - Cupom Trimestral` → SP500TR
+- `Ouro - Bidirecional Alavancado` → CDI
+
+This is the single biggest conceptual weakness in the mapping.
+
+Why:
+- COEs are **structured payoffs**
+- They are not equivalent to “100% equity” or “100% CDI”
+- They can include:
+  - principal protection
+  - caps/floors
+  - path dependence
+  - asymmetric payoff
+  - issuer credit risk
+
+### Recommendation
+For COEs, a **single-index proxy is too crude**.
+
+Best practical fix in your codebase:
+- allow one position to map to **multiple indices with weights**
+- e.g. principal-protected US equity COE could be approximated as:
+  - mostly **CDI**
+  - plus smaller **SP500TR** sleeve
+
+At minimum:
+- mark **all COE mappings as approximate**
+- require **manual review** for COEs above some threshold
+
+For `Ouro - Bidirecional Alavancado`, mapping to CDI is especially misleading.
+
+---
+
+### 5) **Gold and crypto mapped to CDI**
+Examples:
+- `EMPIRICUS OURO FICFIM` → CDI
+- `HASHDEX 20 NASDAQ CRYPTO INDEX FICFIM` → CDI
+- `POLYGON CURNCY (POL)` → CDI
+- gold-linked COE → CDI
+
+This is not financially appropriate, even as a rough proxy.
+
+Why:
+- CDI has low vol and low drawdown
+- gold/crypto have very different return and risk profiles
+- mapping them to CDI materially **understates risk** and **misstates diversification**
+
+### Recommendation
+If OryxMC has no proxy:
+- put them in a **manual / excluded / unmapped** bucket
+- or force explicit override approval
+- do **not silently send them to CDI**
+
+These are small in some accounts, but the principle matters.
+
+---
+
+### 6) **Pre-fixed corporate credit mapped to IRF-M**
+Examples in account `005299917`:
+- pre-fixed CRA/CDCA mapped to **IRF-M**
+
+This is only partially right.
+
+Why:
+- IRF-M captures **Brazilian pre-fixed duration**
+- but these assets also have **corporate spread / credit risk**
+- so IRF-M alone likely **understates credit spread risk**
+
+### Recommendation
+If you can support split mapping:
+- **IRF-M + IDA-DI** blend is better than pure IRF-M
+
+If you must keep one index:
+- IRF-M is defensible as a first-order duration proxy
+- but it should be explicitly marked **[APPROX]**
+
+This is **material**, because it affects a large position set.
+
+---
+
+## Acceptable but should be flagged as approximate
+
+These are not crazy, but they are not exact:
+
+- `USTK11 → SP500TR`
+  - USTK11 is US tech-heavy, not broad S&P 500
+- `XPBR31 → SP500TR`
+- `AURA33 → SP500TR`
+  - especially weak for AURA33 given mining/gold exposure
+- `EMPIRICUS URANIO FIM → SP500TR`
+  - usable equity proxy, but definitely approximate
+- `BTGP CREDITO IMOBILIARIO CDI - FII RL → IFIX`
+  - if kept, should be approximate
+
+Right now some of these **aren’t flagged**, which is a problem.
+
+---
+
+# 2) Code quality / bugs / robustness
+
+## High-priority code issues
+
+### A) Rule-order bug in `map_fund()`
+This is real:
+
+```python
+if re.search(r"INFLAC", n) and "INFRA" in n:
+    return ("IDA-IPCA", ...)
+```
+
+This fires before the infra rule and prevents use of `IDA-Infra`.
+
+**Fix:** reorder or explicitly map `inflation + infra` to `IDA-Infra`.
+
+---
+
+### B) Single-proxy return type is too restrictive
+`map_position()` returns only:
+```python
+(index_key, note)
+```
+
+That’s too limiting for:
+- COEs
+- pre-fixed corporate credit
+- hybrid/alternative funds
+
+**Recommended design:** allow
+```python
+{"CDI": 0.8, "SP500TR": 0.2}
+```
+per position.
+
+That one change would materially improve fidelity.
+
+---
+
+### C) Approximation warnings are incomplete
+Warnings are only generated when the note contains `[APPROX]`.
+
+But many economically approximate mappings do **not** include that tag, e.g.:
+- USTK11
+- XPBR31 / AURA33
+- IRF-M for pre-fixed corporate credit
+- Valor em Trânsito to Ibovespa
+- BTGP Crédito Imobiliário to IFIX
+
+So the current “warning system” is not reliable.
+
+---
+
+### D) Market string matching is brittle
+You compare exact strings like:
+```python
+if mercado == "Renda Fixa":
+```
+
+Safer:
+- normalize with `strip_accents(...).upper().strip()`
+- same for `submercado`, `estrategia`, maybe `produto`
+
+This helps if the broker export changes capitalization or accents.
+
+---
+
+### E) You need a manual override layer
+For a 31-account / 232-position portfolio, heuristics alone are not enough.
+
+Add a top-priority override table keyed by:
+- CNPJ
+- ISIN/ticker
+- exact product name
+
+Run overrides **before** regex rules.
+
+That will solve most of the edge cases cleanly.
+
+---
+
+## Medium-priority issues
+
+### F) `POSITION_DATE` is hardcoded
+```python
+POSITION_DATE = date(2026, 2, 28)
+```
+
+That’s okay for this batch, but fragile.
+
+Better:
+- derive from the file
+- or pass as parameter
+
+---
+
+### G) `Summary` sheet merge range is wrong
+You have 8 columns but merge only:
+```python
+ws_sum.merge_cells("A1:F1")
+```
+Should be `A1:H1`.
+
+Cosmetic, but real.
+
+---
+
+### H) Allocation table has a `Notes` column that is never populated
+You define:
+```python
+headers = ["OryxMC Index", "Category", "Amount (R$)", "Weight (%)", "Notes"]
+```
+but index rows never fill column E.
+
+That’s a missed opportunity; this is exactly where proxy notes/confidence should go.
+
+---
+
+### I) `simulate_clients.py` silently swallows frontier-point errors
+In `make_frontier_chart`, index-stat exceptions are ignored:
+```python
+except Exception:
+    pass
+```
+
+That can hide real data issues.  
+At least log the failed index.
+
+---
+
+### J) External dependency risk
+`write_image()` needs Plotly image export support. If Kaleido isn’t available, PNG export fails.
+
+If this is a repeatable production pipeline, explicitly verify dependency availability.
+
+---
+
+# 3) Financial accuracy / portfolio-theory view
+
+## Biggest financial concern: too much is being collapsed into `IDA-DI`
+
+Your overall summary puts **57.6% of total AUM** into `IDA-DI`.
+
+That is not automatically wrong, but it hides important differences between:
+- diversified DI crédito privado funds
+- FIDCs
+- infra credit funds
+- high-yield previdência funds
+- concentrated single-name CRAs / LFSNs
+- real-estate credit funds
+
+Those do **not** all behave like the same diversified index.
+
+### Practical implication
+Your Monte Carlo results will likely:
+- **understate idiosyncratic credit/default risk**
+- **understate liquidity/gating risk**
+- **smooth out bad tails**
+
+That matters especially for the largest accounts.
+
+---
+
+## The fixed income maturity structure is not really modeled
+
+You use maturity only for NTN-B bucketing.  
+But many holdings are short/medium-maturity instruments:
+
+- CDB / LCA / LCI
+- specific CRAs / CDCAs
+- COEs with maturity dates
+- previdência funds may be fine, but individual bonds are not
+
+A 10-year Monte Carlo that assumes constant exposure is really simulating a **strategic proxy mix**, not the literal current holdings through maturity.
+
+That’s okay if disclosed, but it should be disclosed.
+
+---
+
+## Monthly rebalancing is a strong assumption
+
+You run:
+```python
+rebalance_months=1
+```
+
+So the simulation effectively assumes monthly rebalancing to current proxy weights.
+
+That may be fine for:
+- strategic asset allocation
+- advisor-managed model portfolios
+
+But it may be wrong for:
+- buy-and-hold direct bonds
+- concentrated equity positions
+- COEs
+- maturing instruments
+
+If this is meant to reflect current holdings behavior, monthly rebalance may be too optimistic/stylized.
+
+---
+
+## IID bootstrap is weaker than block bootstrap
+
+You use:
+```python
+bootstrap_mode="iid"
+```
+
+For multi-asset portfolios, especially with equity and credit regimes, IID monthly resampling:
+- breaks serial dependence
+- breaks regime persistence
+- can understate clustered stress
+
+I would prefer:
+- **block bootstrap**, likely 12 months
+- or at least sensitivity test iid vs block
+
+This is an implementation choice, not a mapping issue.
+
+---
+
+# 4) Missing considerations
+
+## A) Taxes
+You are simulating on `valor_bruto`.
+
+That may be okay if the stated objective is **gross pre-tax wealth evolution**.
+
+But note:
+- direct fixed income has tax drag
+- previdência has wrapper-specific taxation
+- PGBL/VGBL are not the same
+- COEs can have different tax handling
+
+At minimum, document whether outputs are **gross** or **net of tax**.
+
+---
+
+## B) Concentration / issuer risk
+Broad indices cannot capture:
+- BRF CRA vs Klabin CRA vs Marfrig CRA concentration
+- single-manager FIDC risk
+- individual issuer default or restructuring
+
+This is a major missing dimension.
+
+---
+
+## C) Liquidity risk
+Especially relevant for:
+- private credit funds
+- FIDC vehicles
+- some infra credit
+- COEs
+
+Index bootstrap assumes tradable continuous mark-to-market behavior.
+
+---
+
+## D) Confidence/governance layer
+You need a review framework such as:
+- Exact
+- Good proxy
+- Approximate
+- Manual required
+- Excluded from simulation
+
+Right now the code only has a weak `[APPROX]` convention.
+
+---
+
+## E) Small-account noise
+Some accounts are a few hundred reais.  
+You may want thresholds for:
+- generating charts
+- frontier plots
+- manual review effort
+
+Not a correctness issue, just operational hygiene.
+
+---
+
+# 5) ORYXMC DEFICIENCY
+
+Per your instruction, these are issues in OryxMC itself or the broader OryxMC modeling layer.
+
+## ORYXMC DEFICIENCY 1
+**No proper categories/proxies for:**
+- commodities / gold
+- crypto
+- structured products / option-like payoffs
+
+This forces clearly bad mappings or manual exclusion.
+
+---
+
+## ORYXMC DEFICIENCY 2
+**The engine models broad historical index behavior, not instrument-specific payoff structures.**
+
+So it cannot properly model:
+- COEs
+- capped/floored payoffs
+- principal-protected structures
+- callable/path-dependent products
+
+---
+
+## ORYXMC DEFICIENCY 3
+**The system does not model idiosyncratic credit/default/liquidity risk** for concentrated Brazilian credit holdings.
+
+Mapping concentrated CRAs/FIDCs/private credit into `IDA-DI` is a beta approximation only.
+
+---
+
+## ORYXMC DEFICIENCY 4
+`compute_portfolio_risk_return()` and `build_individual_returns()` use missing returns as `0.0`.
+
+That is methodologically weaker than the substitution logic in `build_portfolio_returns()` and can distort:
+- frontier point placement
+- single-index risk/return stats
+- non-monthly rebalancing behavior if incomplete histories exist
+
+This should be aligned with the main portfolio-return construction logic.
+
+---
+
+# 6) What I would fix before sign-off
+
+In order:
+
+1. **Map `Valor em Trânsito` to CDI**
+2. **Fix `inflation + infra` rule to use `IDA-Infra`**
+3. **Replace blanket FII detection with manual overrides / better real-estate-credit logic**
+4. **Flag USTK11, XPBR31, AURA33, uranium, etc. as approximate**
+5. **Do not silently map gold/crypto to CDI**
+6. **Add manual override table by CNPJ/name**
+7. **Allow split mappings per position**
+8. **Review all COEs manually**
+9. **Decide whether monthly rebalance is actually intended**
+10. **Run block-bootstrap sensitivity alongside iid**
+11. **Add unit tests for every unique product/ticker in this file**
+12. **Document gross-vs-net and tax assumptions**
+
+---
+
+# Final verdict
+
+## Usable now for:
+- internal exploratory analysis
+- rough client allocation grouping
+- first-pass Monte Carlo proxying
+
+## Not yet ideal for:
+- polished client-facing reporting
+- precise risk communication
+- any workflow that implies these are “true holdings-based simulations”
+
+If you want, I can turn this into a **red/yellow/green issue list** or a **line-by-line remediation plan** for `map_positions.py` and `simulate_clients.py`.

@@ -1,0 +1,422 @@
+Yes. I’d model liquidity on **two separate axes**:
+
+1. **Contractual time-to-cash** for instruments with maturity.  
+2. **Structural exit mechanism** for instruments without maturity.
+
+That matters here because, in your sample, only **45%** of portfolio weight has `expiry_date`; a maturity-only view misses the other **55%**.
+
+## 1) Additional derived fields the precursor should compute mechanically
+
+### A. Position-level derived fields
+These are the most useful additions.
+
+- `has_defined_maturity` : boolean  
+  `true` when `expiry_date` exists.
+
+- `liquidity_profile_code` : enum  
+  This is the key new classifier. Suggested values:
+  - `dated_cashflow`
+  - `bank_paper_lockup_or_maturity`
+  - `treasury_daily_buyback_mtm`
+  - `exchange_secondary_market`
+  - `fund_open_redemption`
+  - `fund_closed_secondary_market`
+  - `unknown`
+
+- `exit_mechanism_code` : enum  
+  Slightly more operational than profile:
+  - `hold_to_maturity`
+  - `daily_buyback`
+  - `secondary_market_sale`
+  - `fund_redemption`
+  - `unknown`
+
+- `liquidity_horizon_bucket` : enum  
+  This replaces the temptation to misuse `maturity_bucket` for undated assets:
+  - `same_day_or_daily`
+  - `d_plus_1_to_5`
+  - `d_plus_6_to_30`
+  - `over_30_business_days`
+  - `at_maturity`
+  - `market_dependent`
+  - `unknown`
+
+- `market_sale_required` : boolean  
+  True for equities, ETFs, FIIs, and other positions where exit requires a buyer.
+
+- `mark_to_market_on_exit` : boolean  
+  Critical for Tesouro Direto and market-traded instruments. Tesouro Direto offers daily repurchase, but early sale happens at market price, so realized proceeds before maturity can differ from the originally contracted return. ([tesourodireto.com.br](https://www.tesourodireto.com.br/es/sobre-o-tesouro/regras-e-regulamento))
+
+- `lockup_present` : boolean  
+- `lockup_days_min` : integer|null  
+- `lockup_status` : enum (`none`, `present_known_days`, `present_unknown_days`, `unknown`)  
+  Good for LCI/LCA and some funds.
+
+- `fund_redemption_quote_days` : integer|null  
+- `fund_redemption_payment_days` : integer|null  
+- `fund_redemption_total_days` : integer|null  
+  For open funds, the relevant dates are request date, quote/conversion date, and payment date; these terms must be in the fund’s regulation/lâmina, and payment is capped by regulation at up to 5 business days after conversion. ([gov.br](https://www.gov.br/investidor/pt-br/investir/tipos-de-investimentos/fundos-de-investimentos/como-investir-aplicacao-e-resgate))
+
+- `fgc_eligible` : boolean  
+  I would normalize current blanks to explicit `false` or `null`.
+
+- `liquidity_assessment_basis` : constant enum  
+  Example: `structural_only`  
+  This is important so downstream AI does **not** imply observed market liquidity.
+
+- `instruction_parse_status` : enum  
+  (`parsed`, `partial`, `unparsed`)
+
+- `instruction_tags` : array of strings  
+  Example: `["daily_buyback","mtm","fgc"]`
+
+### B. Portfolio-level derived fields
+These should go straight into the bundle.
+
+- `dated_weight_pct`  
+- `undated_weight_pct`
+
+- `weighted_avg_days_to_expiry_dated`
+- `weighted_avg_years_to_expiry_dated`
+
+**Important:** compute WAM **only on dated positions**, and always expose the coverage denominator.  
+For your sample:
+- `dated_weight_pct = 0.45`
+- `weighted_avg_days_to_expiry_dated ≈ 1447.84`
+- `weighted_avg_years_to_expiry_dated ≈ 3.97`
+
+- `weight_maturing_within_1y`
+- `weight_maturing_within_3y`
+- `weight_maturing_beyond_5y`
+
+- `maturity_bucket_weights`
+- `largest_maturity_bucket_weight_total`
+- `largest_maturity_bucket_share_of_dated`
+- `maturity_bucket_hhi` or another concentration metric
+
+For your sample:
+- largest bucket on total portfolio = **18%**
+- largest bucket as share of dated sleeve = **40%**
+
+- `fgc_eligible_weight_pct`
+- `exchange_traded_weight_pct`
+- `daily_buyback_weight_pct`
+- `fund_redemption_weight_pct`
+- `market_dependent_exit_weight_pct`
+- `lockup_weight_pct`
+- `unknown_liquidity_terms_weight_pct`
+
+- `fund_redemption_weighted_avg_total_days`
+- `fund_redemption_max_total_days`
+- `fund_redemption_bucket_weights`
+
+### C. One thing I would **not** do
+Do **not** compute a single “liquidity score” unless it is clearly labeled as **structural** and decomposable.  
+With no spreads, no trading volume, and no market depth, a single score will usually overstate precision.
+
+### D. Naming nuance
+Avoid `% in liquid instruments`.  
+Use:
+- `% in exchange_traded instruments`
+- `% with daily buyback`
+- `% subject to fund redemption`
+- `% requiring market sale`
+
+That is more honest given the absence of market data.
+
+---
+
+## 2) For positions without `expiry_date`, what replaces `maturity_bucket`?
+
+Do **not** force a maturity surrogate.
+
+Use:
+
+- `maturity_bucket = null`
+- plus **one new primary field**: `liquidity_profile_code`
+
+And ideally also:
+
+- `exit_mechanism_code`
+- `liquidity_horizon_bucket`
+
+### Recommended mapping
+- **Stocks** → `liquidity_profile_code = "exchange_secondary_market"`  
+  Public equities are exited by selling to another investor in the secondary market. ([gov.br](https://www.gov.br/investidor/pt-br/investir/tipos-de-investimentos/acoes/como-investir))
+
+- **ETFs** → `exchange_secondary_market`  
+  ETFs are exchange-traded and can be bought/sold in the secondary market like stocks. ([b3.com.br](https://www.b3.com.br/pt_br/produtos-e-servicos/negociacao/moedas/etf.htm))
+
+- **FII** → `fund_closed_secondary_market`  
+  FIIs are closed-end funds; cotistas generally do not redeem with the administrator and instead exit via secondary-market sale. ([gov.br](https://www.gov.br/investidor/pt-br/investir/tipos-de-investimentos/fundos-de-investimentos-imobiliarios-fii/como-negociar))
+
+- **Open-end funds / previdência funds** → `fund_open_redemption`  
+  Liquidity comes from fund redemption terms, not maturity. ([gov.br](https://www.gov.br/investidor/pt-br/investir/tipos-de-investimentos/fundos-de-investimentos/como-investir-aplicacao-e-resgate))
+
+- **Tesouro Direto** → `treasury_daily_buyback_mtm`  
+  Daily structural exit exists, but proceeds before maturity are market-priced. ([tesourodireto.com.br](https://www.tesourodireto.com.br/es/sobre-o-tesouro/regras-e-regulamento))
+
+So the replacement is **not another maturity field**. It is an **exit-path field**.
+
+---
+
+## 3) Should the precursor compute a portfolio-level “FGC-covered percentage”?
+
+**Yes — but name it carefully.**
+
+I recommend:
+
+- `fgc_eligible_weight_pct`
+
+Not:
+
+- `fgc_covered_pct`
+
+Why: FGC protection is capped **per CPF/CNPJ and institution/conglomerate** (up to R$250k, with an overall R$1 million cap in four years), and only certain products are eligible. CDB, LCI and LCA are eligible; Tesouro Direto, fundos and debêntures are not in ordinary FGC coverage. ([fgc.org.br](https://fgc.org.br/sobre-garantia-fgc))
+
+So with your current data you can compute:
+
+```text
+fgc_eligible_weight_pct = sum(weight where has_fgc == true)
+```
+
+For your sample, that is **18%**.
+
+But you should **not** imply that 18% is fully guaranteed in economic terms, because that would require:
+- BRL position sizes,
+- issuer/conglomerate aggregation,
+- possibly joint-account logic,
+- and reliable issuer coverage.
+
+So:
+- **Yes**: include `fgc_eligible_weight_pct`
+- **No**: do not call it “covered” unless you later compute caps by conglomerate and investor.
+
+---
+
+## 4) How to capture Brazilian structural liquidity characteristics using only instruction text
+
+Best design: use `instructions_liquidity` as a **versioned rule-carrier**, then parse it deterministically.
+
+### Best practice
+Store instruction text in a **controlled mini-grammar**, not only prose.
+
+Example:
+
+```text
+profile=treasury_daily_buyback_mtm; exit=daily_buyback; mtm=true; fgc=false
+```
+
+or, if you still want human-readable text:
+
+```text
+Liquidez diária via recompra do Tesouro Direto; venda antecipada sujeita à marcação a mercado. | tags: profile=treasury_daily_buyback_mtm; exit=daily_buyback; mtm=true
+```
+
+Then the precursor parses the tags mechanically.
+
+### What to encode by instrument family
+
+#### LCI / LCA
+Use instruction text to encode:
+- `profile=bank_paper_lockup_or_maturity`
+- `fgc=true`
+- `lockup_present=true`
+- `lockup_days_min=<n or null>`
+- `lockup_rule_source=legal_or_contractual`
+
+Why text-based and versioned? Because the legal minimum terms were changed by CMN in 2024: the minimum maturity for new LCA emissions was extended from 90 days to 9 months, and for LCI from 90 days to 12 months. That is exactly the kind of rule you want in a reference table, not hard-coded inside model logic. ([gov.br](https://www.gov.br/fazenda/pt-br/assuntos/noticias/2024/fevereiro/cmn-ajusta-lastros-elegiveis-e-prazos-de-vencimento-dos-titulos-incentivados))
+
+**Important limitation:** with only current fields, you usually **cannot compute remaining carência** unless you also know issue/acquisition date. So capture:
+- presence of lockup,
+- minimum term if parseable,
+- but leave `lockup_days_remaining = null` unless another source exists.
+
+#### Tesouro Direto
+Encode:
+- `profile=treasury_daily_buyback_mtm`
+- `exit=daily_buyback`
+- `mark_to_market_on_exit=true`
+
+Tesouro Direto offers daily liquidity/repurchase, but early sale is at market value rather than guaranteed hold-to-maturity economics. ([tesourodireto.com.br](https://www.tesourodireto.com.br/es/sobre-o-tesouro/regras-e-regulamento))
+
+#### Open-end funds
+Encode:
+- `profile=fund_open_redemption`
+- `exit=fund_redemption`
+- `fund_redemption_quote_days`
+- `fund_redemption_payment_days`
+- `fund_redemption_total_days`
+- `lockup_present`
+- optional `gates_possible=true`
+
+Open funds disclose redemption timing in the regulation and lâmina; regulation also allows carência and, in exceptional illiquidity cases, temporary closure/barriers to redemptions. ([gov.br](https://www.gov.br/investidor/pt-br/investir/tipos-de-investimentos/fundos-de-investimentos/como-investir-aplicacao-e-resgate))
+
+#### FII
+Encode:
+- `profile=fund_closed_secondary_market`
+- `exit=secondary_market_sale`
+- `admin_redemption_available=false`
+
+FIIs are closed-end; exit is normally by selling to another investor in secondary markets. ([gov.br](https://www.gov.br/investidor/pt-br/investir/tipos-de-investimentos/fundos-de-investimentos-imobiliarios-fii/como-negociar))
+
+#### Stocks / listed ETFs / crypto ETFs
+Encode:
+- `profile=exchange_secondary_market`
+- `exit=secondary_market_sale`
+- `market_sale_required=true`
+- `market_depth_unobserved=true`
+
+Stocks are exited in secondary markets, and ETFs trade in exchange as well. ([gov.br](https://www.gov.br/investidor/pt-br/investir/tipos-de-investimentos/acoes/como-investir))
+
+### If you cannot change instruction text format
+Then use deterministic regex extraction from prose, e.g. detect:
+
+- `liquidez diária`
+- `marcação a mercado`
+- `carência`
+- `D+(\d+)`
+- `cotização`
+- `pagamento do resgate`
+- `mercado secundário`
+- `FGC`
+
+But tagged text is much safer than free prose.
+
+---
+
+## 5) Ideal JSON schema for `report_input_bundle.json` liquidity section
+
+Here is a practical sketch.
+
+```json
+{
+  "liquidity": {
+    "methodology": {
+      "assessment_mode": "structural_only",
+      "has_market_data": false,
+      "has_bid_ask_spreads": false,
+      "has_trading_volume": false,
+      "composite_liquidity_score_used": false,
+      "rule_pack_version": "2026-04-06"
+    },
+    "coverage": {
+      "portfolio_weight_total": 1.0,
+      "maturity_weight_coverage": 0.45,
+      "issuer_coverage": 0.45,
+      "issuer_type_coverage": 0.50,
+      "tax_profile_coverage": 1.0,
+      "instruction_parse_weight_coverage": 1.0
+    },
+    "portfolio_metrics": {
+      "dated_weight_pct": 0.45,
+      "undated_weight_pct": 0.55,
+
+      "weighted_avg_days_to_expiry_dated": 1447.84,
+      "weighted_avg_years_to_expiry_dated": 3.97,
+
+      "weight_maturing_within_1y": 0.18,
+      "weight_maturing_within_3y": 0.28,
+      "weight_maturing_beyond_5y": 0.17,
+
+      "largest_maturity_bucket_weight_total": 0.18,
+      "largest_maturity_bucket_share_of_dated": 0.40,
+      "maturity_bucket_hhi_total": 0.0713,
+
+      "fgc_eligible_weight_pct": 0.18,
+      "exchange_traded_weight_pct": null,
+      "daily_buyback_weight_pct": null,
+      "fund_redemption_weight_pct": 0.18,
+      "market_dependent_exit_weight_pct": null,
+      "lockup_weight_pct": null,
+      "unknown_liquidity_terms_weight_pct": 0.0
+    },
+    "maturity_distribution": [
+      { "bucket": "<1y", "weight": 0.18, "pct": 18.0 },
+      { "bucket": "1-3y", "weight": 0.10, "pct": 10.0 },
+      { "bucket": "5-10y", "weight": 0.17, "pct": 17.0 }
+    ],
+    "liquidity_profile_distribution": [
+      { "code": "dated_cashflow", "weight": null },
+      { "code": "bank_paper_lockup_or_maturity", "weight": null },
+      { "code": "treasury_daily_buyback_mtm", "weight": null },
+      { "code": "exchange_secondary_market", "weight": null },
+      { "code": "fund_open_redemption", "weight": null },
+      { "code": "fund_closed_secondary_market", "weight": null },
+      { "code": "unknown", "weight": 0.0 }
+    ],
+    "fund_redemption_distribution": {
+      "known_terms_weight_pct": null,
+      "weighted_avg_quote_days": null,
+      "weighted_avg_payment_days": null,
+      "weighted_avg_total_days": null,
+      "bucket_weights": [
+        { "bucket": "same_day_or_d1", "weight": null },
+        { "bucket": "d2_to_d5", "weight": null },
+        { "bucket": "d6_to_d30", "weight": null },
+        { "bucket": "over_d30", "weight": null }
+      ]
+    },
+    "positions": [
+      {
+        "row_number": 1,
+        "template_code": "cdb_cdi_generic",
+        "weight": 0.10,
+        "instrument_kind": "fixed_income",
+
+        "has_defined_maturity": true,
+        "expiry_date": "2027-03-15",
+        "days_to_expiry": 343,
+        "years_to_expiry": 0.94,
+        "maturity_bucket": "<1y",
+
+        "liquidity_profile_code": "bank_paper_lockup_or_maturity",
+        "exit_mechanism_code": "hold_to_maturity",
+        "liquidity_horizon_bucket": "at_maturity",
+
+        "market_sale_required": false,
+        "mark_to_market_on_exit": false,
+
+        "fgc_eligible": true,
+
+        "lockup_present": false,
+        "lockup_days_min": null,
+        "lockup_days_remaining": null,
+
+        "fund_redemption_quote_days": null,
+        "fund_redemption_payment_days": null,
+        "fund_redemption_total_days": null,
+
+        "instruction_text_raw": null,
+        "instruction_parse_status": "parsed",
+        "instruction_tags": ["fgc", "dated_cashflow"]
+      }
+    ],
+    "flags": [
+      "structural_liquidity_only",
+      "maturity_metrics_cover_only_dated_positions",
+      "do_not_infer_actual_market_depth"
+    ]
+  }
+}
+```
+
+## My concise recommendation
+
+If you want the cleanest design:
+
+1. **Keep `maturity_bucket` only for dated assets.**  
+2. **Add `liquidity_profile_code` for all assets.**  
+3. **Compute portfolio metrics separately for**
+   - maturity,
+   - FGC eligibility,
+   - exchange-traded exit,
+   - fund-redemption exit,
+   - daily buyback exit,
+   - lockup exposure.  
+4. **Put structured tags inside `instructions_liquidity`** and parse them deterministically.  
+5. **Expose coverage explicitly** so downstream AI knows which statements are maturity-based vs structurally inferred.
+
+If you want, I can turn this into:
+- a **final field dictionary**, or
+- a **template-by-template mapping table** for your current `template_code` set.
