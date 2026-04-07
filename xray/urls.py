@@ -1,13 +1,49 @@
 from django.contrib import admin
 from django.urls import path, include
 from django.http import HttpResponse, Http404
-import os
 from django.conf import settings
+import os
+import base64
 
 
+def _check_basic_auth(request):
+    """Check for Basic auth or token query param. Returns True if authorized."""
+    # Check query param
+    token = request.GET.get('token', '')
+    if token == settings.XRAY_API_TOKEN:
+        return True
+
+    # Check Basic auth (username ignored, password = token)
+    auth = request.META.get('HTTP_AUTHORIZATION', '')
+    if auth.startswith('Basic '):
+        try:
+            decoded = base64.b64decode(auth[6:]).decode('utf-8')
+            _, password = decoded.split(':', 1)
+            if password == settings.XRAY_API_TOKEN:
+                return True
+        except Exception:
+            pass
+
+    # Check Bearer token
+    if auth.startswith('Bearer ') and auth[7:].strip() == settings.XRAY_API_TOKEN:
+        return True
+
+    return False
+
+
+def _require_auth(view_func):
+    """Decorator requiring auth for web views."""
+    def wrapped(request, *args, **kwargs):
+        if _check_basic_auth(request):
+            return view_func(request, *args, **kwargs)
+        response = HttpResponse('Authentication required.', status=401)
+        response['WWW-Authenticate'] = 'Basic realm="X-Ray"'
+        return response
+    return wrapped
+
+
+@_require_auth
 def serve_report(request, client):
-    """Serve a client HTML report."""
-    # Check in output dir for latest ZIP, or static reports
     report_path = os.path.join(settings.BASE_DIR, 'staticfiles', 'reports', f'{client}.html')
     if not os.path.exists(report_path):
         raise Http404(f'No report for client "{client}"')
@@ -15,8 +51,8 @@ def serve_report(request, client):
         return HttpResponse(f.read(), content_type='text/html')
 
 
+@_require_auth
 def report_index(request):
-    """List available client reports."""
     reports_dir = os.path.join(settings.BASE_DIR, 'staticfiles', 'reports')
     reports = []
     if os.path.isdir(reports_dir):

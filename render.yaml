@@ -13,6 +13,7 @@ services:
       pip install -r requirements.txt
       python manage.py collectstatic --noinput
       python manage.py migrate --noinput
+      python manage.py loaddata production_seed
     startCommand: gunicorn xray.wsgi:application --bind 0.0.0.0:$PORT
     envVars:
       - key: DATABASE_URL
@@ -27,3 +28,5 @@ services:
         value: "xray-oryx.onrender.com"
       - key: PYTHON_VERSION
         value: "3.12.3"
+      - key: XRAY_API_TOKEN
+        value: "OryxRulezzz2026!!!"

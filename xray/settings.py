@@ -90,6 +90,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # --- X-Ray specific ---
 XRAY_OUTPUT_DIR = os.environ.get('XRAY_OUTPUT_DIR', str(BASE_DIR / 'output'))
 XRAY_WEIGHT_TOLERANCE = 0.0005
+XRAY_API_TOKEN = os.environ.get('XRAY_API_TOKEN', 'OryxRulezzz2026!!!')
 
 # --- DRF ---
 REST_FRAMEWORK = {
@@ -105,6 +106,6 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.JSONRenderer',
         'rest_framework.renderers.BrowsableAPIRenderer',
     ],
-    'DEFAULT_AUTHENTICATION_CLASSES': [],
-    'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.AllowAny'],
+    'DEFAULT_AUTHENTICATION_CLASSES': ['api.auth.TokenAuthentication'],
+    'DEFAULT_PERMISSION_CLASSES': ['api.auth.IsTokenAuthenticated'],
 }

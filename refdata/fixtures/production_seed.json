@@ -228,6 +228,25 @@
   }
 },
 {
+  "model": "refdata.economicexposure",
+  "pk": 13,
+  "fields": {
+    "instructions_diversification": "",
+    "instructions_liquidity": "",
+    "instructions_fees": "",
+    "instructions_tax": "",
+    "instructions_risk": "",
+    "instructions_performance": "",
+    "active": true,
+    "created_at": "2026-04-07T18:30:17.580Z",
+    "updated_at": "2026-04-07T18:30:34.899Z",
+    "exposure_code": "undetermined",
+    "name": "Undetermined",
+    "exposure_group": "undetermined",
+    "description": ""
+  }
+},
+{
   "model": "refdata.taxprofile",
   "pk": 1,
   "fields": {
@@ -5437,7 +5456,7 @@
     "instructions_performance": "",
     "active": true,
     "created_at": "2026-04-07T02:18:42.224Z",
-    "updated_at": "2026-04-07T02:18:42.224Z",
+    "updated_at": "2026-04-07T18:30:17.616Z",
     "template_code": "coe_generic",
     "instrument_kind": "other",
     "short_name": "COE",
@@ -5450,7 +5469,7 @@
     "has_fgc": false,
     "requires_expiry_date": true,
     "requires_issuer_or_issuer_type": true,
-    "primary_economic_exposure": 6,
+    "primary_economic_exposure": 13,
     "economic_exposure_weights_json": null,
     "tax_profile": 1,
     "primary_issuer_type": 2,
@@ -12386,6 +12405,39 @@
     "primary_issuer_type": 1,
     "issuer_type_weights_json": null,
     "issuer": 1
+  }
+},
+{
+  "model": "refdata.instrumenttemplate",
+  "pk": 257,
+  "fields": {
+    "instructions_diversification": "",
+    "instructions_liquidity": "",
+    "instructions_fees": "",
+    "instructions_tax": "",
+    "instructions_risk": "",
+    "instructions_performance": "",
+    "active": true,
+    "created_at": "2026-04-07T17:35:39.642Z",
+    "updated_at": "2026-04-07T17:35:39.642Z",
+    "template_code": "fii_hglg11",
+    "instrument_kind": "listed",
+    "short_name": "HGLG11",
+    "long_name": "",
+    "cnpj": "",
+    "b3_listed": true,
+    "is_bdr": false,
+    "yearly_fee_pct": null,
+    "performance_fee_pct": null,
+    "has_fgc": false,
+    "requires_expiry_date": false,
+    "requires_issuer_or_issuer_type": false,
+    "primary_economic_exposure": 7,
+    "economic_exposure_weights_json": null,
+    "tax_profile": 3,
+    "primary_issuer_type": null,
+    "issuer_type_weights_json": null,
+    "issuer": null
   }
 }
 ]
