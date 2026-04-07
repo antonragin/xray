@@ -1,0 +1,6 @@
+instrument_template_code,weight,expiry_date,issuer_code,issuer_type_code
+fund_btg_black_selic,0.536599,,,
+fund_btg_tesouro_ipca_prev,0.036364,,,
+tesouro_ipca_principal_generic,0.204679,2029-05-15,bacenbanco_central_do_brasil_rj,
+tesouro_ipca_principal_generic,0.087698,2032-08-15,bacenbanco_central_do_brasil_rj,
+tesouro_selic_generic,0.134660,2028-03-01,bacenbanco_central_do_brasil_rj,

@@ -224,3 +224,117 @@ class ReferenceHealthView(APIView):
                 overall = 'fail'
                 break
         return Response({'checks': checks, 'overall': overall})
+
+
+class ProcessPortfolioView(APIView):
+    """Process a portfolio CSV and return the full bundle as JSON.
+
+    POST /api/v1/process/
+    Body: {"csv": "instrument_template_code,weight,...\\n..."} or multipart file upload
+    Returns: full report_input_bundle.json content + angle-specific data
+    """
+    def post(self, request):
+        import io
+        from processing.service import process_portfolio
+        from processing.validators import validate_csv
+        from processing.resolver import resolve_positions
+        from processing.allocations import compute_allocations, compute_coverage
+        from processing.bundler import _unrolled_json, _report_input_bundle
+
+        # Accept CSV as text in body or as file upload
+        csv_text = request.data.get('csv', '')
+        if not csv_text and request.FILES.get('file'):
+            raw = request.FILES['file'].read()
+            csv_text = raw.decode('utf-8') if isinstance(raw, bytes) else raw
+
+        if not csv_text:
+            return Response(
+                {'error': 'validation_error', 'message': 'Provide CSV as "csv" field or file upload.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate
+        csv_file = io.StringIO(csv_text)
+        validation = validate_csv(csv_file)
+        if not validation.is_valid:
+            return Response(
+                {'error': 'validation_error', 'errors': validation.errors, 'warnings': validation.warnings},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Resolve
+        from datetime import date
+        upload_date = date.today()
+        positions = resolve_positions(validation.rows, upload_date)
+        allocations = compute_allocations(positions)
+        coverage = compute_coverage(positions)
+
+        from processing.bundler import generate_run_id
+        run_id = generate_run_id()
+
+        # Build the full bundle
+        bundle = _report_input_bundle(run_id, upload_date, positions, allocations, coverage)
+
+        # Add angle-specific data
+        angles = {}
+        for angle in VALID_ANGLES:
+            angle_data = []
+            for p in positions:
+                angle_data.append({
+                    'row_number': p.row_number,
+                    'template_code': p.template_code,
+                    'weight': float(p.weight),
+                    'instrument_kind': p.instrument_kind,
+                    'instructions': p.instructions.get(angle, []),
+                })
+            angles[angle] = angle_data
+
+        return Response({
+            'run_id': run_id,
+            'validation': {
+                'is_valid': True,
+                'warnings': validation.warnings,
+                'row_count': validation.row_count,
+            },
+            'bundle': bundle,
+            'angles': angles,
+        })
+
+
+class ProcessPortfolioFullView(APIView):
+    """Process a portfolio CSV and return the ZIP bundle for download.
+
+    POST /api/v1/process/zip/
+    Body: {"csv": "instrument_template_code,weight,...\\n..."}
+    Returns: ZIP file download
+    """
+    def post(self, request):
+        import io
+        from django.http import FileResponse
+        from processing.service import process_portfolio
+
+        csv_text = request.data.get('csv', '')
+        if not csv_text and request.FILES.get('file'):
+            raw = request.FILES['file'].read()
+            csv_text = raw.decode('utf-8') if isinstance(raw, bytes) else raw
+
+        if not csv_text:
+            return Response(
+                {'error': 'validation_error', 'message': 'Provide CSV as "csv" field or file upload.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        csv_file = io.StringIO(csv_text)
+        result = process_portfolio(csv_file)
+
+        if not result.success:
+            return Response(
+                {'error': 'processing_error', 'errors': result.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return FileResponse(
+            open(result.zip_path, 'rb'),
+            as_attachment=True,
+            filename=f'{result.run_id}.zip',
+        )

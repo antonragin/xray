@@ -1,0 +1,3137 @@
+{
+  "client": "william",
+  "angle": "fees",
+  "run_id": "run_20260407_173620_576808",
+  "portfolio_summary": {
+    "total_weight": 1.0,
+    "row_count": 50,
+    "unique_templates": 42,
+    "economic_exposure_coverage": 1.0,
+    "tax_profile_coverage": 1.0,
+    "issuer_type_coverage": 0.6369,
+    "issuer_coverage": 0.6369,
+    "maturity_coverage": 0.5889
+  },
+  "allocations": {
+    "instrument_template": [
+      {
+        "code": "tesouro_selic_generic",
+        "weight": 0.257313
+      },
+      {
+        "code": "coe_generic",
+        "weight": 0.13635
+      },
+      {
+        "code": "tesouro_ipca_juros_generic",
+        "weight": 0.065327
+      },
+      {
+        "code": "debenture_ipca_incentivada",
+        "weight": 0.058792
+      },
+      {
+        "code": "fund_btg_cdb_plus",
+        "weight": 0.043381
+      },
+      {
+        "code": "fund_western_cred_bancario",
+        "weight": 0.033652
+      },
+      {
+        "code": "tesouro_prefixado_generic",
+        "weight": 0.032669
+      },
+      {
+        "code": "fund_btg_prime_logistica",
+        "weight": 0.025726
+      },
+      {
+        "code": "fund_btg_incorporacao_fii",
+        "weight": 0.022153
+      },
+      {
+        "code": "equity_movi3",
+        "weight": 0.020051
+      },
+      {
+        "code": "equity_vbbr3",
+        "weight": 0.016509
+      },
+      {
+        "code": "fii_rzag11",
+        "weight": 0.015928
+      },
+      {
+        "code": "fund_whg_rf_dinamico",
+        "weight": 0.015647
+      },
+      {
+        "code": "fund_btg_logcp_fii",
+        "weight": 0.01501
+      },
+      {
+        "code": "fund_alaska_black_bdr",
+        "weight": 0.014197
+      },
+      {
+        "code": "fund_rec_one_fii",
+        "weight": 0.014031
+      },
+      {
+        "code": "fii_juro11",
+        "weight": 0.013999
+      },
+      {
+        "code": "fund_riza_onyx_imob",
+        "weight": 0.013931
+      },
+      {
+        "code": "fii_ifra11",
+        "weight": 0.013746
+      },
+      {
+        "code": "fii_xpml11",
+        "weight": 0.013372
+      },
+      {
+        "code": "fii_bthf11",
+        "weight": 0.013216
+      },
+      {
+        "code": "cra_pre_generic",
+        "weight": 0.012722
+      },
+      {
+        "code": "equity_vale3",
+        "weight": 0.011305
+      },
+      {
+        "code": "cri_pre_generic",
+        "weight": 0.011158
+      },
+      {
+        "code": "fii_kivo11",
+        "weight": 0.01074
+      },
+      {
+        "code": "fund_af_invest_minas_bdr",
+        "weight": 0.010194
+      },
+      {
+        "code": "fii_mcre11",
+        "weight": 0.010047
+      },
+      {
+        "code": "fii_btlg11",
+        "weight": 0.00978
+      },
+      {
+        "code": "fund_btg_bitcoin_100",
+        "weight": 0.008328
+      },
+      {
+        "code": "cri_ipca_generic",
+        "weight": 0.008001
+      },
+      {
+        "code": "fii_hglg11",
+        "weight": 0.0079
+      },
+      {
+        "code": "fund_btg_energy_fip",
+        "weight": 0.00739
+      },
+      {
+        "code": "fii_hsml11",
+        "weight": 0.007235
+      },
+      {
+        "code": "fii_mxrf11",
+        "weight": 0.007095
+      },
+      {
+        "code": "cri_cdi_generic",
+        "weight": 0.006443
+      },
+      {
+        "code": "fii_rbrx11",
+        "weight": 0.005799
+      },
+      {
+        "code": "fund_bv_institucional",
+        "weight": 0.003695
+      },
+      {
+        "code": "fund_mapfre_firf",
+        "weight": 0.003522
+      },
+      {
+        "code": "fund_btg_gl_tech",
+        "weight": 0.002077
+      },
+      {
+        "code": "fii_xpci11",
+        "weight": 0.001327
+      },
+      {
+        "code": "equity_bhia3",
+        "weight": 0.000162
+      },
+      {
+        "code": "debenture_pre_incentivada",
+        "weight": 8e-05
+      }
+    ],
+    "economic_exposure": [
+      {
+        "code": "fi_cdi_br",
+        "weight": 0.379581
+      },
+      {
+        "code": "fi_ipca_br",
+        "weight": 0.189074
+      },
+      {
+        "code": "eq_international",
+        "weight": 0.162818
+      },
+      {
+        "code": "re_br",
+        "weight": 0.148153
+      },
+      {
+        "code": "fi_prefixado_br",
+        "weight": 0.056629
+      },
+      {
+        "code": "eq_br",
+        "weight": 0.055417
+      },
+      {
+        "code": "crypto",
+        "weight": 0.008328
+      }
+    ],
+    "exposure_group": [
+      {
+        "code": "fixed_income",
+        "weight": 0.625284
+      },
+      {
+        "code": "equity",
+        "weight": 0.218235
+      },
+      {
+        "code": "real_estate",
+        "weight": 0.148153
+      },
+      {
+        "code": "crypto",
+        "weight": 0.008328
+      }
+    ],
+    "issuer_type": [
+      {
+        "code": "br_government",
+        "weight": 0.355309
+      },
+      {
+        "code": "br_bank",
+        "weight": 0.13635
+      },
+      {
+        "code": "br_other",
+        "weight": 0.086431
+      },
+      {
+        "code": "br_infrastructure",
+        "weight": 0.058792
+      }
+    ],
+    "issuer": [
+      {
+        "code": "bacenbanco_central_do_brasil_rj",
+        "weight": 0.355309
+      },
+      {
+        "code": "banco_xp_sa",
+        "weight": 0.110922
+      },
+      {
+        "code": "transmissora_alianca_de_energia_eletrica_sa",
+        "weight": 0.030743
+      },
+      {
+        "code": "movida",
+        "weight": 0.020051
+      },
+      {
+        "code": "banco_j_p_morgan_sa",
+        "weight": 0.017879
+      },
+      {
+        "code": "neoenergia_sa",
+        "weight": 0.01682
+      },
+      {
+        "code": "vibra_energia",
+        "weight": 0.016509
+      },
+      {
+        "code": "minerva",
+        "weight": 0.012722
+      },
+      {
+        "code": "vale",
+        "weight": 0.011305
+      },
+      {
+        "code": "rumo_sa",
+        "weight": 0.011229
+      },
+      {
+        "code": "oncoclinicas_ii",
+        "weight": 0.011158
+      },
+      {
+        "code": "assa_atacadista",
+        "weight": 0.008001
+      },
+      {
+        "code": "banco_de_investimentos_credit_suisse_brasil_sa",
+        "weight": 0.007549
+      },
+      {
+        "code": "terracap",
+        "weight": 0.006443
+      },
+      {
+        "code": "casas_bahia",
+        "weight": 0.000162
+      },
+      {
+        "code": "concessionaria_rodovias_do_tiete_sa_em_recuperacao_judicial",
+        "weight": 8e-05
+      }
+    ],
+    "tax_profile": [
+      {
+        "code": "general",
+        "weight": 0.599884
+      },
+      {
+        "code": "taxable_no_come_cotas",
+        "weight": 0.267785
+      },
+      {
+        "code": "tax_exempt",
+        "weight": 0.132331
+      }
+    ],
+    "instrument_kind": [
+      {
+        "code": "fixed_income",
+        "weight": 0.452505
+      },
+      {
+        "code": "fund",
+        "weight": 0.232934
+      },
+      {
+        "code": "listed",
+        "weight": 0.178211
+      },
+      {
+        "code": "other",
+        "weight": 0.13635
+      }
+    ],
+    "maturity_bucket": [
+      {
+        "code": "<1y",
+        "weight": 0.456115
+      },
+      {
+        "code": "10y+",
+        "weight": 0.066367
+      },
+      {
+        "code": "3-5y",
+        "weight": 0.035109
+      },
+      {
+        "code": "5-10y",
+        "weight": 0.023263
+      },
+      {
+        "code": "1-3y",
+        "weight": 0.008001
+      }
+    ]
+  },
+  "angle_positions": [
+    {
+      "row_number": 1,
+      "template_code": "coe_generic",
+      "weight": 0.007549,
+      "instrument_kind": "other",
+      "instructions": []
+    },
+    {
+      "row_number": 2,
+      "template_code": "coe_generic",
+      "weight": 0.017879,
+      "instrument_kind": "other",
+      "instructions": []
+    },
+    {
+      "row_number": 3,
+      "template_code": "coe_generic",
+      "weight": 0.053987,
+      "instrument_kind": "other",
+      "instructions": []
+    },
+    {
+      "row_number": 4,
+      "template_code": "coe_generic",
+      "weight": 0.042661,
+      "instrument_kind": "other",
+      "instructions": []
+    },
+    {
+      "row_number": 5,
+      "template_code": "coe_generic",
+      "weight": 0.003744,
+      "instrument_kind": "other",
+      "instructions": []
+    },
+    {
+      "row_number": 6,
+      "template_code": "coe_generic",
+      "weight": 0.01053,
+      "instrument_kind": "other",
+      "instructions": []
+    },
+    {
+      "row_number": 7,
+      "template_code": "cra_pre_generic",
+      "weight": 0.012722,
+      "instrument_kind": "fixed_income",
+      "instructions": []
+    },
+    {
+      "row_number": 8,
+      "template_code": "cri_cdi_generic",
+      "weight": 0.006443,
+      "instrument_kind": "fixed_income",
+      "instructions": []
+    },
+    {
+      "row_number": 9,
+      "template_code": "cri_ipca_generic",
+      "weight": 0.008001,
+      "instrument_kind": "fixed_income",
+      "instructions": []
+    },
+    {
+      "row_number": 10,
+      "template_code": "cri_pre_generic",
+      "weight": 0.011158,
+      "instrument_kind": "fixed_income",
+      "instructions": []
+    },
+    {
+      "row_number": 11,
+      "template_code": "debenture_ipca_incentivada",
+      "weight": 0.011229,
+      "instrument_kind": "fixed_income",
+      "instructions": []
+    },
+    {
+      "row_number": 12,
+      "template_code": "debenture_ipca_incentivada",
+      "weight": 0.01682,
+      "instrument_kind": "fixed_income",
+      "instructions": []
+    },
+    {
+      "row_number": 13,
+      "template_code": "debenture_ipca_incentivada",
+      "weight": 0.030743,
+      "instrument_kind": "fixed_income",
+      "instructions": []
+    },
+    {
+      "row_number": 14,
+      "template_code": "debenture_pre_incentivada",
+      "weight": 8e-05,
+      "instrument_kind": "fixed_income",
+      "instructions": []
+    },
+    {
+      "row_number": 15,
+      "template_code": "equity_bhia3",
+      "weight": 0.000162,
+      "instrument_kind": "listed",
+      "instructions": []
+    },
+    {
+      "row_number": 16,
+      "template_code": "equity_movi3",
+      "weight": 0.020051,
+      "instrument_kind": "listed",
+      "instructions": []
+    },
+    {
+      "row_number": 17,
+      "template_code": "equity_vale3",
+      "weight": 0.011305,
+      "instrument_kind": "listed",
+      "instructions": []
+    },
+    {
+      "row_number": 18,
+      "template_code": "equity_vbbr3",
+      "weight": 0.016509,
+      "instrument_kind": "listed",
+      "instructions": []
+    },
+    {
+      "row_number": 19,
+      "template_code": "fii_bthf11",
+      "weight": 0.013216,
+      "instrument_kind": "listed",
+      "instructions": []
+    },
+    {
+      "row_number": 20,
+      "template_code": "fii_btlg11",
+      "weight": 0.00978,
+      "instrument_kind": "listed",
+      "instructions": []
+    },
+    {
+      "row_number": 21,
+      "template_code": "fii_hglg11",
+      "weight": 0.0079,
+      "instrument_kind": "listed",
+      "instructions": []
+    },
+    {
+      "row_number": 22,
+      "template_code": "fii_hsml11",
+      "weight": 0.007235,
+      "instrument_kind": "listed",
+      "instructions": []
+    },
+    {
+      "row_number": 23,
+      "template_code": "fii_ifra11",
+      "weight": 0.013746,
+      "instrument_kind": "listed",
+      "instructions": []
+    },
+    {
+      "row_number": 24,
+      "template_code": "fii_juro11",
+      "weight": 0.013999,
+      "instrument_kind": "listed",
+      "instructions": []
+    },
+    {
+      "row_number": 25,
+      "template_code": "fii_kivo11",
+      "weight": 0.01074,
+      "instrument_kind": "listed",
+      "instructions": []
+    },
+    {
+      "row_number": 26,
+      "template_code": "fii_mcre11",
+      "weight": 0.010047,
+      "instrument_kind": "listed",
+      "instructions": []
+    },
+    {
+      "row_number": 27,
+      "template_code": "fii_mxrf11",
+      "weight": 0.007095,
+      "instrument_kind": "listed",
+      "instructions": []
+    },
+    {
+      "row_number": 28,
+      "template_code": "fii_rbrx11",
+      "weight": 0.005799,
+      "instrument_kind": "listed",
+      "instructions": []
+    },
+    {
+      "row_number": 29,
+      "template_code": "fii_rzag11",
+      "weight": 0.015928,
+      "instrument_kind": "listed",
+      "instructions": []
+    },
+    {
+      "row_number": 30,
+      "template_code": "fii_xpci11",
+      "weight": 0.001327,
+      "instrument_kind": "listed",
+      "instructions": []
+    },
+    {
+      "row_number": 31,
+      "template_code": "fii_xpml11",
+      "weight": 0.013372,
+      "instrument_kind": "listed",
+      "instructions": []
+    },
+    {
+      "row_number": 32,
+      "template_code": "fund_af_invest_minas_bdr",
+      "weight": 0.010194,
+      "instrument_kind": "fund",
+      "instructions": []
+    },
+    {
+      "row_number": 33,
+      "template_code": "fund_alaska_black_bdr",
+      "weight": 0.014197,
+      "instrument_kind": "fund",
+      "instructions": []
+    },
+    {
+      "row_number": 34,
+      "template_code": "fund_btg_bitcoin_100",
+      "weight": 0.008328,
+      "instrument_kind": "fund",
+      "instructions": []
+    },
+    {
+      "row_number": 35,
+      "template_code": "fund_btg_cdb_plus",
+      "weight": 0.043381,
+      "instrument_kind": "fund",
+      "instructions": []
+    },
+    {
+      "row_number": 36,
+      "template_code": "fund_btg_energy_fip",
+      "weight": 0.00739,
+      "instrument_kind": "fund",
+      "instructions": []
+    },
+    {
+      "row_number": 37,
+      "template_code": "fund_btg_gl_tech",
+      "weight": 0.002077,
+      "instrument_kind": "fund",
+      "instructions": []
+    },
+    {
+      "row_number": 38,
+      "template_code": "fund_btg_incorporacao_fii",
+      "weight": 0.022153,
+      "instrument_kind": "fund",
+      "instructions": []
+    },
+    {
+      "row_number": 39,
+      "template_code": "fund_btg_logcp_fii",
+      "weight": 0.01501,
+      "instrument_kind": "fund",
+      "instructions": []
+    },
+    {
+      "row_number": 40,
+      "template_code": "fund_btg_prime_logistica",
+      "weight": 0.025726,
+      "instrument_kind": "fund",
+      "instructions": []
+    },
+    {
+      "row_number": 41,
+      "template_code": "fund_bv_institucional",
+      "weight": 0.003695,
+      "instrument_kind": "fund",
+      "instructions": []
+    },
+    {
+      "row_number": 42,
+      "template_code": "fund_mapfre_firf",
+      "weight": 0.003522,
+      "instrument_kind": "fund",
+      "instructions": []
+    },
+    {
+      "row_number": 43,
+      "template_code": "fund_rec_one_fii",
+      "weight": 0.014031,
+      "instrument_kind": "fund",
+      "instructions": []
+    },
+    {
+      "row_number": 44,
+      "template_code": "fund_riza_onyx_imob",
+      "weight": 0.013931,
+      "instrument_kind": "fund",
+      "instructions": []
+    },
+    {
+      "row_number": 45,
+      "template_code": "fund_western_cred_bancario",
+      "weight": 0.033652,
+      "instrument_kind": "fund",
+      "instructions": []
+    },
+    {
+      "row_number": 46,
+      "template_code": "fund_whg_rf_dinamico",
+      "weight": 0.015647,
+      "instrument_kind": "fund",
+      "instructions": []
+    },
+    {
+      "row_number": 47,
+      "template_code": "tesouro_ipca_juros_generic",
+      "weight": 0.029783,
+      "instrument_kind": "fixed_income",
+      "instructions": []
+    },
+    {
+      "row_number": 48,
+      "template_code": "tesouro_ipca_juros_generic",
+      "weight": 0.035544,
+      "instrument_kind": "fixed_income",
+      "instructions": []
+    },
+    {
+      "row_number": 49,
+      "template_code": "tesouro_prefixado_generic",
+      "weight": 0.032669,
+      "instrument_kind": "fixed_income",
+      "instructions": []
+    },
+    {
+      "row_number": 50,
+      "template_code": "tesouro_selic_generic",
+      "weight": 0.257313,
+      "instrument_kind": "fixed_income",
+      "instructions": []
+    }
+  ],
+  "positions_detail": [
+    {
+      "row_number": 1,
+      "input": {
+        "instrument_template_code": "coe_generic",
+        "weight": 0.007549
+      },
+      "resolved": {
+        "instrument_kind": "other",
+        "short_name": "COE",
+        "tax_profile_code": "general",
+        "issuer_code": "banco_de_investimentos_credit_suisse_brasil_sa",
+        "issuer_type_code": "br_bank",
+        "economic_exposures": [
+          {
+            "code": "eq_international",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_bank",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": "2026-07-10",
+        "days_to_expiry": 94,
+        "years_to_expiry": 0.26,
+        "maturity_bucket": "<1y",
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": true
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 2,
+      "input": {
+        "instrument_template_code": "coe_generic",
+        "weight": 0.017879
+      },
+      "resolved": {
+        "instrument_kind": "other",
+        "short_name": "COE",
+        "tax_profile_code": "general",
+        "issuer_code": "banco_j_p_morgan_sa",
+        "issuer_type_code": "br_bank",
+        "economic_exposures": [
+          {
+            "code": "eq_international",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_bank",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": "2026-09-08",
+        "days_to_expiry": 154,
+        "years_to_expiry": 0.42,
+        "maturity_bucket": "<1y",
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": true
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 3,
+      "input": {
+        "instrument_template_code": "coe_generic",
+        "weight": 0.053987
+      },
+      "resolved": {
+        "instrument_kind": "other",
+        "short_name": "COE",
+        "tax_profile_code": "general",
+        "issuer_code": "banco_xp_sa",
+        "issuer_type_code": "br_bank",
+        "economic_exposures": [
+          {
+            "code": "eq_international",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_bank",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": "2026-09-16",
+        "days_to_expiry": 162,
+        "years_to_expiry": 0.44,
+        "maturity_bucket": "<1y",
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": true
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 4,
+      "input": {
+        "instrument_template_code": "coe_generic",
+        "weight": 0.042661
+      },
+      "resolved": {
+        "instrument_kind": "other",
+        "short_name": "COE",
+        "tax_profile_code": "general",
+        "issuer_code": "banco_xp_sa",
+        "issuer_type_code": "br_bank",
+        "economic_exposures": [
+          {
+            "code": "eq_international",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_bank",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": "2026-10-01",
+        "days_to_expiry": 177,
+        "years_to_expiry": 0.48,
+        "maturity_bucket": "<1y",
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": true
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 5,
+      "input": {
+        "instrument_template_code": "coe_generic",
+        "weight": 0.003744
+      },
+      "resolved": {
+        "instrument_kind": "other",
+        "short_name": "COE",
+        "tax_profile_code": "general",
+        "issuer_code": "banco_xp_sa",
+        "issuer_type_code": "br_bank",
+        "economic_exposures": [
+          {
+            "code": "eq_international",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_bank",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": "2026-10-29",
+        "days_to_expiry": 205,
+        "years_to_expiry": 0.56,
+        "maturity_bucket": "<1y",
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": true
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 6,
+      "input": {
+        "instrument_template_code": "coe_generic",
+        "weight": 0.01053
+      },
+      "resolved": {
+        "instrument_kind": "other",
+        "short_name": "COE",
+        "tax_profile_code": "general",
+        "issuer_code": "banco_xp_sa",
+        "issuer_type_code": "br_bank",
+        "economic_exposures": [
+          {
+            "code": "eq_international",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_bank",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": "2026-11-30",
+        "days_to_expiry": 237,
+        "years_to_expiry": 0.65,
+        "maturity_bucket": "<1y",
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": true
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 7,
+      "input": {
+        "instrument_template_code": "cra_pre_generic",
+        "weight": 0.012722
+      },
+      "resolved": {
+        "instrument_kind": "fixed_income",
+        "short_name": "CRA Prefixado",
+        "tax_profile_code": "tax_exempt",
+        "issuer_code": "minerva",
+        "issuer_type_code": "br_other",
+        "economic_exposures": [
+          {
+            "code": "fi_prefixado_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_other",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": "2031-03-17",
+        "days_to_expiry": 1805,
+        "years_to_expiry": 4.94,
+        "maturity_bucket": "3-5y",
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": true
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 8,
+      "input": {
+        "instrument_template_code": "cri_cdi_generic",
+        "weight": 0.006443
+      },
+      "resolved": {
+        "instrument_kind": "fixed_income",
+        "short_name": "CRI CDI",
+        "tax_profile_code": "tax_exempt",
+        "issuer_code": "terracap",
+        "issuer_type_code": "br_other",
+        "economic_exposures": [
+          {
+            "code": "fi_cdi_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_other",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": "2031-05-22",
+        "days_to_expiry": 1871,
+        "years_to_expiry": 5.12,
+        "maturity_bucket": "5-10y",
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": true
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 9,
+      "input": {
+        "instrument_template_code": "cri_ipca_generic",
+        "weight": 0.008001
+      },
+      "resolved": {
+        "instrument_kind": "fixed_income",
+        "short_name": "CRI IPCA+",
+        "tax_profile_code": "tax_exempt",
+        "issuer_code": "assa_atacadista",
+        "issuer_type_code": "br_other",
+        "economic_exposures": [
+          {
+            "code": "fi_ipca_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_other",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": "2028-10-16",
+        "days_to_expiry": 923,
+        "years_to_expiry": 2.53,
+        "maturity_bucket": "1-3y",
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": true
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 10,
+      "input": {
+        "instrument_template_code": "cri_pre_generic",
+        "weight": 0.011158
+      },
+      "resolved": {
+        "instrument_kind": "fixed_income",
+        "short_name": "CRI Prefixado",
+        "tax_profile_code": "tax_exempt",
+        "issuer_code": "oncoclinicas_ii",
+        "issuer_type_code": "br_other",
+        "economic_exposures": [
+          {
+            "code": "fi_prefixado_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_other",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": "2030-10-15",
+        "days_to_expiry": 1652,
+        "years_to_expiry": 4.52,
+        "maturity_bucket": "3-5y",
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": true
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 11,
+      "input": {
+        "instrument_template_code": "debenture_ipca_incentivada",
+        "weight": 0.011229
+      },
+      "resolved": {
+        "instrument_kind": "fixed_income",
+        "short_name": "Debênture Incentivada IPCA+",
+        "tax_profile_code": "tax_exempt",
+        "issuer_code": "rumo_sa",
+        "issuer_type_code": "br_infrastructure",
+        "economic_exposures": [
+          {
+            "code": "fi_ipca_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_infrastructure",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": "2029-10-15",
+        "days_to_expiry": 1287,
+        "years_to_expiry": 3.52,
+        "maturity_bucket": "3-5y",
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": true
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 12,
+      "input": {
+        "instrument_template_code": "debenture_ipca_incentivada",
+        "weight": 0.01682
+      },
+      "resolved": {
+        "instrument_kind": "fixed_income",
+        "short_name": "Debênture Incentivada IPCA+",
+        "tax_profile_code": "tax_exempt",
+        "issuer_code": "neoenergia_sa",
+        "issuer_type_code": "br_infrastructure",
+        "economic_exposures": [
+          {
+            "code": "fi_ipca_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_infrastructure",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": "2033-06-15",
+        "days_to_expiry": 2626,
+        "years_to_expiry": 7.19,
+        "maturity_bucket": "5-10y",
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": true
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 13,
+      "input": {
+        "instrument_template_code": "debenture_ipca_incentivada",
+        "weight": 0.030743
+      },
+      "resolved": {
+        "instrument_kind": "fixed_income",
+        "short_name": "Debênture Incentivada IPCA+",
+        "tax_profile_code": "tax_exempt",
+        "issuer_code": "transmissora_alianca_de_energia_eletrica_sa",
+        "issuer_type_code": "br_infrastructure",
+        "economic_exposures": [
+          {
+            "code": "fi_ipca_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_infrastructure",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": "2044-09-15",
+        "days_to_expiry": 6736,
+        "years_to_expiry": 18.44,
+        "maturity_bucket": "10y+",
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": true
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 14,
+      "input": {
+        "instrument_template_code": "debenture_pre_incentivada",
+        "weight": 8e-05
+      },
+      "resolved": {
+        "instrument_kind": "fixed_income",
+        "short_name": "Debênture Incentivada Pré",
+        "tax_profile_code": "tax_exempt",
+        "issuer_code": "concessionaria_rodovias_do_tiete_sa_em_recuperacao_judicial",
+        "issuer_type_code": "br_other",
+        "economic_exposures": [
+          {
+            "code": "fi_prefixado_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_other",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": "2099-12-03",
+        "days_to_expiry": 26903,
+        "years_to_expiry": 73.66,
+        "maturity_bucket": "10y+",
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": true
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 15,
+      "input": {
+        "instrument_template_code": "equity_bhia3",
+        "weight": 0.000162
+      },
+      "resolved": {
+        "instrument_kind": "listed",
+        "short_name": "Grupo Casas Bahia",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": "casas_bahia",
+        "issuer_type_code": "br_other",
+        "economic_exposures": [
+          {
+            "code": "eq_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_other",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": true,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 16,
+      "input": {
+        "instrument_template_code": "equity_movi3",
+        "weight": 0.020051
+      },
+      "resolved": {
+        "instrument_kind": "listed",
+        "short_name": "Movida",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": "movida",
+        "issuer_type_code": "br_other",
+        "economic_exposures": [
+          {
+            "code": "eq_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_other",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": true,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 17,
+      "input": {
+        "instrument_template_code": "equity_vale3",
+        "weight": 0.011305
+      },
+      "resolved": {
+        "instrument_kind": "listed",
+        "short_name": "Vale",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": "vale",
+        "issuer_type_code": "br_other",
+        "economic_exposures": [
+          {
+            "code": "eq_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_other",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": true,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 18,
+      "input": {
+        "instrument_template_code": "equity_vbbr3",
+        "weight": 0.016509
+      },
+      "resolved": {
+        "instrument_kind": "listed",
+        "short_name": "Vibra Energia",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": "vibra_energia",
+        "issuer_type_code": "br_other",
+        "economic_exposures": [
+          {
+            "code": "eq_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_other",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": true,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 19,
+      "input": {
+        "instrument_template_code": "fii_bthf11",
+        "weight": 0.013216
+      },
+      "resolved": {
+        "instrument_kind": "listed",
+        "short_name": "BTHF11",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "re_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": true,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 20,
+      "input": {
+        "instrument_template_code": "fii_btlg11",
+        "weight": 0.00978
+      },
+      "resolved": {
+        "instrument_kind": "listed",
+        "short_name": "BTLG11",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "re_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": true,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 21,
+      "input": {
+        "instrument_template_code": "fii_hglg11",
+        "weight": 0.0079
+      },
+      "resolved": {
+        "instrument_kind": "listed",
+        "short_name": "HGLG11",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "re_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": true,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 22,
+      "input": {
+        "instrument_template_code": "fii_hsml11",
+        "weight": 0.007235
+      },
+      "resolved": {
+        "instrument_kind": "listed",
+        "short_name": "HSML11",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "re_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": true,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 23,
+      "input": {
+        "instrument_template_code": "fii_ifra11",
+        "weight": 0.013746
+      },
+      "resolved": {
+        "instrument_kind": "listed",
+        "short_name": "IFRA11",
+        "tax_profile_code": "tax_exempt",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "fi_ipca_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": true,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 24,
+      "input": {
+        "instrument_template_code": "fii_juro11",
+        "weight": 0.013999
+      },
+      "resolved": {
+        "instrument_kind": "listed",
+        "short_name": "JURO11",
+        "tax_profile_code": "tax_exempt",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "fi_ipca_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": true,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 25,
+      "input": {
+        "instrument_template_code": "fii_kivo11",
+        "weight": 0.01074
+      },
+      "resolved": {
+        "instrument_kind": "listed",
+        "short_name": "KIVO11",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "fi_ipca_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": true,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 26,
+      "input": {
+        "instrument_template_code": "fii_mcre11",
+        "weight": 0.010047
+      },
+      "resolved": {
+        "instrument_kind": "listed",
+        "short_name": "MCRE11",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "fi_ipca_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": true,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 27,
+      "input": {
+        "instrument_template_code": "fii_mxrf11",
+        "weight": 0.007095
+      },
+      "resolved": {
+        "instrument_kind": "listed",
+        "short_name": "MXRF11",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "fi_ipca_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": true,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 28,
+      "input": {
+        "instrument_template_code": "fii_rbrx11",
+        "weight": 0.005799
+      },
+      "resolved": {
+        "instrument_kind": "listed",
+        "short_name": "RBRX11",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "re_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": true,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 29,
+      "input": {
+        "instrument_template_code": "fii_rzag11",
+        "weight": 0.015928
+      },
+      "resolved": {
+        "instrument_kind": "listed",
+        "short_name": "RZAG11",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "fi_cdi_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": true,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 30,
+      "input": {
+        "instrument_template_code": "fii_xpci11",
+        "weight": 0.001327
+      },
+      "resolved": {
+        "instrument_kind": "listed",
+        "short_name": "XPCI11",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "fi_ipca_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": true,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 31,
+      "input": {
+        "instrument_template_code": "fii_xpml11",
+        "weight": 0.013372
+      },
+      "resolved": {
+        "instrument_kind": "listed",
+        "short_name": "FII XPML11",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "re_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": true,
+        "is_bdr": null,
+        "yearly_fee_pct": 0.95,
+        "performance_fee_pct": null,
+        "has_fgc": null,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 32,
+      "input": {
+        "instrument_template_code": "fund_af_invest_minas_bdr",
+        "weight": 0.010194
+      },
+      "resolved": {
+        "instrument_kind": "fund",
+        "short_name": "AF INVEST MINAS BDR NIVEL I FIA",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "eq_international",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Non-Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 33,
+      "input": {
+        "instrument_template_code": "fund_alaska_black_bdr",
+        "weight": 0.014197
+      },
+      "resolved": {
+        "instrument_kind": "fund",
+        "short_name": "ALASKA BLACK FICFIA BDR NIVEL I",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "eq_international",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Non-Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 34,
+      "input": {
+        "instrument_template_code": "fund_btg_bitcoin_100",
+        "weight": 0.008328
+      },
+      "resolved": {
+        "instrument_kind": "fund",
+        "short_name": "BTG REF BITCOIN 100 FICFIM IE",
+        "tax_profile_code": "general",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "crypto",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Non-Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 35,
+      "input": {
+        "instrument_template_code": "fund_btg_cdb_plus",
+        "weight": 0.043381
+      },
+      "resolved": {
+        "instrument_kind": "fund",
+        "short_name": "BTG CDB Plus FIRF CrPr",
+        "tax_profile_code": "general",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "fi_cdi_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 36,
+      "input": {
+        "instrument_template_code": "fund_btg_energy_fip",
+        "weight": 0.00739
+      },
+      "resolved": {
+        "instrument_kind": "fund",
+        "short_name": "BTG PACTUAL ENERGY OPPORTUNITIES FIP INF",
+        "tax_profile_code": "tax_exempt",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "eq_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 37,
+      "input": {
+        "instrument_template_code": "fund_btg_gl_tech",
+        "weight": 0.002077
+      },
+      "resolved": {
+        "instrument_kind": "fund",
+        "short_name": "BTG REF GL TECH FIA",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "eq_international",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Non-Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 38,
+      "input": {
+        "instrument_template_code": "fund_btg_incorporacao_fii",
+        "weight": 0.022153
+      },
+      "resolved": {
+        "instrument_kind": "fund",
+        "short_name": "BTG INCORPORACAO FII RESP LIMITADA",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "re_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 39,
+      "input": {
+        "instrument_template_code": "fund_btg_logcp_fii",
+        "weight": 0.01501
+      },
+      "resolved": {
+        "instrument_kind": "fund",
+        "short_name": "BTG PACTUAL LOGCP FII",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "re_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 40,
+      "input": {
+        "instrument_template_code": "fund_btg_prime_logistica",
+        "weight": 0.025726
+      },
+      "resolved": {
+        "instrument_kind": "fund",
+        "short_name": "BTG PACTUAL PRIME LOGÍSTICA FII RL",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "re_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 41,
+      "input": {
+        "instrument_template_code": "fund_bv_institucional",
+        "weight": 0.003695
+      },
+      "resolved": {
+        "instrument_kind": "fund",
+        "short_name": "BV INSTITUCIONAL FIRF CrPr",
+        "tax_profile_code": "general",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "fi_cdi_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 42,
+      "input": {
+        "instrument_template_code": "fund_mapfre_firf",
+        "weight": 0.003522
+      },
+      "resolved": {
+        "instrument_kind": "fund",
+        "short_name": "MAPFRE FIRF",
+        "tax_profile_code": "general",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "fi_cdi_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 43,
+      "input": {
+        "instrument_template_code": "fund_rec_one_fii",
+        "weight": 0.014031
+      },
+      "resolved": {
+        "instrument_kind": "fund",
+        "short_name": "REC ONE FII RL",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "re_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 44,
+      "input": {
+        "instrument_template_code": "fund_riza_onyx_imob",
+        "weight": 0.013931
+      },
+      "resolved": {
+        "instrument_kind": "fund",
+        "short_name": "RIZA ONYX FI IMOBILIARIO RL",
+        "tax_profile_code": "taxable_no_come_cotas",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "re_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 45,
+      "input": {
+        "instrument_template_code": "fund_western_cred_bancario",
+        "weight": 0.033652
+      },
+      "resolved": {
+        "instrument_kind": "fund",
+        "short_name": "Western Credito Bancario Plus FIRF CrPr",
+        "tax_profile_code": "general",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "fi_cdi_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 46,
+      "input": {
+        "instrument_template_code": "fund_whg_rf_dinamico",
+        "weight": 0.015647
+      },
+      "resolved": {
+        "instrument_kind": "fund",
+        "short_name": "WHG RF DINAMICO FICFIM",
+        "tax_profile_code": "general",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "fi_cdi_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 47,
+      "input": {
+        "instrument_template_code": "tesouro_ipca_juros_generic",
+        "weight": 0.029783
+      },
+      "resolved": {
+        "instrument_kind": "fixed_income",
+        "short_name": "Tesouro IPCA+ com Juros",
+        "tax_profile_code": "general",
+        "issuer_code": "bacenbanco_central_do_brasil_rj",
+        "issuer_type_code": "br_government",
+        "economic_exposures": [
+          {
+            "code": "fi_ipca_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_government",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": "2026-08-15",
+        "days_to_expiry": 130,
+        "years_to_expiry": 0.36,
+        "maturity_bucket": "<1y",
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": true
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 48,
+      "input": {
+        "instrument_template_code": "tesouro_ipca_juros_generic",
+        "weight": 0.035544
+      },
+      "resolved": {
+        "instrument_kind": "fixed_income",
+        "short_name": "Tesouro IPCA+ com Juros",
+        "tax_profile_code": "general",
+        "issuer_code": "bacenbanco_central_do_brasil_rj",
+        "issuer_type_code": "br_government",
+        "economic_exposures": [
+          {
+            "code": "fi_ipca_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_government",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": "2045-05-15",
+        "days_to_expiry": 6978,
+        "years_to_expiry": 19.1,
+        "maturity_bucket": "10y+",
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": true
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 49,
+      "input": {
+        "instrument_template_code": "tesouro_prefixado_generic",
+        "weight": 0.032669
+      },
+      "resolved": {
+        "instrument_kind": "fixed_income",
+        "short_name": "Tesouro Prefixado (LTN)",
+        "tax_profile_code": "general",
+        "issuer_code": "bacenbanco_central_do_brasil_rj",
+        "issuer_type_code": "br_government",
+        "economic_exposures": [
+          {
+            "code": "fi_prefixado_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_government",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": "2027-01-01",
+        "days_to_expiry": 269,
+        "years_to_expiry": 0.74,
+        "maturity_bucket": "<1y",
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": true
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 50,
+      "input": {
+        "instrument_template_code": "tesouro_selic_generic",
+        "weight": 0.257313
+      },
+      "resolved": {
+        "instrument_kind": "fixed_income",
+        "short_name": "Tesouro Selic (LFT)",
+        "tax_profile_code": "general",
+        "issuer_code": "bacenbanco_central_do_brasil_rj",
+        "issuer_type_code": "br_government",
+        "economic_exposures": [
+          {
+            "code": "fi_cdi_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_government",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": "2027-03-01",
+        "days_to_expiry": 328,
+        "years_to_expiry": 0.9,
+        "maturity_bucket": "<1y",
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": true
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    }
+  ]
+}

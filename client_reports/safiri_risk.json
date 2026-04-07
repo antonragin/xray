@@ -1,0 +1,381 @@
+{
+  "client": "safiri",
+  "angle": "risk",
+  "run_id": "run_20260407_173620_07b418",
+  "portfolio_summary": {
+    "total_weight": 1.0,
+    "row_count": 5,
+    "unique_templates": 4,
+    "economic_exposure_coverage": 1.0,
+    "tax_profile_coverage": 1.0,
+    "issuer_type_coverage": 0.427,
+    "issuer_coverage": 0.427,
+    "maturity_coverage": 0.427
+  },
+  "allocations": {
+    "instrument_template": [
+      {
+        "code": "fund_btg_black_selic",
+        "weight": 0.536599
+      },
+      {
+        "code": "tesouro_ipca_principal_generic",
+        "weight": 0.292377
+      },
+      {
+        "code": "tesouro_selic_generic",
+        "weight": 0.13466
+      },
+      {
+        "code": "fund_btg_tesouro_ipca_prev",
+        "weight": 0.036364
+      }
+    ],
+    "economic_exposure": [
+      {
+        "code": "fi_cdi_br",
+        "weight": 0.671259
+      },
+      {
+        "code": "fi_ipca_br",
+        "weight": 0.328741
+      }
+    ],
+    "exposure_group": [
+      {
+        "code": "fixed_income",
+        "weight": 1.0
+      }
+    ],
+    "issuer_type": [
+      {
+        "code": "br_government",
+        "weight": 0.427037
+      }
+    ],
+    "issuer": [
+      {
+        "code": "bacenbanco_central_do_brasil_rj",
+        "weight": 0.427037
+      }
+    ],
+    "tax_profile": [
+      {
+        "code": "general",
+        "weight": 0.963636
+      },
+      {
+        "code": "previdencia",
+        "weight": 0.036364
+      }
+    ],
+    "instrument_kind": [
+      {
+        "code": "fund",
+        "weight": 0.572963
+      },
+      {
+        "code": "fixed_income",
+        "weight": 0.427037
+      }
+    ],
+    "maturity_bucket": [
+      {
+        "code": "3-5y",
+        "weight": 0.204679
+      },
+      {
+        "code": "1-3y",
+        "weight": 0.13466
+      },
+      {
+        "code": "5-10y",
+        "weight": 0.087698
+      }
+    ]
+  },
+  "angle_positions": [
+    {
+      "row_number": 1,
+      "template_code": "fund_btg_black_selic",
+      "weight": 0.536599,
+      "instrument_kind": "fund",
+      "instructions": []
+    },
+    {
+      "row_number": 2,
+      "template_code": "fund_btg_tesouro_ipca_prev",
+      "weight": 0.036364,
+      "instrument_kind": "fund",
+      "instructions": []
+    },
+    {
+      "row_number": 3,
+      "template_code": "tesouro_ipca_principal_generic",
+      "weight": 0.204679,
+      "instrument_kind": "fixed_income",
+      "instructions": []
+    },
+    {
+      "row_number": 4,
+      "template_code": "tesouro_ipca_principal_generic",
+      "weight": 0.087698,
+      "instrument_kind": "fixed_income",
+      "instructions": []
+    },
+    {
+      "row_number": 5,
+      "template_code": "tesouro_selic_generic",
+      "weight": 0.13466,
+      "instrument_kind": "fixed_income",
+      "instructions": []
+    }
+  ],
+  "positions_detail": [
+    {
+      "row_number": 1,
+      "input": {
+        "instrument_template_code": "fund_btg_black_selic",
+        "weight": 0.536599
+      },
+      "resolved": {
+        "instrument_kind": "fund",
+        "short_name": "BTG Black Tesouro Selic Simples FIRF RL",
+        "tax_profile_code": "general",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "fi_cdi_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 2,
+      "input": {
+        "instrument_template_code": "fund_btg_tesouro_ipca_prev",
+        "weight": 0.036364
+      },
+      "resolved": {
+        "instrument_kind": "fund",
+        "short_name": "BTG PACTUAL TESOURO IPCA LON PREV FICRF",
+        "tax_profile_code": "previdencia",
+        "issuer_code": null,
+        "issuer_type_code": null,
+        "economic_exposures": [
+          {
+            "code": "fi_ipca_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": []
+      },
+      "derived": {
+        "expiry_date": null,
+        "days_to_expiry": null,
+        "years_to_expiry": null,
+        "maturity_bucket": null,
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": false
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 3,
+      "input": {
+        "instrument_template_code": "tesouro_ipca_principal_generic",
+        "weight": 0.204679
+      },
+      "resolved": {
+        "instrument_kind": "fixed_income",
+        "short_name": "Tesouro IPCA+ Principal",
+        "tax_profile_code": "general",
+        "issuer_code": "bacenbanco_central_do_brasil_rj",
+        "issuer_type_code": "br_government",
+        "economic_exposures": [
+          {
+            "code": "fi_ipca_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_government",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": "2029-05-15",
+        "days_to_expiry": 1134,
+        "years_to_expiry": 3.1,
+        "maturity_bucket": "3-5y",
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": true
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 4,
+      "input": {
+        "instrument_template_code": "tesouro_ipca_principal_generic",
+        "weight": 0.087698
+      },
+      "resolved": {
+        "instrument_kind": "fixed_income",
+        "short_name": "Tesouro IPCA+ Principal",
+        "tax_profile_code": "general",
+        "issuer_code": "bacenbanco_central_do_brasil_rj",
+        "issuer_type_code": "br_government",
+        "economic_exposures": [
+          {
+            "code": "fi_ipca_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_government",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": "2032-08-15",
+        "days_to_expiry": 2322,
+        "years_to_expiry": 6.36,
+        "maturity_bucket": "5-10y",
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": true
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    },
+    {
+      "row_number": 5,
+      "input": {
+        "instrument_template_code": "tesouro_selic_generic",
+        "weight": 0.13466
+      },
+      "resolved": {
+        "instrument_kind": "fixed_income",
+        "short_name": "Tesouro Selic (LFT)",
+        "tax_profile_code": "general",
+        "issuer_code": "bacenbanco_central_do_brasil_rj",
+        "issuer_type_code": "br_government",
+        "economic_exposures": [
+          {
+            "code": "fi_cdi_br",
+            "weight": 1.0
+          }
+        ],
+        "issuer_type_weights": [
+          {
+            "code": "br_government",
+            "weight": 1.0
+          }
+        ]
+      },
+      "derived": {
+        "expiry_date": "2028-03-01",
+        "days_to_expiry": 694,
+        "years_to_expiry": 1.9,
+        "maturity_bucket": "1-3y",
+        "country_bucket": "Brazil"
+      },
+      "template_metadata": {
+        "long_name": "",
+        "cnpj": "",
+        "b3_listed": false,
+        "is_bdr": false,
+        "yearly_fee_pct": null,
+        "performance_fee_pct": null,
+        "has_fgc": false,
+        "requires_expiry_date": true
+      },
+      "instructions": {
+        "diversification": [],
+        "liquidity": [],
+        "fees": [],
+        "tax": [],
+        "risk": [],
+        "performance": []
+      }
+    }
+  ]
+}
