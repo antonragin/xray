@@ -226,6 +226,24 @@ class ReferenceHealthView(APIView):
         return Response({'checks': checks, 'overall': overall})
 
 
+class LoadFixtureView(APIView):
+    """Load the production_seed fixture into the database.
+    POST /api/v1/admin/load-fixture/
+    """
+    def post(self, request):
+        from django.core.management import call_command
+        import io
+        out = io.StringIO()
+        try:
+            call_command('loaddata', 'production_seed', stdout=out, verbosity=1)
+            return Response({'status': 'ok', 'message': out.getvalue().strip()})
+        except Exception as e:
+            return Response(
+                {'error': 'load_failed', 'message': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
 class ProcessPortfolioView(APIView):
     """Process a portfolio CSV and return the full bundle as JSON.
 

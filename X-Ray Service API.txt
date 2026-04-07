@@ -1,0 +1,396 @@
+================================================================================
+PORTFOLIO X-RAY SERVICE — API DOCUMENTATION
+================================================================================
+
+Base URL: https://xray-oryx.onrender.com
+Authentication: Bearer token in Authorization header
+
+All requests must include:
+  Authorization: Bearer OryxRulezzz2026!!!
+
+Alternative auth methods:
+  - Basic auth: any username, password = token
+  - Query param: ?token=OryxRulezzz2026!!!
+
+================================================================================
+1. OVERVIEW
+================================================================================
+
+Portfolio X-Ray is a deterministic mechanical service for Brazilian investment
+portfolios. It does NOT contain AI logic. It:
+
+  1. Maintains 5 reference tables describing the Brazilian investment universe
+  2. Accepts a portfolio CSV (positions mapped to instrument templates)
+  3. Resolves each position against the reference tables
+  4. Produces structured precursors for downstream AI report generators
+
+The service has 242 instrument templates covering: government bonds, CDBs,
+LCIs, LCAs, CRAs, CRIs, debentures, listed equities, BDRs, ETFs, FIIs,
+investment funds, crypto, and COEs.
+
+================================================================================
+2. ENDPOINTS — REFERENCE DATA (Read & Write)
+================================================================================
+
+All reference data endpoints follow the same pattern. Resources are identified
+by their code field (immutable after creation), not by numeric ID.
+
+2.1 SCHEMA DISCOVERY
+--------------------
+GET /api/v1/schema/
+
+Returns the complete data model: all tables, fields, types, choices,
+relationships, constraints, and conventions. An agent should call this
+first to understand the system.
+
+2.2 ECONOMIC EXPOSURES
+----------------------
+GET    /api/v1/economic-exposures/                     List all (paginated)
+POST   /api/v1/economic-exposures/                     Create new
+GET    /api/v1/economic-exposures/{exposure_code}/      Get one
+PUT    /api/v1/economic-exposures/{exposure_code}/      Full replace
+PATCH  /api/v1/economic-exposures/{exposure_code}/      Partial update
+
+Query params: ?search=gold&exposure_group=precious_metals&active=true&ordering=-updated_at&page=1&page_size=50
+
+Current exposure codes (13):
+  fi_cdi_br, fi_ipca_br, fi_prefixado_br, fi_international, fi_usd_br,
+  eq_br, eq_international, re_br, re_international,
+  crypto, gold, silver, undetermined
+
+Exposure groups: fixed_income, equity, real_estate, crypto, precious_metals, undetermined
+
+2.3 TAX PROFILES
+----------------
+GET/POST   /api/v1/tax-profiles/
+GET/PUT/PATCH /api/v1/tax-profiles/{tax_profile_code}/
+
+Current codes (4):
+  general               — come-cotas regime (most open-end funds, CDBs, government bonds)
+  tax_exempt            — LCI, LCA, CRA, CRI, debenture incentivada, FIP-Infra
+  taxable_no_come_cotas — listed equities, ETFs, FIIs, direct crypto
+  previdencia           — PGBL/VGBL pension funds
+
+2.4 ISSUER TYPES
+----------------
+GET/POST   /api/v1/issuer-types/
+GET/PUT/PATCH /api/v1/issuer-types/{issuer_type_code}/
+
+Current codes (6):
+  br_government, br_bank, br_infrastructure, br_other,
+  nonbr_government, nonbr_other
+
+2.5 ISSUERS
+-----------
+GET/POST   /api/v1/issuers/
+GET/PUT/PATCH /api/v1/issuers/{issuer_code}/
+
+Query params: ?issuer_type_code=br_bank&search=btg
+
+212 issuers loaded. On write, submit issuer_type as code string:
+  {"issuer_code": "banco_abc", "name": "Banco ABC", "issuer_type_code": "br_bank"}
+
+On read, issuer_type returned as nested object:
+  {"issuer_code": "banco_abc", "name": "Banco ABC", "issuer_type": {"issuer_type_code": "br_bank", "name": "Brazilian Bank"}}
+
+2.6 INSTRUMENT TEMPLATES
+-------------------------
+GET/POST   /api/v1/instrument-templates/
+GET/PUT/PATCH /api/v1/instrument-templates/{template_code}/
+
+Query params: ?instrument_kind=fund&active=true&tax_profile_code=general&search=btg
+
+242 templates loaded. instrument_kind values: listed, fixed_income, fund, crypto, other
+
+On write, all foreign keys submitted as code strings:
+  {
+    "template_code": "my_new_template",
+    "instrument_kind": "fund",
+    "short_name": "My Fund",
+    "primary_economic_exposure_code": "fi_cdi_br",
+    "tax_profile_code": "general",
+    "requires_expiry_date": false,
+    "requires_issuer_or_issuer_type": false
+  }
+
+Key constraint: exactly ONE of primary_economic_exposure_code or
+economic_exposure_weights_json must be present. Weights must sum to 1.0.
+
+================================================================================
+3. ENDPOINTS — INSTRUCTION TEXT (Batch Write)
+================================================================================
+
+Each of the 5 tables has 6 instruction text fields, one per report angle:
+  instructions_diversification
+  instructions_liquidity
+  instructions_fees
+  instructions_tax
+  instructions_risk
+  instructions_performance
+
+These are free-text fields that downstream AI agents will receive as context
+when generating report sections. They can be updated individually via PATCH
+on any record, or in bulk:
+
+PATCH /api/v1/batch/instructions/
+{
+  "angle": "diversification",
+  "updates": [
+    {"table": "economic_exposure", "code": "fi_cdi_br", "text": "CDI-indexed instruments..."},
+    {"table": "tax_profile", "code": "general", "text": "General tax regime..."},
+    {"table": "instrument_template", "code": "cdb_cdi_generic", "text": "CDB specifics..."}
+  ]
+}
+
+Valid angles: diversification, liquidity, fees, tax, risk, performance
+Valid tables: economic_exposure, tax_profile, issuer_type, issuer, instrument_template
+
+The operation is atomic: if any entry fails validation, no changes are applied.
+Set "text" to null to clear a field.
+
+================================================================================
+4. ENDPOINTS — PORTFOLIO PROCESSING
+================================================================================
+
+4.1 PROCESS TO JSON (primary endpoint for agents)
+--------------------------------------------------
+POST /api/v1/process/
+Content-Type: application/json
+
+Request body:
+{
+  "csv": "instrument_template_code,weight,expiry_date,issuer_code,issuer_type_code\ncdb_cdi_generic,0.50,2027-06-15,banco_btg_pactual_s_a,\ntesouro_selic_generic,0.50,2029-01-01,,"
+}
+
+Response (200):
+{
+  "run_id": "run_20260407_...",
+  "validation": {"is_valid": true, "warnings": [], "row_count": 2},
+  "bundle": {
+    "schema_version": "1.0",
+    "portfolio_summary": {
+      "total_weight": 1.0,
+      "row_count": 2,
+      "unique_templates": 2,
+      "economic_exposure_coverage": 1.0,
+      "issuer_coverage": 0.5,
+      ...
+    },
+    "allocations": {
+      "economic_exposure": [{"code": "fi_cdi_br", "name": "CDI Brazil", "weight": 1.0}],
+      "issuer_type": [...],
+      "instrument_kind": [...],
+      ...
+    },
+    "positions": [
+      {
+        "row_number": 1,
+        "input": {"instrument_template_code": "cdb_cdi_generic", "weight": 0.5},
+        "resolved": {
+          "instrument_kind": "fixed_income",
+          "short_name": "CDB CDI Generic",
+          "display_name": "CDB CDI Generic",
+          "tax_profile_code": "general",
+          "tax_profile_name": "General",
+          "issuer_code": "banco_btg_pactual_s_a",
+          "issuer_name": "BANCO BTG PACTUAL S A",
+          "issuer_type_code": "br_bank",
+          "issuer_type_name": "Brazilian Bank",
+          "economic_exposures": [{"code": "fi_cdi_br", "name": "CDI Brazil", "weight": 1.0}],
+          ...
+        },
+        "derived": {
+          "expiry_date": "2027-06-15",
+          "days_to_expiry": 434,
+          "years_to_expiry": 1.19,
+          "maturity_bucket": "1-3y",
+          "country_bucket": "Brazil"
+        },
+        "template_metadata": {...},
+        "instructions": {
+          "diversification": [
+            {"source": "instrument_template", "code": "cdb_cdi_generic", "text": "..."},
+            {"source": "issuer_type", "code": "br_bank", "text": "..."},
+            {"source": "economic_exposure", "code": "fi_cdi_br", "text": "..."},
+            {"source": "tax_profile", "code": "general", "text": "..."}
+          ],
+          "liquidity": [...],
+          "fees": [...],
+          "tax": [...],
+          "risk": [...],
+          "performance": [...]
+        }
+      }
+    ]
+  },
+  "angles": {
+    "diversification": [{"row_number": 1, "template_code": "...", "weight": 0.5, "instructions": [...]}],
+    "liquidity": [...],
+    "fees": [...],
+    "tax": [...],
+    "risk": [...],
+    "performance": [...]
+  }
+}
+
+4.2 PROCESS TO ZIP (full bundle download)
+------------------------------------------
+POST /api/v1/process/zip/
+Content-Type: application/json
+
+Same request body as above. Returns a ZIP file containing:
+  run_<id>/input/original.csv
+  run_<id>/machine/unrolled_positions.csv
+  run_<id>/machine/unrolled_positions.json
+  run_<id>/machine/allocation_by_*.csv
+  run_<id>/machine/angle_*.csv
+  run_<id>/machine/report_input_bundle.json
+  run_<id>/machine/coverage_summary.json
+  run_<id>/html/preview.html
+  run_<id>/charts/*.svg
+  run_<id>/meta/run_metadata.json
+  run_<id>/meta/validation.json
+
+================================================================================
+5. ENDPOINTS — HEALTH & MONITORING
+================================================================================
+
+GET /api/v1/health/references/
+
+Returns reference data consistency checks:
+  - Templates missing economic exposure
+  - Invalid weight totals
+  - Active issuers with inactive issuer types
+  - Sparse instruction coverage
+  - Overall pass/fail status
+
+================================================================================
+6. CSV INPUT CONTRACT
+================================================================================
+
+Required columns:
+  instrument_template_code   — must exist in instrument_template table
+  weight                     — positive decimal, all rows must sum to 1.0 (±0.0005)
+  expiry_date                — YYYY-MM-DD, required if template.requires_expiry_date=true
+  issuer_code                — optional, must exist in issuer table if provided
+  issuer_type_code           — optional fallback if issuer_code absent
+
+Example:
+  instrument_template_code,weight,expiry_date,issuer_code,issuer_type_code
+  cdb_cdi_generic,0.30,2027-06-15,banco_btg_pactual_s_a,
+  tesouro_selic_generic,0.20,2029-01-01,,
+  equity_vale3,0.15,,,
+  fii_hglg11,0.10,,,
+  fund_btg_cdb_plus,0.25,,,
+
+================================================================================
+7. CONVENTIONS
+================================================================================
+
+- All codes are lowercase snake_case, immutable after creation
+- No DELETE endpoints — use PATCH {"active": false} to deactivate
+- Duplicate POST returns 409 with existing record (idempotent)
+- Foreign keys: submitted as code strings on write, returned as {code, name} on read
+- All list endpoints paginated: ?page=1&page_size=50
+- Names appear alongside codes in all outputs (display_name preferred)
+- The processing pipeline is deterministic: same CSV + same DB = identical output
+
+================================================================================
+8. ERROR RESPONSES
+================================================================================
+
+All errors follow:
+{
+  "error": "validation_error|conflict|not_found|method_not_allowed",
+  "message": "Human-readable description",
+  "field_errors": {"field_name": ["error detail"]},      // for validation
+  "existing": {...},                                       // for 409 conflict
+  "references": [...]                                      // for deactivation blocked
+}
+
+401: Missing or invalid token
+400: Validation error (bad input)
+404: Resource not found
+409: Conflict (duplicate POST or deactivation blocked by references)
+
+================================================================================
+9. TEMPLATE CATEGORIES QUICK REFERENCE
+================================================================================
+
+GOVERNMENT BONDS (5):
+  tesouro_selic_generic, tesouro_ipca_principal_generic,
+  tesouro_ipca_juros_generic, tesouro_prefixado_generic, tesouro_ntnf_generic
+
+BANK DEPOSITS (10):
+  cdb_cdi_generic, cdb_ipca_generic, cdb_pre_generic,
+  lci_cdi_generic, lci_ipca_generic, lci_pre_generic,
+  lca_cdi_generic, lca_pre_generic, lca_ipca_generic,
+  compromissada_generic, cdie_pre_generic
+
+PRIVATE CREDIT (14):
+  cra_cdi_generic, cra_ipca_generic, cra_pre_generic,
+  cri_cdi_generic, cri_ipca_generic, cri_pre_generic,
+  cdca_cdi_generic, cdca_ipca_generic, cdca_pre_generic,
+  debenture_cdi_incentivada, debenture_ipca_incentivada, debenture_pre_incentivada,
+  debenture_cdi_regular, debenture_ipca_regular, debenture_pre_regular
+
+OTHER GENERIC (4):
+  coe_generic, lfsn_generic, lf_cdi_generic,
+  equity_br_listed_generic, bdr_equity_listed_generic
+
+ETFs (6): etf_bova11, etf_ivvb11, etf_ustk11, etf_gold11, etf_b5p211, etf_debb11
+
+FIIs (41): fii_arri11 through fii_xpml11 (40 listed + fii_hglg11)
+
+BR EQUITIES (48): equity_alos3 through equity_wege3
+
+BDRs (3): bdr_tsla34, bdr_aura33, bdr_xpbr31
+
+UNITS (2): unit_klbn11, unit_cyre99
+
+CRYPTO (8): crypto_bitcoin through crypto_render
+
+FUNDS (96): fund_absolute_creta through fund_western_cred_bancario
+
+TOTAL: 242 templates
+
+================================================================================
+10. EXAMPLE CURL COMMANDS
+================================================================================
+
+# List all economic exposures
+curl -H "Authorization: Bearer OryxRulezzz2026!!!" \
+  https://xray-oryx.onrender.com/api/v1/economic-exposures/
+
+# Get a specific template
+curl -H "Authorization: Bearer OryxRulezzz2026!!!" \
+  https://xray-oryx.onrender.com/api/v1/instrument-templates/cdb_cdi_generic/
+
+# Search templates
+curl -H "Authorization: Bearer OryxRulezzz2026!!!" \
+  "https://xray-oryx.onrender.com/api/v1/instrument-templates/?search=tesouro&instrument_kind=fixed_income"
+
+# Update instruction text
+curl -X PATCH \
+  -H "Authorization: Bearer OryxRulezzz2026!!!" \
+  -H "Content-Type: application/json" \
+  https://xray-oryx.onrender.com/api/v1/instrument-templates/cdb_cdi_generic/ \
+  -d '{"instructions_tax": "CDB is subject to the regressive IR table..."}'
+
+# Batch update instructions for an angle
+curl -X PATCH \
+  -H "Authorization: Bearer OryxRulezzz2026!!!" \
+  -H "Content-Type: application/json" \
+  https://xray-oryx.onrender.com/api/v1/batch/instructions/ \
+  -d '{"angle":"tax","updates":[{"table":"economic_exposure","code":"fi_cdi_br","text":"CDI tax..."}]}'
+
+# Process a portfolio
+curl -X POST \
+  -H "Authorization: Bearer OryxRulezzz2026!!!" \
+  -H "Content-Type: application/json" \
+  https://xray-oryx.onrender.com/api/v1/process/ \
+  -d '{"csv":"instrument_template_code,weight,expiry_date,issuer_code,issuer_type_code\ncdb_cdi_generic,0.40,2027-06-15,banco_btg_pactual_s_a,\ntesouro_selic_generic,0.30,2029-01-01,,\nequity_vale3,0.30,,,"}'
+
+# Health check
+curl -H "Authorization: Bearer OryxRulezzz2026!!!" \
+  https://xray-oryx.onrender.com/api/v1/health/references/

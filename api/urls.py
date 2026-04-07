@@ -4,7 +4,7 @@ from .views import (
     EconomicExposureViewSet, TaxProfileViewSet, IssuerTypeViewSet,
     IssuerViewSet, InstrumentTemplateViewSet,
     SchemaView, BatchInstructionView, ReferenceHealthView,
-    ProcessPortfolioView, ProcessPortfolioFullView,
+    ProcessPortfolioView, ProcessPortfolioFullView, LoadFixtureView,
 )
 
 router = DefaultRouter()
@@ -20,4 +20,5 @@ urlpatterns = [
     path('health/references/', ReferenceHealthView.as_view(), name='reference-health'),
     path('process/', ProcessPortfolioView.as_view(), name='process-portfolio'),
     path('process/zip/', ProcessPortfolioFullView.as_view(), name='process-portfolio-zip'),
+    path('admin/load-fixture/', LoadFixtureView.as_view(), name='load-fixture'),
 ] + router.urls
