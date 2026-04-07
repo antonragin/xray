@@ -16,8 +16,12 @@ class ResolvedPosition:
     instrument_kind: str
     short_name: str
 
+    # Display name (prefer long_name, fall back to short_name)
+    display_name: str = ''
+
     # Resolved references
-    tax_profile_code: str
+    tax_profile_code: str = ''
+    tax_profile_name: str = ''
     issuer_code: Optional[str] = None
     issuer_name: Optional[str] = None
     issuer_type_code: Optional[str] = None
@@ -66,7 +70,9 @@ def _resolve_single(row, upload_date, exposures, issuer_types):
         weight=weight,
         instrument_kind=template.instrument_kind,
         short_name=template.short_name,
+        display_name=template.long_name.strip() if template.long_name and template.long_name.strip() else template.short_name,
         tax_profile_code=template.tax_profile.tax_profile_code,
+        tax_profile_name=template.tax_profile.name,
     )
 
     # Template metadata
@@ -93,32 +99,33 @@ def _resolve_single(row, upload_date, exposures, issuer_types):
     if issuer:
         pos.issuer_type_code = issuer.issuer_type.issuer_type_code
         pos.issuer_type_name = issuer.issuer_type.name
-        pos.issuer_type_weights = [{'code': issuer.issuer_type.issuer_type_code, 'weight': 1.0}]
+        pos.issuer_type_weights = [{'code': issuer.issuer_type.issuer_type_code, 'name': issuer.issuer_type.name, 'weight': 1.0}]
     elif row.get('issuer_type_override'):
         it = row['issuer_type_override']
         pos.issuer_type_code = it.issuer_type_code
         pos.issuer_type_name = it.name
-        pos.issuer_type_weights = [{'code': it.issuer_type_code, 'weight': 1.0}]
+        pos.issuer_type_weights = [{'code': it.issuer_type_code, 'name': it.name, 'weight': 1.0}]
     elif template.primary_issuer_type_id:
         it = template.primary_issuer_type
         pos.issuer_type_code = it.issuer_type_code
         pos.issuer_type_name = it.name
-        pos.issuer_type_weights = [{'code': it.issuer_type_code, 'weight': 1.0}]
+        pos.issuer_type_weights = [{'code': it.issuer_type_code, 'name': it.name, 'weight': 1.0}]
     elif template.issuer_type_weights_json:
         pos.issuer_type_weights = [
-            {'code': code, 'weight': w}
+            {'code': code, 'name': issuer_types[code].name if code in issuer_types else code, 'weight': w}
             for code, w in sorted(template.issuer_type_weights_json.items(), key=lambda x: -x[1])
         ]
         if pos.issuer_type_weights:
             pos.issuer_type_code = pos.issuer_type_weights[0]['code']
+            pos.issuer_type_name = pos.issuer_type_weights[0].get('name', '')
 
     # 5. Resolve economic exposure
     if template.primary_economic_exposure_id:
         exp = template.primary_economic_exposure
-        pos.economic_exposures = [{'code': exp.exposure_code, 'weight': 1.0}]
+        pos.economic_exposures = [{'code': exp.exposure_code, 'name': exp.name, 'weight': 1.0}]
     elif template.economic_exposure_weights_json:
         pos.economic_exposures = [
-            {'code': code, 'weight': w}
+            {'code': code, 'name': exposures[code].name if code in exposures else code, 'weight': w}
             for code, w in sorted(template.economic_exposure_weights_json.items(), key=lambda x: -x[1])
         ]
 

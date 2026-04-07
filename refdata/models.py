@@ -34,6 +34,7 @@ class EconomicExposure(ReferenceBase):
         ('real_estate', 'Real Estate'),
         ('crypto', 'Crypto'),
         ('precious_metals', 'Precious Metals'),
+        ('undetermined', 'Undetermined'),
     ]
     exposure_code = models.CharField(max_length=64, unique=True)
     name = models.CharField(max_length=255)

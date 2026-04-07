@@ -58,10 +58,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 {% for alloc_name, alloc_data in allocations.items %}
 <h2>{{ alloc_name|title }}</h2>
 <table>
-  <thead><tr><th>Code</th><th class="pct">Weight</th><th class="pct">%</th></tr></thead>
+  <thead><tr><th>Name</th><th>Code</th><th class="pct">Weight</th><th class="pct">%</th></tr></thead>
   <tbody>
   {% for row in alloc_data %}
-  <tr><td>{{ row.code }}</td><td class="pct">{{ row.weight }}</td><td class="pct">{{ row.pct }}%</td></tr>
+  <tr><td>{{ row.name }}</td><td><code>{{ row.code }}</code></td><td class="pct">{{ row.weight }}</td><td class="pct">{{ row.pct }}%</td></tr>
   {% endfor %}
   </tbody>
 </table>
@@ -75,17 +75,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <h2>Unrolled Positions</h2>
 <table>
   <thead>
-    <tr><th>#</th><th>Template</th><th>Kind</th><th>Weight</th><th>Issuer</th><th>Exposure</th><th>Maturity</th></tr>
+    <tr><th>#</th><th>Name</th><th>Code</th><th>Kind</th><th>Weight</th><th>Issuer</th><th>Exposure</th><th>Tax</th><th>Maturity</th></tr>
   </thead>
   <tbody>
   {% for pos in positions %}
   <tr>
     <td>{{ pos.row_number }}</td>
-    <td>{{ pos.template_code }}</td>
+    <td>{{ pos.display_name }}</td>
+    <td><code>{{ pos.template_code }}</code></td>
     <td>{{ pos.instrument_kind }}</td>
     <td class="pct">{{ pos.weight }}</td>
-    <td>{{ pos.issuer_code|default:"—" }}</td>
+    <td>{{ pos.issuer_name|default:"—" }}{% if pos.issuer_code %} <small>({{ pos.issuer_code }})</small>{% endif %}</td>
     <td>{{ pos.exposure_display }}</td>
+    <td>{{ pos.tax_profile_name|default:"—" }}</td>
     <td>{{ pos.maturity_bucket|default:"—" }}</td>
   </tr>
   {% endfor %}
@@ -94,7 +96,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
 {% for pos in positions %}
 <details>
-  <summary>Row {{ pos.row_number }}: {{ pos.template_code }} — Instructions</summary>
+  <summary>Row {{ pos.row_number }}: {{ pos.display_name }} ({{ pos.template_code }}) — Instructions</summary>
   {% for angle, sources in pos.instructions.items %}
   {% if sources %}
   <h4>{{ angle|title }}</h4>
@@ -125,22 +127,29 @@ def generate_html_preview(run_id, upload_date, validation, positions, allocation
     for name, data in allocations.items():
         display_name = name.replace('by_', '').replace('_', ' ')
         alloc_display[display_name] = [
-            {'code': d['code'], 'weight': f"{d['weight']:.4f}", 'pct': f"{d['weight'] * 100:.1f}"}
+            {'code': d['code'], 'name': d.get('name', d['code']),
+             'weight': f"{d['weight']:.4f}", 'pct': f"{d['weight'] * 100:.1f}"}
             for d in data
         ]
 
     # Prepare positions for display
     pos_display = []
     for p in positions:
-        exp_codes = ', '.join(f"{e['code']}({e['weight']:.0%})" if e['weight'] < 1 else e['code']
-                              for e in p.economic_exposures)
+        exp_display = ', '.join(
+            f"{e.get('name', e['code'])}({e['weight']:.0%})" if e['weight'] < 1
+            else e.get('name', e['code'])
+            for e in p.economic_exposures
+        )
         pos_display.append({
             'row_number': p.row_number,
             'template_code': p.template_code,
+            'display_name': p.display_name,
             'instrument_kind': p.instrument_kind,
             'weight': f"{float(p.weight):.4f}",
             'issuer_code': p.issuer_code,
-            'exposure_display': exp_codes,
+            'issuer_name': p.issuer_name,
+            'exposure_display': exp_display,
+            'tax_profile_name': p.tax_profile_name,
             'maturity_bucket': p.maturity_bucket,
             'instructions': p.instructions,
         })

@@ -109,8 +109,9 @@ def _unrolled_csv(positions):
     out = io.StringIO()
     writer = csv.writer(out)
     header = [
-        'row_number', 'template_code', 'weight', 'instrument_kind',
-        'tax_profile_code', 'issuer_code', 'issuer_type_code',
+        'row_number', 'template_code', 'display_name', 'weight', 'instrument_kind',
+        'tax_profile_code', 'tax_profile_name',
+        'issuer_code', 'issuer_name', 'issuer_type_code', 'issuer_type_name',
         'economic_exposures', 'expiry_date', 'days_to_expiry',
         'years_to_expiry', 'maturity_bucket', 'country_bucket',
         'instructions_diversification', 'instructions_liquidity',
@@ -119,10 +120,16 @@ def _unrolled_csv(positions):
     ]
     writer.writerow(header)
     for p in positions:
-        exp_str = '; '.join(f"{e['code']}:{e['weight']}" for e in p.economic_exposures)
+        exp_str = '; '.join(
+            f"{e['code']}({e.get('name', e['code'])}):{e['weight']}"
+            for e in p.economic_exposures
+        )
         writer.writerow([
-            p.row_number, p.template_code, f"{float(p.weight):.6f}", p.instrument_kind,
-            p.tax_profile_code, p.issuer_code or '', p.issuer_type_code or '',
+            p.row_number, p.template_code, p.display_name, f"{float(p.weight):.6f}",
+            p.instrument_kind,
+            p.tax_profile_code, p.tax_profile_name,
+            p.issuer_code or '', p.issuer_name or '',
+            p.issuer_type_code or '', p.issuer_type_name or '',
             exp_str, p.expiry_date or '', p.days_to_expiry or '',
             p.years_to_expiry or '', p.maturity_bucket or '', p.country_bucket or '',
             flatten_instructions(p.instructions.get('diversification', [])),
@@ -147,9 +154,13 @@ def _unrolled_json(positions):
             'resolved': {
                 'instrument_kind': p.instrument_kind,
                 'short_name': p.short_name,
+                'display_name': p.display_name,
                 'tax_profile_code': p.tax_profile_code,
+                'tax_profile_name': p.tax_profile_name,
                 'issuer_code': p.issuer_code,
+                'issuer_name': p.issuer_name,
                 'issuer_type_code': p.issuer_type_code,
+                'issuer_type_name': p.issuer_type_name,
                 'economic_exposures': p.economic_exposures,
                 'issuer_type_weights': p.issuer_type_weights,
             },
@@ -169,9 +180,9 @@ def _unrolled_json(positions):
 def _allocation_csv(alloc_data):
     out = io.StringIO()
     writer = csv.writer(out)
-    writer.writerow(['code', 'weight', 'pct'])
+    writer.writerow(['code', 'name', 'weight', 'pct'])
     for d in alloc_data:
-        writer.writerow([d['code'], f"{d['weight']:.6f}", f"{d['weight'] * 100:.2f}"])
+        writer.writerow([d['code'], d.get('name', d['code']), f"{d['weight']:.6f}", f"{d['weight'] * 100:.2f}"])
     return out.getvalue()
 
 
@@ -180,7 +191,7 @@ def _angle_csv(positions, angle):
     out = io.StringIO()
     writer = csv.writer(out)
 
-    base_cols = ['row_number', 'template_code', 'weight', 'instrument_kind']
+    base_cols = ['row_number', 'template_code', 'display_name', 'weight', 'instrument_kind']
 
     if angle == 'diversification':
         extra_cols = ['issuer_code', 'issuer_type_code', 'economic_exposures', 'country_bucket']
@@ -201,7 +212,7 @@ def _angle_csv(positions, angle):
     writer.writerow(header)
 
     for p in positions:
-        row = [p.row_number, p.template_code, f"{float(p.weight):.6f}", p.instrument_kind]
+        row = [p.row_number, p.template_code, p.display_name, f"{float(p.weight):.6f}", p.instrument_kind]
 
         for col in extra_cols:
             if col == 'economic_exposures':
