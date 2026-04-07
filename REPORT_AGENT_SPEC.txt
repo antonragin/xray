@@ -1,0 +1,516 @@
+================================================================================
+REPORT AGENT SPECIFICATION
+================================================================================
+Version: 1.0
+Date: 2026-04-07
+System: Portfolio X-Ray Report Generator Agent
+
+================================================================================
+1. PURPOSE
+================================================================================
+
+Build 6 independent report services — one per analysis angle — that take a
+Portfolio X-Ray precursor as input and produce a polished HTML client report
+as output. Each service makes exactly ONE call to an AI advisor (Cloe or Diana)
+to assemble the final report.
+
+The services are developed iteratively: 10 rounds per angle, 2 advisor calls
+per round (one to generate/improve the service, one to review), across all
+6 angles = 120 advisor calls total.
+
+================================================================================
+2. INVESTMENT PHILOSOPHY (HARD CONSTRAINT)
+================================================================================
+
+All reports MUST conform to the passive wealth management philosophy:
+
+REQUIRED:
+  - Analyze what the client CURRENTLY holds and its structural characteristics
+  - Discuss diversification, concentration, risk exposure, fee impact, tax
+    efficiency, and performance drivers as they ARE, not as they SHOULD BE
+  - Frame observations in terms of portfolio theory (modern portfolio theory,
+    efficient frontier concepts, systematic vs idiosyncratic risk)
+  - Present factual data: allocations, coverage, maturity profiles, fee totals
+  - Identify structural risks (concentration, liquidity mismatches, tax
+    inefficiency) without recommending specific trades
+  - Use hedging language: "the portfolio exhibits", "this allocation implies",
+    "concentration in X represents Y% of total"
+
+STRICTLY PROHIBITED:
+  - Recommending specific securities to buy or sell
+  - Suggesting the client can "beat the market" or achieve alpha
+  - Stock picking, market timing, or tactical allocation suggestions
+  - Speculative statements about future returns, prices, or market direction
+  - Inventing specific numbers (returns, yields, volatilities) not in the data
+  - Claiming one asset class will outperform another
+  - Any language implying active management superiority
+
+PHILOSOPHY SUMMARY:
+  The advisor believes in market efficiency. The role is to ensure the client's
+  portfolio is well-structured (diversified, tax-efficient, cost-conscious,
+  risk-appropriate) — NOT to pick winners. Think: Vanguard advisor, not hedge
+  fund pitch.
+
+================================================================================
+3. ARCHITECTURE
+================================================================================
+
+3.1 DIRECTORY STRUCTURE
+
+  report_services/
+    diversification/
+      service.py          — the report generator
+      templates/
+        report.html       — Jinja2/Django HTML template
+      config.json         — advisor choice (Cloe/Diana), prompt template
+      iterations/
+        round_01/
+          advisor_suggestion.txt
+          changes_applied.txt
+        round_02/
+          ...
+    liquidity/
+      (same structure)
+    fees/
+      (same structure)
+    tax/
+      (same structure)
+    risk/
+      (same structure)
+    performance/
+      (same structure)
+    common/
+      base_template.html  — shared HTML/CSS base
+      utils.py            — shared utilities
+    generated_reports/
+      victor/
+        diversification.html
+        liquidity.html
+        fees.html
+        tax.html
+        risk.html
+        performance.html
+      william/
+        (same)
+      safiri/
+        (same)
+      ... (all clients)
+
+3.2 REPORT SERVICE INTERFACE
+
+Each service.py MUST implement:
+
+  def generate_report(precursor: dict, angle: str, client_name: str) -> str:
+      """
+      Args:
+          precursor: the full JSON response from POST /api/v1/process/
+                     (contains bundle, angles, validation, run_id)
+          angle: one of diversification/liquidity/fees/tax/risk/performance
+          client_name: for display purposes
+
+      Returns:
+          HTML string — the complete, self-contained client report for this angle
+      """
+
+Inside this function, there is EXACTLY ONE call to an AI advisor (Cloe or Diana)
+via the AdvisorBridge API. The call sends:
+
+  1. The angle-specific precursor data (from precursor['angles'][angle])
+  2. The portfolio summary and allocations (from precursor['bundle'])
+  3. The system prompt assembled from instructions_* fields collected in the
+     precursor (these come from all 5 reference tables)
+  4. A fixed report generation prompt specific to this angle
+
+The advisor returns the narrative text, which the service formats into the
+HTML template.
+
+3.3 DATA FLOW
+
+  Client CSV
+      ↓
+  X-Ray API (POST /api/v1/process/)
+      ↓
+  Precursor JSON (bundle + angles + instructions)
+      ↓
+  Report Service (service.py)
+      ↓ [exactly 1 advisor call]
+  Final HTML Report
+
+================================================================================
+4. X-RAY SERVICE API REFERENCE
+================================================================================
+
+Base URL: https://xray-oryx.onrender.com
+Auth: Authorization: Bearer OryxRulezzz2026!!!
+
+4.1 PROCESS PORTFOLIO
+  POST /api/v1/process/
+  Body: {"csv": "instrument_template_code,weight,...\n..."}
+  Returns: {run_id, validation, bundle, angles}
+
+  The 'bundle' contains:
+    - portfolio_summary (row_count, coverage metrics)
+    - allocations (by exposure, issuer type, issuer, instrument kind, etc.)
+    - positions (each with resolved data, derived fields, and instructions)
+
+  The 'angles' contains:
+    - One entry per angle, each with position-level data + instructions
+
+4.2 READ DB STATE (for instructions review)
+  GET /api/v1/instrument-templates/?page_size=200
+  GET /api/v1/economic-exposures/
+  GET /api/v1/tax-profiles/
+  GET /api/v1/issuer-types/
+  GET /api/v1/issuers/?page_size=200
+
+4.3 UPDATE INSTRUCTIONS (the only X-Ray mutation allowed)
+  PATCH /api/v1/batch/instructions/
+  Body: {"angle": "<angle>", "updates": [{"table": "...", "code": "...", "text": "..."}]}
+
+  OR individual PATCH:
+  PATCH /api/v1/instrument-templates/{code}/
+  Body: {"instructions_<angle>": "new text"}
+
+================================================================================
+5. ADVISORBRIDGE API
+================================================================================
+
+Base URL: http://127.0.0.1:3210 (local only, no auth needed)
+
+Available advisors:
+  - Cloe: OpenAI gpt-5.4, web search + code interpreter, max reasoning
+  - Diana: Google Gemini 3.1 Pro, Google Search + code execution, max reasoning
+
+Submit:
+  POST /v1/jobs
+  Body: {"advisor": "Cloe", "request": {"raw": "...", "redacted": "short label"}}
+  Returns: {"job_id": "..."}
+
+Poll:
+  GET /v1/jobs/{job_id}
+  Check status field: running → succeeded | failed
+
+Retrieve:
+  GET /v1/jobs/{job_id}/response
+  Returns: {"payload": "advisor response text"}
+
+IMPORTANT: Each call is stateless. Include ALL context in each call.
+
+================================================================================
+6. CLIENT PORTFOLIOS
+================================================================================
+
+Located in: /srv/drop/work/xray/client_portfolios/*.csv
+Already prepared for: victor.csv, william.csv, safiri.csv
+
+The agent MUST also prepare CSVs for ALL other clients from the raw position
+files at /srv/drop/work/xray/real_positions.xlsx and real_positions2.xlsx.
+
+The mapping logic from raw positions to template codes is documented in the
+existing code at the top of this specification's companion codebase. Key rules:
+
+  - Produto + Estratégia → template_code (see mapping table in final plan)
+  - Valor Bruto → weight (normalized to sum to 1.0)
+  - Vencimento → expiry_date (YYYY-MM-DD)
+  - Emissor → issuer_code (snake_case normalized)
+  - Skip: Conta Corrente, Dividendos, Juros s/ Capital, derivatives
+
+================================================================================
+7. ITERATION PROTOCOL (PER ANGLE)
+================================================================================
+
+For each angle (diversification, liquidity, fees, tax, risk, performance):
+
+ROUND 1 (Bootstrap):
+
+  Step 1: Generate precursors
+    - Run all client portfolios through POST /api/v1/process/
+    - Extract the angle-specific data for each client
+    - Save as reference data
+
+  Step 2: Build initial report service
+    - Create service.py with:
+      * A system prompt for the advisor call
+      * An HTML template for the report
+      * Logic to extract relevant data from the precursor
+      * Exactly ONE advisor call (Cloe or Diana)
+    - The system prompt should incorporate the instructions_* text from
+      the precursor (these guide the advisor on what to say)
+
+  Step 3: Generate initial reports
+    - Run the service on all client portfolios
+    - Save HTML reports to generated_reports/{client}/{angle}.html
+
+  Step 4: Submit for review (ADVISOR CALL 1 of 2)
+    Submit to Diana or Cloe (alternate from the one used in the service):
+    - The full precursor for 2-3 representative clients
+    - The full X-Ray DB state (instructions for this angle)
+    - The generated HTML reports for those clients
+    - The complete service.py and template code
+
+    Ask:
+    "Review this {angle} report service. The reports are generated for
+    Brazilian investment portfolios by a passive wealth management firm.
+
+    Evaluate:
+    1. Report quality: Is the analysis insightful and accurate?
+    2. Report structure: Is the HTML well-organized and readable?
+    3. Instruction text quality: Are the instructions_* fields in the X-Ray
+       DB providing good guidance to the advisor call?
+    4. Missing insights: What portfolio theory concepts should be covered
+       but aren't?
+    5. Anti-hallucination: Does the report avoid speculative claims?
+    6. Brazilian specifics: Are BR market conventions correctly applied?
+
+    Provide specific, actionable suggestions. For instruction text changes,
+    provide the exact text to write to the DB."
+
+  Step 5: Implement improvements (ADVISOR CALL 2 of 2)
+    Submit the review suggestions to the other advisor:
+    - Previous advisor's suggestions
+    - Current service code
+    - Current instructions_* text
+    - Ask: "Implement these improvements. Return:
+      (a) Updated service.py code
+      (b) Updated HTML template
+      (c) Updated instructions_* text for any records that need it
+      (d) Explain what you changed and why"
+
+  Step 6: Apply changes
+    - Update service.py and template
+    - Update instructions_* fields via PATCH /api/v1/batch/instructions/
+    - Regenerate reports for all clients
+    - Save iteration artifacts to iterations/round_01/
+
+ROUNDS 2-10 (Refinement):
+
+  Repeat Steps 3-6 with these additions:
+  - Include the PREVIOUS round's reports for comparison
+  - Include the PREVIOUS advisor suggestions and what was implemented
+  - Focus the review on: "What improved? What still needs work?"
+  - As rounds progress, shift focus from structural issues to polish:
+    * Rounds 2-4: Fix structural problems, missing analysis, bad framing
+    * Rounds 5-7: Improve depth, nuance, Brazilian-specific insights
+    * Rounds 8-10: Polish presentation, consistency, anti-hallucination
+
+================================================================================
+8. REPORT CONTENT GUIDELINES (PER ANGLE)
+================================================================================
+
+8.1 DIVERSIFICATION REPORT
+  Must cover:
+    - Economic exposure allocation (with names: "CDI Brazil 30%", not codes)
+    - Exposure group distribution (Fixed Income vs Equity vs Real Estate vs ...)
+    - Issuer concentration (top issuers by weight, coverage gaps)
+    - Issuer type distribution (banks vs government vs corporate)
+    - Country split (Brazil vs international)
+    - Instrument kind distribution (listed vs fixed income vs fund)
+    - Concentration metrics where applicable
+    - FGC coverage analysis (what % is guaranteed)
+  Must NOT cover:
+    - "You should diversify into X" (prohibited)
+    - Specific fund or stock recommendations
+
+8.2 LIQUIDITY REPORT
+  Must cover:
+    - Maturity profile (bucket distribution for fixed income)
+    - Weighted average maturity for dated instruments
+    - Percentage in liquid vs illiquid instruments
+    - FGC-covered percentage
+    - Instruments with lockup periods (LCI/LCA carência)
+    - Fund redemption characteristics (where known from instructions)
+    - Listed vs unlisted split (exchange-tradeable portion)
+  Must NOT cover:
+    - "You should increase liquidity" (prohibited)
+
+8.3 FEES REPORT
+  Must cover:
+    - Weighted average portfolio fee (where data available)
+    - Fee distribution by instrument type
+    - High-fee outliers
+    - Fee-free instruments and their trade-offs
+    - Come-cotas as implicit fee (for general tax profile funds)
+    - Comparison of fee levels to typical ranges (from instructions)
+  Must NOT cover:
+    - "Switch to cheaper fund X" (prohibited)
+
+8.4 TAX REPORT
+  Must cover:
+    - Tax profile distribution (general/exempt/no-come-cotas/previdência)
+    - IR regressive table implications for fixed income by maturity
+    - Come-cotas impact on general-profile funds
+    - Tax-exempt allocation and potential behavioral bias
+    - IOF risk for short-term positions (< 30 days)
+    - Previdência allocation and basic tax treatment
+  Must NOT cover:
+    - Specific tax optimization strategies (prohibited)
+    - "Move assets to tax-exempt" (prohibited)
+
+8.5 RISK REPORT
+  Must cover:
+    - Interest rate risk (CDI/Selic exposure, prefixado duration risk)
+    - Inflation risk (IPCA-linked allocation)
+    - Credit risk (issuer type distribution, FGC coverage)
+    - Currency risk (international exposure, USD-linked instruments)
+    - Concentration risk (single-issuer, single-type)
+    - Crypto/alternative exposure and volatility characteristics
+    - Mark-to-market risk for Tesouro Direto and prefixado
+  Must NOT cover:
+    - Specific VaR numbers or volatility estimates (not in data)
+    - "Reduce risk by selling X" (prohibited)
+
+8.6 PERFORMANCE REPORT
+  Must cover:
+    - Return driver identification (CDI, IPCA+spread, equity market, RE income)
+    - Exposure to different return regimes
+    - Maturity-adjusted return context for fixed income
+    - Fee drag on returns
+    - Tax drag on returns (come-cotas, IR brackets)
+    - What the portfolio is "betting on" structurally
+  Must NOT cover:
+    - Specific return numbers or projections (prohibited)
+    - "This will return X%" (prohibited)
+    - Past performance of specific instruments (not in data)
+
+================================================================================
+9. HTML REPORT FORMAT
+================================================================================
+
+Each report should be a self-contained HTML file with:
+
+  - Clean, professional design (suitable for a wealth management client)
+  - Client name and date at the top
+  - Executive summary (3-5 sentences)
+  - Data tables with allocations (names + codes + percentages)
+  - Key metrics cards (similar to the X-Ray preview)
+  - Narrative analysis sections (from the advisor call)
+  - Charts if applicable (embedded SVG from precursor, or generated)
+  - Disclaimers at the bottom:
+    * "This report is for informational purposes only"
+    * "It does not constitute investment advice"
+    * "Past performance is not indicative of future results"
+    * "Consult your financial advisor before making investment decisions"
+
+  CSS should be inline (self-contained HTML, no external dependencies).
+  Design should feel like a premium financial report, not a tech dashboard.
+
+================================================================================
+10. INSTRUCTION TEXT MANAGEMENT
+================================================================================
+
+The instructions_* fields in the X-Ray DB are the ONLY part of the X-Ray
+service that the report agent is allowed to modify. These fields guide the
+advisor call inside each report service.
+
+There are 6 instruction fields per record, one per angle:
+  instructions_diversification
+  instructions_liquidity
+  instructions_fees
+  instructions_tax
+  instructions_risk
+  instructions_performance
+
+Across 5 tables:
+  economic_exposure (13 rows)
+  tax_profile (4 rows)
+  issuer_type (6 rows)
+  issuer (212 rows — focus on the most common ones)
+  instrument_template (242 rows — focus on generic templates + common funds)
+
+The instruction text should tell the advisor:
+  - What context this record provides for the analysis
+  - What the downstream advisor should say about positions linked to this record
+  - What the advisor should NOT say (guardrails)
+  - Brazilian-specific details relevant to this angle
+
+Example for economic_exposure.fi_cdi_br, instructions_diversification:
+  "[Scope] Brazilian local-currency fixed income indexed to CDI/Selic post-fixed
+  rates. [Use for] Assess how much of the portfolio depends on Brazilian
+  short-rate and carry conditions. [Interpret carefully] Multiple positions
+  can be economically similar here even if they differ by issuer, tax wrapper,
+  or fund vehicle. [Do not infer] Do not assume duration, guarantee coverage,
+  or credit quality beyond the explicit position data."
+
+================================================================================
+11. EXECUTION PLAN
+================================================================================
+
+Phase 1: Preparation
+  - Generate CSVs for ALL clients (not just the 3 already done)
+  - Run all through X-Ray API
+  - Verify all process successfully
+  - Store precursors for reference
+
+Phase 2: Angle iteration (repeat for each of 6 angles)
+  For rounds 1-10:
+    - Advisor Call A: Review current state → get suggestions
+    - Advisor Call B: Implement suggestions → get updated code/instructions
+    - Apply changes to service code and X-Ray instructions
+    - Regenerate all client reports
+    - Save iteration artifacts
+
+Phase 3: Final validation
+  - Run all 6 services on all client portfolios
+  - Verify all reports generate without errors
+  - Spot-check quality on 3-5 representative clients
+
+Total advisor calls: 6 angles × 10 rounds × 2 calls = 120 calls
+
+Estimated time per call: 2-5 minutes (Cloe/Diana thinking time)
+Estimated total: 4-10 hours of advisor time
+Budget: spread across Cloe and Diana to balance load
+
+================================================================================
+12. ADVISOR SELECTION STRATEGY
+================================================================================
+
+For the advisor call INSIDE each report service (the one that generates the
+actual report narrative):
+
+  diversification → Cloe (stronger on structured analysis)
+  liquidity       → Diana (stronger on Brazilian market specifics)
+  fees            → Cloe (stronger on quantitative analysis)
+  tax             → Diana (stronger on Brazilian tax specifics via Google Search)
+  risk            → Cloe (stronger on risk framework analysis)
+  performance     → Diana (stronger on Brazilian benchmark context)
+
+For the review/improvement advisor calls:
+  Alternate: if the service uses Cloe, review with Diana, and vice versa.
+  This ensures both perspectives are represented.
+
+================================================================================
+13. SUCCESS CRITERIA
+================================================================================
+
+After 10 rounds, each report service should:
+
+  1. Generate without errors for all client portfolios
+  2. Produce reports that a CPA-20 certified Brazilian advisor would find
+     credible and useful
+  3. Contain NO speculative claims or specific return projections
+  4. Correctly apply Brazilian tax, regulatory, and market conventions
+  5. Present data clearly with professional formatting
+  6. Include proper disclaimers
+  7. Run in under 60 seconds per client (mostly advisor call latency)
+  8. Have well-tuned instruction text in the X-Ray DB that guides the
+     advisor call effectively
+
+================================================================================
+14. CONSTRAINTS AND HARD RULES
+================================================================================
+
+  1. Each report service makes EXACTLY ONE advisor call. Not zero, not two.
+  2. The X-Ray processing engine code MUST NOT be modified. Only the
+     instructions_* DB fields may be changed.
+  3. No investment recommendations. No "buy X", "sell Y", "rebalance to Z".
+  4. No invented numbers. All quantities must come from the precursor data.
+  5. The agent must use the X-Ray API (not import processing code directly)
+     to generate precursors. This validates the API works correctly.
+  6. Reports must be self-contained HTML (no external CSS/JS dependencies).
+  7. The agent must process ALL client portfolios, not just the 3 examples.
+  8. Each iteration must be saved (code + suggestions + changes) for audit.
+  9. The advisor inside the report service receives instructions_* text as
+     part of its prompt — these instructions are the primary lever for
+     improving report quality.
+  10. Advisor calls for review/improvement are stateless — include full
+      context each time (code, instructions, sample reports, precursor).
