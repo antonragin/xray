@@ -1,0 +1,551 @@
+================================================================================
+PORTFOLIO X-RAY — DB POPULATION PLAN (FINAL)
+================================================================================
+Date: 2026-04-07
+Based on: 1,231 positions from 2 real client brokerage exports
+Advisors consulted: Cloe (gpt-5.4), Diana (Gemini 3.1 Pro), Alice (gpt-5.4-pro)
+
+================================================================================
+1. SCHEMA CHANGES
+================================================================================
+
+1.1 New exposure_group value: precious_metals
+    Add to CHECK constraint (currently: fixed_income, equity, real_estate, crypto).
+
+1.2 New economic_exposure rows (3):
+
+    exposure_code      | name                     | exposure_group
+    -------------------|--------------------------|----------------
+    gold               | Gold                     | precious_metals
+    silver             | Silver                   | precious_metals
+    fi_usd_br          | FI USD Brazil            | fixed_income
+
+1.3 Updated economic_exposure table (12 rows total):
+
+    exposure_code      | name                          | exposure_group
+    -------------------|-------------------------------|----------------
+    fi_cdi_br          | CDI Brazil                    | fixed_income
+    fi_ipca_br         | IPCA Brazil                   | fixed_income
+    fi_prefixado_br    | Prefixado Brazil              | fixed_income
+    fi_international   | Fixed Income International    | fixed_income
+    fi_usd_br          | FI USD Brazil                 | fixed_income
+    eq_br              | Equity Brazil                 | equity
+    eq_international   | Equity International          | equity
+    re_br              | Real Estate Brazil            | real_estate
+    re_international   | Real Estate International     | real_estate
+    crypto             | Crypto                        | crypto
+    gold               | Gold                          | precious_metals
+    silver             | Silver                        | precious_metals
+
+1.4 No changes to tax_profile (4 rows) or issuer_type (6 rows).
+
+================================================================================
+2. EXCLUSIONS
+================================================================================
+
+NOT modeled as instrument_templates:
+  - Conta Corrente (125 pos) — cash, not an investment position
+  - Dividendos (12 pos) — receivables, not positions
+  - Juros s/ Capital (22 pos) — receivables, not positions
+  - MOVI1, AZUL12, AZUL14, AZUL16, BMGB10 — derivatives (rights/receipts)
+  - LIQ BOLSA / VENDA entries — settlement events
+
+================================================================================
+3. INSTRUMENT TEMPLATES — COMPLETE CATALOG
+================================================================================
+
+Legend:
+  ECON = primary_economic_exposure_code
+  TAX  = tax_profile_code
+  IT   = primary_issuer_type_code
+  EXPD = requires_expiry_date
+  ISS  = requires_issuer_or_issuer_type
+  FGC  = has_fgc
+  B3   = b3_listed
+  BDR  = is_bdr
+
+---------------------------------------------------------------------------
+3.1 TESOURO DIRETO / GOVERNMENT BONDS (5 templates)
+---------------------------------------------------------------------------
+All: kind=fixed_income, TAX=general, IT=br_government, ISS=false, FGC=false,
+     B3=false, BDR=false. Default issuer=tesouro_nacional on all.
+
+template_code                  | short_name                | ECON           | EXPD
+-------------------------------|---------------------------|----------------|----
+tesouro_selic_generic          | Tesouro Selic (LFT)       | fi_cdi_br      | yes
+tesouro_ipca_principal_generic | Tesouro IPCA+ Principal   | fi_ipca_br     | yes
+tesouro_ipca_juros_generic     | Tesouro IPCA+ com Juros   | fi_ipca_br     | yes
+tesouro_prefixado_generic      | Tesouro Prefixado (LTN)   | fi_prefixado_br| yes
+tesouro_ntnf_generic           | Tesouro NTN-F             | fi_prefixado_br| yes
+
+Covers: TESOURO DIRETO - LFT (35), NTN-B-P (39), NTN-B (3+1), LTN (3),
+        NTN-B secondary (68), NTN-F (2), LFT secondary (1).
+
+---------------------------------------------------------------------------
+3.2 BANK DEPOSITS (10 templates)
+---------------------------------------------------------------------------
+All: kind=fixed_income, IT=br_bank, ISS=true, B3=false, BDR=false.
+
+template_code          | short_name     | ECON           | TAX         | EXPD| FGC
+-----------------------|----------------|----------------|-------------|-----|-----
+cdb_cdi_generic        | CDB CDI        | fi_cdi_br      | general     | yes | yes
+cdb_ipca_generic       | CDB IPCA+      | fi_ipca_br     | general     | yes | yes
+cdb_pre_generic        | CDB Prefixado  | fi_prefixado_br| general     | yes | yes
+lci_cdi_generic        | LCI CDI        | fi_cdi_br      | tax_exempt  | yes | yes
+lci_ipca_generic       | LCI IPCA+      | fi_ipca_br     | tax_exempt  | yes | yes
+lci_pre_generic        | LCI Prefixado  | fi_prefixado_br| tax_exempt  | yes | yes
+lca_cdi_generic        | LCA CDI        | fi_cdi_br      | tax_exempt  | yes | yes
+lca_pre_generic        | LCA Prefixado  | fi_prefixado_br| tax_exempt  | yes | yes
+compromissada_generic  | Compromissada  | fi_cdi_br      | general     | yes | no
+cdie_pre_generic       | CDIE Prefixado | fi_prefixado_br| general     | yes | yes
+
+Covers: CDB (56), LCI (9), LCA (17), COMPROMISSADA (7), CDIE (3).
+
+---------------------------------------------------------------------------
+3.3 PRIVATE CREDIT (14 templates)
+---------------------------------------------------------------------------
+All: kind=fixed_income, ISS=true, B3=false, BDR=false, FGC=false.
+
+template_code                    | short_name                     | ECON           | TAX        | IT
+---------------------------------|--------------------------------|----------------|------------|---
+cra_cdi_generic                  | CRA CDI                        | fi_cdi_br      | tax_exempt | br_other
+cra_ipca_generic                 | CRA IPCA+                      | fi_ipca_br     | tax_exempt | br_other
+cra_pre_generic                  | CRA Prefixado                  | fi_prefixado_br| tax_exempt | br_other
+cri_cdi_generic                  | CRI CDI                        | fi_cdi_br      | tax_exempt | br_other
+cri_ipca_generic                 | CRI IPCA+                      | fi_ipca_br     | tax_exempt | br_other
+cri_pre_generic                  | CRI Prefixado                  | fi_prefixado_br| tax_exempt | br_other
+cdca_cdi_generic                 | CDCA CDI                       | fi_cdi_br      | tax_exempt | br_other
+cdca_ipca_generic                | CDCA IPCA+                     | fi_ipca_br     | tax_exempt | br_other
+debenture_cdi_incentivada        | Debênture Incentivada CDI      | fi_cdi_br      | tax_exempt | br_other
+debenture_ipca_incentivada       | Debênture Incentivada IPCA+    | fi_ipca_br     | tax_exempt | br_other
+debenture_pre_incentivada        | Debênture Incentivada Pré      | fi_prefixado_br| tax_exempt | br_other
+debenture_cdi_regular            | Debênture Regular CDI          | fi_cdi_br      | general    | br_other
+debenture_ipca_regular           | Debênture Regular IPCA+        | fi_ipca_br     | general    | br_other
+debenture_pre_regular            | Debênture Regular Pré          | fi_prefixado_br| general    | br_other
+
+Note: Incentivada vs regular distinguished by IR=0 in source data.
+
+Covers: CRA (150), CRI (44), CDCA (14), Debênture (124).
+
+---------------------------------------------------------------------------
+3.4 OTHER GENERIC (3 templates)
+---------------------------------------------------------------------------
+
+template_code                | kind         | short_name              | ECON             | TAX                  | notes
+-----------------------------|--------------|-------------------------|------------------|----------------------|------
+coe_generic                  | other        | COE                     | eq_international | general              | ISS=true, EXPD=true, IT=br_bank
+lfsn_generic                 | fixed_income | Letra Financeira Sub.   | fi_cdi_br        | general              | ISS=true, EXPD=true, IT=br_bank, FGC=false
+equity_br_listed_generic     | listed       | Ação BR (genérica)      | eq_br            | taxable_no_come_cotas| fallback for unseen tickers
+bdr_equity_listed_generic    | listed       | BDR (genérico)          | eq_international | taxable_no_come_cotas| fallback, is_bdr=true
+
+---------------------------------------------------------------------------
+3.5 ETFs (6 templates)
+---------------------------------------------------------------------------
+All: kind=listed, ISS=false, EXPD=false, FGC=false, B3=true, BDR=false.
+
+template_code  | short_name                  | ECON             | TAX
+---------------|-----------------------------|--------------------|----------------------
+etf_bova11     | BOVA11 Ibovespa ETF         | eq_br              | taxable_no_come_cotas
+etf_ivvb11     | IVVB11 S&P 500 ETF          | eq_international   | taxable_no_come_cotas
+etf_ustk11     | USTK11 US Tech ETF          | eq_international   | taxable_no_come_cotas
+etf_gold11     | GOLD11 Gold ETF             | gold               | taxable_no_come_cotas
+etf_b5p211     | B5P211 IPCA+ FI ETF         | fi_ipca_br         | taxable_no_come_cotas
+etf_debb11     | DEBB11 Debenture ETF        | fi_cdi_br          | taxable_no_come_cotas
+
+---------------------------------------------------------------------------
+3.6 FIIs (40 templates)
+---------------------------------------------------------------------------
+All: kind=listed, TAX=taxable_no_come_cotas, ISS=false, EXPD=false,
+     FGC=false, B3=true, BDR=false.
+
+Exposure mapping:
+  re_br       → tijolo / hybrid FIIs (malls, logistics, offices, residential)
+  fi_cdi_br   → papel FIIs indexed to CDI
+  fi_ipca_br  → papel FIIs indexed to IPCA
+  fi_usd_br   → KDOL11 (USD-denominated agro credit)
+
+template_code  | short_name     | ECON
+---------------|----------------|----------------
+fii_arri11     | ARRI11         | re_br
+fii_brco11     | BRCO11         | re_br
+fii_brcr11     | BRCR11         | re_br
+fii_btci11     | BTCI11         | fi_cdi_br
+fii_btlg11     | BTLG11         | re_br
+fii_bthf11     | BTHF11         | re_br
+fii_cacr11     | CACR11         | fi_cdi_br
+fii_cnes11     | CNES11         | re_br
+fii_gzit11     | GZIT11         | re_br
+fii_hgbs11     | HGBS11         | re_br
+fii_hglg11     | HGLG11         | re_br
+fii_hsml11     | HSML11         | re_br
+fii_icri11     | ICRI11         | fi_ipca_br
+fii_ifra11     | IFRA11         | fi_ipca_br
+fii_irim11     | IRIM11         | fi_ipca_br
+fii_juro11     | JURO11         | fi_cdi_br
+fii_kdol11     | KDOL11         | fi_usd_br
+fii_kivo11     | KIVO11         | fi_cdi_br
+fii_kncr11     | KNCR11         | fi_cdi_br
+fii_knip11     | KNIP11         | fi_ipca_br
+fii_knuq11     | KNUQ11         | fi_cdi_br
+fii_mcci11     | MCCI11         | fi_ipca_br
+fii_mcre11     | MCRE11         | fi_cdi_br
+fii_mxrf11     | MXRF11         | fi_cdi_br
+fii_pmll11     | PMLL11         | re_br
+fii_pvbi11     | PVBI11         | re_br
+fii_rbhy11     | RBHY11         | fi_cdi_br
+fii_rbrr11     | RBRR11         | fi_ipca_br
+fii_rbrx11     | RBRX11         | re_br
+fii_rbry11     | RBRY11         | fi_cdi_br
+fii_recr11     | RECR11         | fi_cdi_br
+fii_rzag11     | RZAG11         | fi_cdi_br
+fii_tgar11     | TGAR11         | re_br
+fii_trbl11     | TRBL11         | re_br
+fii_trxf11     | TRXF11         | re_br
+fii_vghf11     | VGHF11         | fi_cdi_br
+fii_vgip11     | VGIP11         | fi_ipca_br
+fii_vilg11     | VILG11         | re_br
+fii_visc11     | VISC11         | re_br
+fii_xpci11     | XPCI11         | fi_cdi_br
+fii_xpml11     | XPML11         | re_br
+
+Note: FII exposure mapping (tijolo vs papel) should be verified by operator.
+      Papel CDI FIIs invest in CRIs/CRAs/LCIs indexed to CDI.
+      Papel IPCA FIIs invest in CRIs indexed to IPCA.
+
+---------------------------------------------------------------------------
+3.7 BR EQUITIES (48 templates)
+---------------------------------------------------------------------------
+All: kind=listed, ECON=eq_br, TAX=taxable_no_come_cotas, ISS=false,
+     EXPD=false, FGC=false, B3=true, BDR=false.
+Each template has its company as the default issuer.
+
+template_code    | short_name
+-----------------|----------------------------
+equity_alos3     | Allos
+equity_amer3     | Americanas
+equity_anim3     | Ânima Educação
+equity_asai3     | Assaí Atacadista
+equity_azul11    | Azul (ON)
+equity_azul53    | Azul (ON post-conversion)
+equity_azza3     | Azzas 2154
+equity_b3sa3     | B3
+equity_bbas3     | Banco do Brasil
+equity_bbdc4     | Bradesco PN
+equity_bbse3     | BB Seguridade
+equity_beef3     | Minerva Foods
+equity_bhia3     | Grupo Casas Bahia
+equity_bmgb4     | Banco BMG PN
+equity_brav3     | Brava Energia
+equity_brkm5     | Braskem PNA
+equity_cmig4     | CEMIG PN
+equity_csan3     | Cosan
+equity_cyre3     | Cyrela
+equity_eter3     | Eternit
+equity_fesa4     | Ferbasa PN
+equity_flry3     | Fleury
+equity_goll54    | GOL (ON post-restructuring)
+equity_hapv3     | Hapvida
+equity_irbr3     | IRB Brasil Re
+equity_itsa4     | Itaúsa PN
+equity_jall3     | Jalles Machado
+equity_kepl3     | Kepler Weber
+equity_klbn4     | Klabin PN
+equity_leve3     | Mahle Metal Leve
+equity_mbrf3     | Marfrig
+equity_mglu3     | Magazine Luiza
+equity_movi3     | Movida
+equity_mrve3     | MRV Engenharia
+equity_odpv3     | Odontoprev
+equity_petr3     | Petrobras ON
+equity_petr4     | Petrobras PN
+equity_prio3     | PRIO
+equity_radl3     | Raia Drogasil
+equity_recv3     | PetroRecôncavo
+equity_sbfg3     | Grupo SBF
+equity_smto3     | São Martinho
+equity_tots3     | TOTVS
+equity_usim5     | Usiminas PNA
+equity_vale3     | Vale
+equity_vbbr3     | Vibra Energia
+equity_vveo3     | Viveo
+equity_wege3     | WEG
+
+---------------------------------------------------------------------------
+3.8 BDRs (3 templates)
+---------------------------------------------------------------------------
+All: kind=listed, ECON=eq_international, TAX=taxable_no_come_cotas,
+     ISS=false, EXPD=false, FGC=false, B3=true, BDR=true.
+
+template_code  | short_name
+---------------|----------------------------
+bdr_tsla34     | Tesla BDR
+bdr_aura33     | Aura Minerals BDR
+bdr_xpbr31     | XP Inc BDR
+
+---------------------------------------------------------------------------
+3.9 UNITS (2 templates)
+---------------------------------------------------------------------------
+All: kind=listed, TAX=taxable_no_come_cotas, ECON=eq_br, B3=true,
+     ISS=false, EXPD=false, FGC=false, BDR=false.
+
+template_code  | short_name
+---------------|----------------------------
+unit_klbn11    | Klabin Unit (ON+PN)
+unit_cyre99    | Cyrela Unit (ON+PN)
+
+---------------------------------------------------------------------------
+3.10 CRYPTO (8 templates)
+---------------------------------------------------------------------------
+All: kind=crypto, ECON=crypto, TAX=taxable_no_come_cotas, ISS=false,
+     EXPD=false, FGC=false, B3=false, BDR=false.
+
+template_code     | short_name
+------------------|----------------------------
+crypto_bitcoin    | Bitcoin (XBT)
+crypto_ethereum   | Ethereum (XET)
+crypto_solana     | Solana (XSO)
+crypto_aave       | AAVE (AVE)
+crypto_chainlink  | Chainlink (LNK)
+crypto_polygon    | Polygon (POL)
+crypto_uniswap    | Uniswap (UNI)
+crypto_render     | Render (RNR)
+
+---------------------------------------------------------------------------
+3.11 INVESTMENT FUNDS (96 templates)
+---------------------------------------------------------------------------
+All: kind=fund, ISS=false, EXPD=false, FGC=false, B3=false, BDR=false.
+Each fund is one template with its own CNPJ, fee data, and exposure mapping.
+
+TAX mapping:
+  general                → most FIRF, FIM, DI, crédito, macro, multimercado
+  taxable_no_come_cotas  → FIA (equity funds), some FIMs with >67% equity
+  previdencia            → funds with PREV in name
+
+EXP mapping (operator must verify per fund):
+  fi_cdi_br          → DI, Selic, CDI, crédito privado funds
+  fi_ipca_br         → inflation-linked, Tesouro IPCA funds
+  eq_br              → FIA domestic equity
+  eq_international   → FIA BDR, global equity
+  crypto             → crypto-referenced funds (Hashdex, BTG Bitcoin)
+  gold               → gold-referenced funds (BTG Ouro, Empiricus Ouro)
+  Use economic_exposure_weights_json for mixed funds
+
+Note: Several funds have "FII" in their name (e.g., BTG INCORPORACAO FII,
+RBR OPORTUNIDADES FII RL, RENDIMENTO - FII CENESP). These are UNLISTED /
+restricted-access real estate funds accessed via subscription platforms.
+They are NOT the B3-traded FIIs in section 3.6. Correct placement: here.
+
+Fund list (96):
+
+  #  | template_code (operator assigns)       | fund name
+  ---|----------------------------------------|------------------------------------------
+   1 | fund_absolute_creta                    | ABSOLUTE CRETA FICFIRF CrPr
+   2 | fund_acs_atenas_prev                   | ACS ABSOLUTE ATENAS PREV FIM CRED PRIV
+   3 | fund_af_invest_minas_bdr              | AF INVEST MINAS BDR NIVEL I FIA
+   4 | fund_alaska_black_bdr                 | ALASKA BLACK FICFIA BDR NIVEL I
+   5 | fund_artesanal_btg_cdi_fidc           | ARTESANAL BTG CDI FIC DE FIDC RL
+   6 | fund_arx_fuji                         | ARX FUJI FICFIRF CrPr
+   7 | fund_arx_vinson                       | ARX VINSON FICFIRF CrPr ACCESS
+   8 | fund_augme_30                         | AUGME 30 FICFIRF CrPr
+   9 | fund_az_quest_prev_luce               | AZ QUEST PREV ICATU LUCE FIC RF CP
+  10 | fund_az_quest_deb_incent              | AZ Quest Debentures Incent FICFIM CrPr
+  11 | fund_absolute_hidra_cdi              | Absolute Hidra CDI Plus P Infra RF RL
+  12 | fund_bnp_rubi                         | BNP PARIBAS RUBI FICFIRF CrPr
+  13 | fund_bnp_match_di                     | BNP Paribas Match DI FIRF CrPr
+  14 | fund_bradesco_deb_incent              | Bradesco Debêntures Incentivadas CDI II
+  15 | fund_btg_black_selic                  | BTG Black Tesouro Selic Simples FIRF RL
+  16 | fund_btg_cdb_plus_prev               | BTG CDB PLUS PREV FI MULT CRED PRIV
+  17 | fund_btg_cdb_plus                     | BTG CDB Plus FIRF CrPr
+  18 | fund_btg_cred_corp_incent             | BTG CRED CORP INCENTIVADO FICFIIIRF RL
+  19 | fund_btg_digital_dolar               | BTG DIGITAL DOLAR FI CAMBIAL
+  20 | fund_btg_div_acoes_glob              | BTG DIV ACOES GLOB BDR NIVEL I FIA
+  21 | fund_btg_digital_selic               | BTG Digital Tesouro Selic Simples FIRF
+  22 | fund_btg_hedge_incent                | BTG HEDGE INCENTIVADO FIRF INFRA CrPr
+  23 | fund_btg_hedge_ii                    | BTG Hedge II Incentivado Infra FIRF
+  24 | fund_btg_incorporacao_fii            | BTG INCORPORACAO FII RESP LIMITADA
+  25 | fund_btg_log_cajamar                 | BTG LOG AAA CAJAMAR FII RL SNR
+  26 | fund_btg_pac_cred_prev               | BTG PAC CRED COPR PREV FIC FI MULT CP RL
+  27 | fund_btg_pact_cred_ii_prev           | BTG PACT CRED CORP II PREV FC FI MULT CP
+  28 | fund_btg_energy_fip                  | BTG PACTUAL ENERGY OPPORTUNITIES FIP INF
+  29 | fund_btg_logcp_fii                   | BTG PACTUAL LOGCP FII
+  30 | fund_btg_prime_logistica             | BTG PACTUAL PRIME LOGÍSTICA FII RL
+  31 | fund_btg_tesouro_ipca_prev           | BTG PACTUAL TESOURO IPCA LON PREV FICRF
+  32 | fund_btg_bitcoin_100                 | BTG REF BITCOIN 100 FICFIM IE
+  33 | fund_btg_gl_tech                     | BTG REF GL TECH FIA
+  34 | fund_btg_ouro_usd                    | BTG REF OURO USD FICFIM
+  35 | fund_btg_prata                       | BTG REF PRATA FIM
+  36 | fund_btg_tesouro_selic               | BTG Tesouro Selic FIRFRefDI
+  37 | fund_btgp_cred_agri_fiagro           | BTGP CRED AGRICOLA BTAG II PRE FIAGRO DC
+  38 | fund_btgp_cred_imob_cdi             | BTGP CREDITO IMOBILIARIO CDI - FII RL
+  39 | fund_btgp_moderado_fgts             | BTGP REF MODERADO FMP FGTS CARTE LIVRE
+  40 | fund_bv_institucional                | BV INSTITUCIONAL FIRF CrPr
+  41 | fund_bradesco_sky_di                 | Bradesco Sky DI FICFIRFRef
+  42 | fund_ceres_btg_agro                  | CERES BTG U AG 2 FI C PR DO AG R LTDA SR
+  43 | fund_compass_yield_30                | COMPASS YIELD 30 FIRF CrPr
+  44 | fund_dahlia_total_return             | DAHLIA TOTAL RETURN FICFIM
+  45 | fund_daemon_nous_global              | Daemon Nous Glonal FICFIM
+  46 | fund_drys_shelter_top30              | Drys Shelter Top 30 FICFIRF CrPr LP RL
+  47 | fund_empiricus_cash_yield            | EMPIRICUS CASH YIELD FIRF
+  48 | fund_empiricus_superprev_2           | EMPIRICUS FOF SUPERPREVIDÊNCIA 2 ICATU FIM
+  49 | fund_empiricus_superprev             | EMPIRICUS FOF SUPERPREVIDÊNCIA ICATU FIM
+  50 | fund_empiricus_microcap              | EMPIRICUS MICROCAP ALERT FIA
+  51 | fund_empiricus_money_rider           | EMPIRICUS MONEY RIDER HEDGE FUND FIM IE
+  52 | fund_empiricus_ouro                  | EMPIRICUS OURO FICFIM
+  53 | fund_empiricus_uranio                | EMPIRICUS URANIO FIM
+  54 | fund_equitas_shelter                 | EQUITAS SHELTER FICFIRF CrPr LP
+  55 | fund_exclusive_mult_cred             | EXCLUSIVE FI MULT CRED PRIV
+  56 | fund_exes_caraja_fiagro              | EXES CARAJA FI CAD PROD ANGROIN FIAGRO D
+  57 | fund_empiricus_selic                 | Empiricus Selic Simples FIRF
+  58 | fund_hashdex_20_crypto               | HASHDEX 20 NASDAQ CRYPTO INDEX FICFIM
+  59 | fund_hidra_cdi_infra                 | Hidra CDI FICFIInfraRF
+  60 | fund_ibiuna_credit                   | IBIUNA CREDIT FICFIM CrPr
+  61 | fund_inter_hedge_incent              | INTER HEDGE FUNDO INCENT EM INFRA
+  62 | fund_itau_hy_prev                    | ITAU HIGH YIELD PREV RF CP P DIST BP FIC
+  63 | fund_itau_hy_prev_2                  | ITAU HY PREV FIC RF
+  64 | fund_jgp_corporate                   | JGP CORPORATE FICFIRF CrPr LP
+  65 | fund_kinea_chronos                   | Kinea Chronos FIM
+  66 | fund_m8_credit_advanced              | M8 Credit Advanced FICFIDC
+  67 | fund_mapfre_firf                     | MAPFRE FIRF
+  68 | fund_mapfre_confianza_di             | Mapfre Confianza DI FIRFRef CrPr
+  69 | fund_poligono_delta_fidc             | POLIGONO DELTA FIDC
+  70 | fund_porto_di                        | Porto DI CrPr FIRef
+  71 | fund_rbr_infra_pre                   | RBR INFRA CRÉDITO PRÉ FIP
+  72 | fund_rbr_oportunidades               | RBR OPORTUNIDADES FII RL
+  73 | fund_rec_one_fii                     | REC ONE FII RL
+  74 | fund_rendimento_cenesp               | RENDIMENTO - FII CENESP CI ER
+  75 | fund_rendimento_gazit                | RENDIMENTO - FII GAZIT CI ER
+  76 | fund_riza_onyx_imob                  | RIZA ONYX FI IMOBILIARIO RL
+  77 | fund_riza_lotus_di                   | Riza Lotus FIRFRefDI CrPr
+  78 | fund_sparta_top                      | SPARTA TOP FIC RF CrPr LP
+  79 | fund_spx_seahawk                     | SPX SEAHAWK FICFIRF CrPr LP ACCESS
+  80 | fund_spx_seahawk_deb_incent          | SPX Seahawk Debentures Incentivado Infra
+  81 | fund_sulamerica_cred_ativo           | SUL AMERICA CREDITO ATIVO FIRF CrPr
+  82 | fund_sulamerica_retorno_total        | SUL AMERICA RETORNO TOTAL FIRF LP
+  83 | fund_sulamerica_premium_di           | SULAMERICA PREMIUM PLUS FIRF REF DI CrPr
+  84 | fund_solis_antares                   | Solis Antares Light CrPr FICFIDC
+  85 | fund_trigono_flagship                | TRIGONO FLAGSHIP 60 FICFIA
+  86 | fund_upon_capital_inflacao           | Upon Capital DI Inflacao Infra FICFIRF
+  87 | fund_v8_cash                         | V8 CASH FICFIRF
+  88 | fund_v8_cash_platinum                | V8 CASH PLATINUM FIC RF CrPr
+  89 | fund_v8_speedway                     | V8 SPEEDWAY LS FICFIM
+  90 | fund_valora_infra_ipca               | VALORA INFRA IPCA RENDA MAIS FIP RESP L
+  91 | fund_vinland_credito                 | VINLAND CREDITO FICFIM CrPr
+  92 | fund_vinland_deb_infra               | VINLAND FIINV DEB INFRA RF CrPr ATIVO LP
+  93 | fund_vtr_atmr_iii                    | VTR ATMR III FICFIA
+  94 | fund_western_asset_bdr               | WESTERN ASSET FIA BDR NIVEL I
+  95 | fund_whg_rf_dinamico                 | WHG RF DINAMICO FICFIM
+  96 | fund_western_cred_bancario           | Western Credito Bancario Plus FIRF CrPr
+
+================================================================================
+4. TEMPLATE COUNT SUMMARY
+================================================================================
+
+  Category                         | Count
+  ---------------------------------|------
+  Tesouro / Government bonds       |    5
+  Bank deposits (CDB/LCI/LCA/CDIE)|   10
+  Private credit (CRA/CRI/DEB/CDCA)|  14
+  Other generic (COE/LFSN/fallbacks)|  4
+  ETFs                             |    6
+  FIIs                             |   40
+  BR Equities                      |   48
+  BDRs                             |    3
+  Units                            |    2
+  Crypto                           |    8
+  Investment Funds                 |   96
+  ---------------------------------|------
+  TOTAL                            |  236
+
+================================================================================
+5. ISSUERS
+================================================================================
+
+5.1 Must exist (government):
+    tesouro_nacional         | Tesouro Nacional           | br_government
+
+5.2 Banks (from CDB/LCI/LCA/COE issuers):
+    banco_btg_pactual        | BTG Pactual                | br_bank
+    banco_bradesco           | Bradesco                   | br_bank
+    banco_itau               | Itaú Unibanco              | br_bank
+    banco_xp                 | Banco XP                   | br_bank
+    banco_master             | Banco Master               | br_bank
+    banco_safra              | Banco Safra                | br_bank
+    caixa_economica          | Caixa Econômica Federal    | br_bank
+    banco_jp_morgan          | JP Morgan Brasil            | br_bank
+    banco_credit_suisse      | Credit Suisse Brasil        | br_bank
+    banco_morgan_stanley     | Morgan Stanley Brasil       | br_bank
+    (+ all other banks appearing in CDB/LCI/LCA positions)
+
+5.3 Corporate issuers (from CRA/CRI/Debenture):
+    All 88 CRA issuers, 37 CRI issuers, 77 debenture issuers
+    to be extracted from the position data and mapped to issuer_type
+    (mostly br_other, some br_infrastructure for infra debentures).
+
+5.4 Equity issuers (for dedicated equity templates):
+    One issuer per equity template (48 companies + 3 BDR underlyings).
+    Map to br_other (most), br_bank (BBAS3, BBDC4, BMGB4, ITSA4),
+    br_infrastructure (CMIG4, ETER3).
+
+    Full issuer list to be generated from equity template catalog.
+
+================================================================================
+6. IMPLEMENTATION ORDER
+================================================================================
+
+Phase 1: Schema migration
+  - Add precious_metals to exposure_group CHECK constraint
+  - Add 3 new economic_exposure rows (gold, silver, fi_usd_br)
+
+Phase 2: Seed issuers (~200+)
+  - Government, banks, corporates, equity companies
+
+Phase 3: Seed generic templates (33)
+  - Tesouro (5), CDB (3), LCI (3), LCA (2), CRA (3), CRI (3),
+    CDCA (2), Debenture (6), Compromissada (1), CDIE (1), LFSN (1),
+    COE generic (1), equity generic (1), BDR generic (1)
+
+Phase 4: Seed dedicated listed templates (99)
+  - 48 BR equities, 3 BDRs, 6 ETFs, 40 FIIs, 2 units
+
+Phase 5: Seed fund templates (96)
+  - Per fund name, with CNPJ and fee data where available
+
+Phase 6: Seed crypto templates (8)
+
+Phase 7: Populate instruction text (6 angles × 236 templates)
+  - Via /api/v1/batch/instructions/ endpoint
+  - AI agents fill instructions using advisor-designed templates
+
+================================================================================
+7. POSITION-TO-TEMPLATE MAPPING RULES
+================================================================================
+
+When the upstream team maps raw brokerage data to CSV:
+
+  Produto = "CDB" + Estratégia = "Pós-fixado"  → cdb_cdi_generic
+  Produto = "CDB" + Estratégia = "Inflação"     → cdb_ipca_generic
+  Produto = "CDB" + Estratégia = "Pré-fixado"   → cdb_pre_generic
+  Produto = "CRA" + Estratégia = "Pós-fixado"   → cra_cdi_generic
+  Produto = "CRA" + Estratégia = "Inflação"     → cra_ipca_generic
+  (same pattern for CRI, CDCA, LCI, LCA)
+
+  Produto = "Debênture" + IR=0                   → debenture_*_incentivada
+  Produto = "Debênture" + IR>0                    → debenture_*_regular
+
+  TESOURO DIRETO - LFT                           → tesouro_selic_generic
+  TESOURO DIRETO - NTN-B-P                        → tesouro_ipca_principal_generic
+  TESOURO DIRETO - NTN-B                          → tesouro_ipca_juros_generic
+  TESOURO DIRETO - LTN                            → tesouro_prefixado_generic
+  NTN-B / NTNB (secondary)                        → tesouro_ipca_juros_generic
+  NTN-F (secondary)                               → tesouro_ntnf_generic
+
+  Listed equity ticker (e.g., VALE3)              → equity_vale3
+  BDR ticker (e.g., TSLA34)                       → bdr_tsla34
+  ETF ticker (e.g., BOVA11)                       → etf_bova11
+  FII ticker (e.g., HGLG11)                       → fii_hglg11
+  Fund name                                       → fund_<slug>
+  Crypto token                                    → crypto_<name>
+  COE (any)                                       → coe_generic
+
+  Unseen equity ticker                            → equity_br_listed_generic
+  Unseen BDR ticker                               → bdr_equity_listed_generic

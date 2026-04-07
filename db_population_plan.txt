@@ -2395,3 +2395,138 @@ FINAL REVISED TEMPLATE COUNT:
   3 BDR templates
   2 generic fallbacks (equity + BDR)
   TOTAL: ~258 templates
+
+================================================================================
+SECTION 10: FINAL DECISIONS (2026-04-07)
+================================================================================
+
+A. DERIVATIVES EXCLUDED
+   The following are subscription rights, receipts, or similar derivatives.
+   They are EXCLUDED from the template catalog for the MVP:
+   - MOVI1   (subscription right)
+   - AZUL12  (rights/receipts)
+   - AZUL14  (rights/receipts)
+   - AZUL16  (rights/receipts)
+   - BMGB10  (subscription receipt)
+   Net change: -5 templates
+
+B. SCHEMA CHANGES TO economic_exposure
+
+   B.1 New exposure_group: precious_metals
+       Added to the CHECK constraint alongside fixed_income, equity,
+       real_estate, crypto.
+
+   B.2 New economic_exposure rows:
+
+       | exposure_code | name            | exposure_group   |
+       |---------------|-----------------|------------------|
+       | gold          | Gold            | precious_metals  |
+       | silver        | Silver          | precious_metals  |
+       | fi_usd_br     | FI USD Brazil   | fixed_income     |
+
+   B.3 Rationale
+       - gold / silver: GOLD11 ETF and any future precious-metals products.
+         "commodity_global" was rejected — oil/gas companies (Petrobras, PRIO)
+         are equities, not commodities in our taxonomy. Precious metals are
+         their own asset class for portfolio analysis.
+       - fi_usd_br: Brazilian instruments denominated in or indexed to USD
+         (e.g., KDOL11 Kinea Agro Income, USD-linked COEs, offshore-referenced
+         CRAs). Distinct from fi_international (foreign-issued instruments).
+
+   B.4 Updated full economic_exposure table (12 rows):
+
+       | exposure_code      | name                          | exposure_group   |
+       |--------------------|-------------------------------|------------------|
+       | fi_cdi_br          | CDI Brazil                    | fixed_income     |
+       | fi_ipca_br         | IPCA Brazil                   | fixed_income     |
+       | fi_prefixado_br    | Prefixado Brazil              | fixed_income     |
+       | fi_international   | Fixed Income International    | fixed_income     |
+       | fi_usd_br          | Fixed Income USD Brazil       | fixed_income     |
+       | eq_br              | Equity Brazil                 | equity           |
+       | eq_international   | Equity International          | equity           |
+       | re_br              | Real Estate Brazil            | real_estate      |
+       | re_international   | Real Estate International     | real_estate      |
+       | crypto             | Crypto                        | crypto           |
+       | gold               | Gold                          | precious_metals  |
+       | silver             | Silver                        | precious_metals  |
+
+C. TEMPLATE RECLASSIFICATIONS
+
+   C.1 ETF exposure corrections:
+       - etf_gold11  → primary_economic_exposure = gold (was eq_br)
+       - etf_debb11  → primary_economic_exposure = fi_cdi_br (credit ETF)
+       - etf_b5p211  → primary_economic_exposure = fi_ipca_br (inflation ETF)
+
+   C.2 KDOL11 reclassification:
+       - Template: fii_kdol11 (kept as listed, Sub Mercado = FII in source data)
+       - primary_economic_exposure = fi_usd_br
+
+   C.3 KLBN11 reclassification:
+       - Was: ETF → Now: unit_klbn11 (Klabin unit ON+PN)
+       - primary_economic_exposure = eq_br
+
+D. COE DECISION: ONE GENERIC TEMPLATE
+   COEs are bespoke structured products with unlimited variety.
+   19 individual templates is over-engineering — each is a one-off.
+   Decision: ONE generic coe_generic template (instrument_kind = other).
+   Issuer (BTG, XP, JP Morgan, Credit Suisse) supplied per CSV row.
+   Underlying exposure varies too much to classify mechanically.
+   Net change: 19 → 1 = -18 templates.
+
+   coe_generic:
+     instrument_kind = other
+     short_name = COE (Certificado de Operações Estruturadas)
+     primary_economic_exposure = eq_international (best generic default)
+     tax_profile = general
+     primary_issuer_type = br_bank
+     requires_expiry_date = true
+     requires_issuer_or_issuer_type = true
+     b3_listed = false, is_bdr = false, has_fgc = false
+
+E. MISCLASSIFICATION FIX
+   "BTG DIV ACOES GLOB BDR NIVEL I FIA" was in COE data but is actually
+   a fund (FIA). Moved to fund templates. Fund count: 94 → 95.
+
+F. REVISED FINAL TEMPLATE COUNT
+
+   32  generic fixed income / repo / other (31 + coe_generic)
+    6  ETFs (BOVA11, IVVB11, USTK11, GOLD11, B5P211, DEBB11)
+   41  FIIs (per ticker, including KDOL11)
+   95  funds (per CNPJ, including BTG DIV ACOES GLOB BDR)
+    8  crypto tokens
+   48  BR equities (53 original - 5 derivatives excluded)
+    3  BDRs (TSLA34, AURA33, XPBR31)
+    1  unit (KLBN11)
+    2  generic fallbacks (equity + BDR, for unseen future tickers)
+   ---
+   236 templates total
+
+G. IMPLEMENTATION ORDER
+
+   Phase 1: Schema changes
+     - Add precious_metals to exposure_group CHECK constraint
+     - Add 3 new economic_exposure rows (gold, silver, fi_usd_br)
+     - Run migration
+
+   Phase 2: Seed generic templates (32)
+     - Tesouro (4), CDB (3), LCI (3), LCA (2), CRA (3), CRI (3),
+       CDCA (2), Debenture (6), Compromissada (1), NTN-F (1),
+       coe_generic (1),
+       equity_br_listed_generic, bdr_equity_listed_generic, lfsn_generic
+
+   Phase 3: Seed issuers (~100+)
+     - All banks, government, and corporate issuers from real positions
+     - Issuer-to-issuer_type mapping
+
+   Phase 4: Seed dedicated listed templates (99)
+     - 48 BR equities, 3 BDRs, 6 ETFs, 41 FIIs, 1 unit
+
+   Phase 5: Seed fund templates (95)
+     - Per CNPJ, with fee data where available
+
+   Phase 6: Seed crypto templates (8)
+     - Per token
+
+   Phase 7: Populate instruction text via AI-agent API
+     - Use /api/v1/batch/instructions/ endpoint
+     - 6 angles × all templates
