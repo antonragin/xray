@@ -123,6 +123,7 @@ class InstrumentTemplateSerializer(serializers.ModelSerializer):
             'template_code', 'instrument_kind', 'short_name', 'long_name',
             'cnpj', 'b3_listed', 'is_bdr',
             'yearly_fee_pct', 'performance_fee_pct', 'has_fgc',
+            'withdrawal_days',
             'requires_expiry_date', 'requires_issuer_or_issuer_type',
             'primary_economic_exposure_code', 'economic_exposure_weights_json',
             'tax_profile_code',

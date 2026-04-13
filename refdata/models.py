@@ -118,6 +118,10 @@ class InstrumentTemplate(ReferenceBase):
         max_digits=8, decimal_places=4, null=True, blank=True
     )
     has_fgc = models.BooleanField(null=True, blank=True)
+    withdrawal_days = models.IntegerField(
+        null=True, blank=True,
+        help_text='Withdrawal/redemption days (T+N). E.g., 0=same day, 1=T+1, 30=T+30.'
+    )
     requires_expiry_date = models.BooleanField(default=False)
     requires_issuer_or_issuer_type = models.BooleanField(default=False)
 
@@ -202,6 +206,17 @@ class InstrumentTemplate(ReferenceBase):
             raise ValidationError({'yearly_fee_pct': 'Must be non-negative.'})
         if self.performance_fee_pct is not None and self.performance_fee_pct < 0:
             raise ValidationError({'performance_fee_pct': 'Must be non-negative.'})
+        # Fund-specific mandatory fields
+        if self.instrument_kind == 'fund':
+            errors = {}
+            if not self.cnpj or not self.cnpj.strip():
+                errors['cnpj'] = 'CNPJ is required for funds.'
+            if self.yearly_fee_pct is None:
+                errors['yearly_fee_pct'] = 'Administration fee (yearly_fee_pct) is required for funds.'
+            if self.withdrawal_days is None:
+                errors['withdrawal_days'] = 'Withdrawal days (T+N) is required for funds.'
+            if errors:
+                raise ValidationError(errors)
 
 
 def _validate_weights_json(data, model_class, code_field, field_name):
