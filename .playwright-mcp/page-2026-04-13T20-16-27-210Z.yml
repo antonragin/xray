@@ -1,0 +1,30 @@
+- generic [ref=e2]:
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - img [ref=e7]
+      - text: Axis
+    - generic [ref=e9]:
+      - textbox "Login" [active] [ref=e11]
+      - paragraph
+      - textbox "Password" [ref=e13]
+      - paragraph
+      - paragraph [ref=e14]:
+        - checkbox "Remember me" [ref=e15]
+        - text: Remember me
+        - link "Forgot my password" [ref=e16] [cursor=pointer]:
+          - /url: "#"
+      - button "Sign in" [ref=e18] [cursor=pointer]
+    - paragraph [ref=e20]:
+      - text: Already a customer and need to login?
+      - link "Request your access." [ref=e21] [cursor=pointer]:
+        - /url: "#"
+    - paragraph [ref=e23]:
+      - text: Not a client?
+      - link "Contact Us" [ref=e24] [cursor=pointer]:
+        - /url: http://www.quantumfinance.com.br/#contato
+      - text: .
+  - generic [ref=e26]:
+    - text: 2005 - 2026 | QUANTUM | All rights reserved. Any reproduction without QUANTUMs authorization is forbidden.
+    - link "Tems and conditions" [ref=e27] [cursor=pointer]:
+      - /url: "#"
+    - text: .

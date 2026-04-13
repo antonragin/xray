@@ -1,0 +1,10 @@
+[    1284ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://www.quantumaxis.com.br/webaxis/webaxis2/laminaPersonalizada/laminaPersonalizada/paletaCoresLamina.css?q=00253f5:0
+[    1874ms] [LOG] JQMIGRATE: Logging is active @ https://www.quantumaxis.com.br/webaxis/resources/lib/jquery-migrate.js?q=00253f5:4
+[    2077ms] [WARNING] JQMIGRATE: jQuery.fn.load() is deprecated @ https://www.quantumaxis.com.br/webaxis/resources/lib/jquery-migrate.js?q=00253f5:4
+[    2563ms] [WARNING] JQMIGRATE: jQuery.browser is deprecated @ https://www.quantumaxis.com.br/webaxis/resources/lib/jquery-migrate.js?q=00253f5:4
+[    3028ms] [LOG] Conexao estabelecida com sucesso. Utilizando transporte websocket @ https://www.quantumaxis.com.br/webaxis/resources/comum/js/util/QuantumSocket.js?q=00253f5:0
+[   23382ms] Error: Load timeout for modules: text!controllers/tarefas/html/manter_unnormalized3,text!controllers/tarefas/html/manter
+http://requirejs.org/docs/errors.html#timeout
+    at C (https://www.quantumaxis.com.br/webaxis/resources/lib/require.js?version=00253f5:1:804)
+    at D (https://www.quantumaxis.com.br/webaxis/resources/lib/require.js?version=00253f5:1:3585)
+    at https://www.quantumaxis.com.br/webaxis/resources/lib/require.js?version=00253f5:1:3760

@@ -1,0 +1,249 @@
+- generic [ref=e2]:
+  - table [ref=e4]:
+    - rowgroup [ref=e5]:
+      - row [ref=e6]:
+        - cell [ref=e7]:
+          - table [ref=e8]:
+            - rowgroup [ref=e9]:
+              - 'row "BTG PACTUAL CDB PLUS FIF RENDA FIXA CNPJ: 27.717.359/0001-30" [ref=e10]':
+                - cell "BTG PACTUAL CDB PLUS FIF RENDA FIXA" [ref=e11]:
+                  - img [ref=e12]
+                  - strong [ref=e14]: BTG PACTUAL CDB PLUS FIF RENDA FIXA
+                - 'cell "CNPJ: 27.717.359/0001-30" [ref=e15]':
+                  - generic [ref=e16]: "CNPJ: 27.717.359/0001-30"
+              - row [ref=e17]:
+                - cell [ref=e18]:
+                  - img [ref=e19]
+              - row [ref=e20]:
+                - cell [ref=e21]:
+                  - table [ref=e22]:
+                    - rowgroup [ref=e23]:
+                      - row [ref=e24]:
+                        - cell [ref=e25]
+                      - row [ref=e26]:
+                        - cell [ref=e27]:
+                          - img [ref=e28]
+                      - row "Specifications" [ref=e29]:
+                        - cell "Specifications" [ref=e30]
+                      - 'row "Investment Fund Management: BTG Pactual Asset Management Custodian: Banco BTG Pactual Portfolio Manager: Julio de Siqueira Carvalho de Araujo Filho Auditors: PriceWaterhouseCoopers Administrator: BTG Pactual Serviços Financeiros" [ref=e31]':
+                        - 'cell "Investment Fund Management: BTG Pactual Asset Management Custodian: Banco BTG Pactual Portfolio Manager: Julio de Siqueira Carvalho de Araujo Filho Auditors: PriceWaterhouseCoopers Administrator: BTG Pactual Serviços Financeiros" [ref=e32]':
+                          - table [ref=e33]:
+                            - rowgroup [ref=e34]:
+                              - row [ref=e35]:
+                                - cell [ref=e36]:
+                                  - img [ref=e37]
+                              - 'row "Investment Fund Management: BTG Pactual Asset Management Custodian: Banco BTG Pactual" [ref=e38]':
+                                - 'cell "Investment Fund Management: BTG Pactual Asset Management" [ref=e39]':
+                                  - generic [ref=e40]:
+                                    - text: "Investment Fund Management:"
+                                    - link "BTG Pactual Asset Management" [ref=e42] [cursor=pointer]:
+                                      - /url: javascript:direcionarInstituicao(100020, 'GESTAO');
+                                - cell [ref=e43]
+                                - 'cell "Custodian: Banco BTG Pactual" [ref=e44]':
+                                  - generic [ref=e45]:
+                                    - text: "Custodian:"
+                                    - link "Banco BTG Pactual" [ref=e47] [cursor=pointer]:
+                                      - /url: javascript:direcionarInstituicao(3573, 'CUSTODIANTE');
+                              - 'row "Portfolio Manager: Julio de Siqueira Carvalho de Araujo Filho Auditors: PriceWaterhouseCoopers" [ref=e48]':
+                                - 'cell "Portfolio Manager: Julio de Siqueira Carvalho de Araujo Filho" [ref=e49]':
+                                  - generic [ref=e50]:
+                                    - text: "Portfolio Manager:"
+                                    - link "Julio de Siqueira Carvalho de Araujo Filho" [ref=e52] [cursor=pointer]:
+                                      - /url: javascript:direcionarGestor();
+                                - cell [ref=e53]
+                                - 'cell "Auditors: PriceWaterhouseCoopers" [ref=e54]':
+                                  - generic [ref=e55]:
+                                    - text: "Auditors:"
+                                    - link "PriceWaterhouseCoopers" [ref=e57] [cursor=pointer]:
+                                      - /url: javascript:direcionarInstituicao(1000068, 'AUDITORIA');
+                              - 'row "Administrator: BTG Pactual Serviços Financeiros" [ref=e58]':
+                                - 'cell "Administrator: BTG Pactual Serviços Financeiros" [ref=e59]':
+                                  - generic [ref=e60]:
+                                    - text: "Administrator:"
+                                    - link "BTG Pactual Serviços Financeiros" [ref=e62] [cursor=pointer]:
+                                      - /url: javascript:direcionarInstituicao(1000139, 'ADMINISTRADOR');
+                                - cell [ref=e63]
+                                - cell [ref=e64]
+                      - row [ref=e65]:
+                        - cell [ref=e66]
+                      - row [ref=e67]:
+                        - cell [ref=e68]:
+                          - img [ref=e69]
+                      - row "Summary" [ref=e70]:
+                        - cell "Summary" [ref=e71]
+                      - 'row "Inception: 11/20/2017 Target Audience: Investors in general Benchmark: CDI (Interbank Rate)" [ref=e72]':
+                        - 'cell "Inception: 11/20/2017 Target Audience: Investors in general Benchmark: CDI (Interbank Rate)" [ref=e73]':
+                          - table [ref=e74]:
+                            - rowgroup [ref=e75]:
+                              - row [ref=e76]:
+                                - cell [ref=e77]:
+                                  - img [ref=e78]
+                              - 'row "Inception: 11/20/2017 Target Audience: Investors in general" [ref=e79]':
+                                - 'cell "Inception: 11/20/2017" [ref=e80]':
+                                  - generic [ref=e81]: "Inception: 11/20/2017"
+                                - cell [ref=e82]
+                                - 'cell "Target Audience: Investors in general" [ref=e83]'
+                              - 'row "Benchmark: CDI (Interbank Rate)" [ref=e84]':
+                                - 'cell "Benchmark: CDI (Interbank Rate)" [ref=e85]':
+                                  - generic [ref=e86]: "Benchmark: CDI (Interbank Rate)"
+                      - row [ref=e87]:
+                        - cell [ref=e88]
+                      - row [ref=e89]:
+                        - cell [ref=e90]:
+                          - img [ref=e91]
+                      - row "Fees" [ref=e92]:
+                        - cell "Fees" [ref=e93]
+                      - 'row "Admin. and Management Fee: 0.3 % Exit Charge: There is not Performance fee: There is not Lockup Period: Does not exist Performance indice: There is not" [ref=e94]':
+                        - 'cell "Admin. and Management Fee: 0.3 % Exit Charge: There is not Performance fee: There is not Lockup Period: Does not exist Performance indice: There is not" [ref=e95]':
+                          - table [ref=e96]:
+                            - rowgroup [ref=e97]:
+                              - row [ref=e98]:
+                                - cell [ref=e99]:
+                                  - img [ref=e100]
+                              - 'row "Admin. and Management Fee: 0.3 % Exit Charge: There is not" [ref=e101]':
+                                - 'cell "Admin. and Management Fee: 0.3 %" [ref=e102]':
+                                  - generic [ref=e103]: "Admin. and Management Fee: 0.3 %"
+                                - cell [ref=e104]
+                                - 'cell "Exit Charge: There is not" [ref=e105]'
+                              - 'row "Performance fee: There is not Lockup Period: Does not exist" [ref=e106]':
+                                - 'cell "Performance fee: There is not" [ref=e107]':
+                                  - generic [ref=e108]: "Performance fee: There is not"
+                                - cell [ref=e109]
+                                - 'cell "Lockup Period: Does not exist" [ref=e110]'
+                              - 'row "Performance indice: There is not" [ref=e111]':
+                                - 'cell "Performance indice: There is not" [ref=e112]':
+                                  - generic [ref=e113]: "Performance indice: There is not"
+                                - cell [ref=e114]
+                                - cell [ref=e115]
+                      - row [ref=e116]:
+                        - cell [ref=e117]
+                      - row [ref=e118]:
+                        - cell [ref=e119]:
+                          - img [ref=e120]
+                      - row "Operational information" [ref=e121]:
+                        - cell "Operational information" [ref=e122]
+                      - 'row "Initial deposit: R$500.00 Availability of invested amount: D+0 Minimum investment/redemption: R$100.00 Share conversion for investment: D+0 Minimum balance: R$100.00 Share conversion for redemption: D+0 _ Availability of reedemed amount: D+0" [ref=e123]':
+                        - 'cell "Initial deposit: R$500.00 Availability of invested amount: D+0 Minimum investment/redemption: R$100.00 Share conversion for investment: D+0 Minimum balance: R$100.00 Share conversion for redemption: D+0 _ Availability of reedemed amount: D+0" [ref=e124]':
+                          - table [ref=e125]:
+                            - rowgroup [ref=e126]:
+                              - row [ref=e127]:
+                                - cell [ref=e128]:
+                                  - img [ref=e129]
+                              - 'row "Initial deposit: R$500.00 Availability of invested amount: D+0" [ref=e130]':
+                                - 'cell "Initial deposit: R$500.00" [ref=e131]'
+                                - cell [ref=e132]
+                                - 'cell "Availability of invested amount: D+0" [ref=e133]'
+                              - 'row "Minimum investment/redemption: R$100.00 Share conversion for investment: D+0" [ref=e134]':
+                                - 'cell "Minimum investment/redemption: R$100.00" [ref=e135]':
+                                  - generic [ref=e136]: "Minimum investment/redemption: R$100.00"
+                                - cell [ref=e137]
+                                - 'cell "Share conversion for investment: D+0" [ref=e138]'
+                              - 'row "Minimum balance: R$100.00 Share conversion for redemption: D+0" [ref=e139]':
+                                - 'cell "Minimum balance: R$100.00" [ref=e140]'
+                                - cell [ref=e141]
+                                - 'cell "Share conversion for redemption: D+0" [ref=e142]'
+                              - 'row "_ Availability of reedemed amount: D+0" [ref=e143]':
+                                - cell "_" [ref=e144]
+                                - cell [ref=e145]
+                                - 'cell "Availability of reedemed amount: D+0" [ref=e146]'
+                      - row [ref=e147]:
+                        - cell [ref=e148]
+                      - row [ref=e149]:
+                        - cell [ref=e150]:
+                          - img [ref=e151]
+                      - row "Category" [ref=e152]:
+                        - cell "Category" [ref=e153]
+                      - 'row "CVM: Fixed Income Legal: FI Quantum: Fixed Income - CDI Jornal Valor: Renda Fixa Duração Livre Grau de Investimento Anbima: Renda Fixa Duração Baixa Grau de Investimento _" [ref=e154]':
+                        - 'cell "CVM: Fixed Income Legal: FI Quantum: Fixed Income - CDI Jornal Valor: Renda Fixa Duração Livre Grau de Investimento Anbima: Renda Fixa Duração Baixa Grau de Investimento _" [ref=e155]':
+                          - table [ref=e156]:
+                            - rowgroup [ref=e157]:
+                              - row [ref=e158]:
+                                - cell [ref=e159]:
+                                  - img [ref=e160]
+                              - 'row "CVM: Fixed Income Legal: FI" [ref=e161]':
+                                - 'cell "CVM: Fixed Income" [ref=e162]':
+                                  - generic [ref=e163]: "CVM: Fixed Income"
+                                - cell [ref=e164]
+                                - 'cell "Legal: FI" [ref=e165]'
+                              - 'row "Quantum: Fixed Income - CDI Jornal Valor: Renda Fixa Duração Livre Grau de Investimento" [ref=e166]':
+                                - 'cell "Quantum: Fixed Income - CDI" [ref=e167]':
+                                  - generic [ref=e168]: "Quantum: Fixed Income - CDI"
+                                - cell [ref=e169]
+                                - 'cell "Jornal Valor: Renda Fixa Duração Livre Grau de Investimento" [ref=e170]'
+                              - 'row "Anbima: Renda Fixa Duração Baixa Grau de Investimento _" [ref=e171]':
+                                - 'cell "Anbima: Renda Fixa Duração Baixa Grau de Investimento" [ref=e172]':
+                                  - generic [ref=e173]: "Anbima: Renda Fixa Duração Baixa Grau de Investimento"
+                                - cell [ref=e174]
+                                - cell "_" [ref=e175]
+                      - row [ref=e176]:
+                        - cell [ref=e177]
+                      - row [ref=e178]:
+                        - cell [ref=e179]:
+                          - img [ref=e180]
+                      - row "Contact" [ref=e181]:
+                        - cell "Contact" [ref=e182]
+                      - 'row "Name: BTG Pactual Asset Management Site: www.btgpactual.com.br Phone: (11) 4007-2511 Email: atendimentoinvestimentos@btgpactual.com" [ref=e183]':
+                        - 'cell "Name: BTG Pactual Asset Management Site: www.btgpactual.com.br Phone: (11) 4007-2511 Email: atendimentoinvestimentos@btgpactual.com" [ref=e184]':
+                          - table [ref=e185]:
+                            - rowgroup [ref=e186]:
+                              - row [ref=e187]:
+                                - cell [ref=e188]:
+                                  - img [ref=e189]
+                              - 'row "Name: BTG Pactual Asset Management Site: www.btgpactual.com.br" [ref=e190]':
+                                - 'cell "Name: BTG Pactual Asset Management" [ref=e191]':
+                                  - generic [ref=e192]:
+                                    - text: "Name:"
+                                    - link "BTG Pactual Asset Management" [ref=e194] [cursor=pointer]:
+                                      - /url: javascript:direcionarInstituicao(100020, 'GESTAO');
+                                - cell [ref=e195]
+                                - 'cell "Site: www.btgpactual.com.br" [ref=e196]':
+                                  - text: "Site:"
+                                  - link "www.btgpactual.com.br" [ref=e199] [cursor=pointer]:
+                                    - /url: http://www.btgpactual.com.br
+                              - 'row "Phone: (11) 4007-2511 Email: atendimentoinvestimentos@btgpactual.com" [ref=e200]':
+                                - 'cell "Phone: (11) 4007-2511" [ref=e201]':
+                                  - generic [ref=e202]: "Phone: (11) 4007-2511"
+                                - cell [ref=e203]
+                                - 'cell "Email: atendimentoinvestimentos@btgpactual.com" [ref=e204]'
+                      - row [ref=e205]:
+                        - cell [ref=e206]
+              - row [ref=e207]:
+                - cell [ref=e208]:
+                  - img [ref=e209]
+              - row [ref=e210]:
+                - cell [ref=e211]:
+                  - table [ref=e212]:
+                    - rowgroup [ref=e213]:
+                      - row [ref=e214]:
+                        - cell [ref=e215]:
+                          - generic [ref=e216]: Investment funds do not have the warranty of the fund's Manager, portfolio's Manager, of any insurance, Credits Guarantor Fund - FGC. The profitability obtained in the past does not asure future profitability. Derivatives strategies, used as part of the investment policy of investment funds, may result in losses greater than the invested capital and the consequent obligation for the investor to contribute additional funds to cover the loss of the fund. The investor is recommended to carefully read the leaflet and the investment fund regulation upon applying its resources. To evaluate the performance of an investment fund, a twelve-month period analysis is recommended. The "adjusted" historical series of assets may contain adjustments that differentiate them from the original series. The performance of the indexes portrayed is obtained from public sources and shared for informational purposes only (article 6, items II and III, of Law No. 8,078/1990 and CVM Resolution 135/22). Quantum has no relationship with the index creators.
+      - row "2005 | QUANTUM | All rights reserved. Any reproduction without QUANTUMs authorization is forbidden. Tems and conditions." [ref=e217]:
+        - cell "2005 | QUANTUM | All rights reserved. Any reproduction without QUANTUMs authorization is forbidden. Tems and conditions." [ref=e218]:
+          - paragraph [ref=e219]:
+            - generic [ref=e220]:
+              - text: 2005 |
+              - strong [ref=e221]: QUANTUM
+              - text: "| All rights reserved. Any reproduction without QUANTUMs authorization is forbidden."
+              - generic [ref=e222] [cursor=pointer]: Tems and conditions
+              - text: .
+      - row "_" [ref=e223]:
+        - cell "_" [ref=e224]:
+          - table [ref=e225]:
+            - rowgroup [ref=e226]:
+              - row "_" [ref=e227]:
+                - cell "_" [ref=e228]:
+                  - generic [ref=e229]: _
+  - table [ref=e231]:
+    - rowgroup [ref=e232]:
+      - row [ref=e233]:
+        - cell [ref=e234]
+      - row [ref=e235]:
+        - cell [ref=e236]
+      - row [ref=e237]:
+        - cell [ref=e238]
+        - cell [ref=e239]:
+          - img [ref=e240] [cursor=pointer]
+      - row [ref=e241]:
+        - cell [ref=e242]
+      - row [ref=e243]:
+        - cell [ref=e244]

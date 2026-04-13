@@ -1,0 +1,6 @@
+- generic [active] [ref=e1]:
+  - img [ref=e6]
+  - generic:
+    - img [ref=e7]
+    - img [ref=e8]
+    - img [ref=e9]

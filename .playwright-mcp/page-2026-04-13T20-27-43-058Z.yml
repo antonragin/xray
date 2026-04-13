@@ -1,0 +1,44 @@
+- generic [ref=e2]:
+  - generic [ref=e4]:
+    - img [ref=e5]
+    - text: Lâminas
+  - generic [ref=e7]:
+    - generic:
+      - link "Voltar":
+        - /url: "#"
+        - img [ref=e8] [cursor=pointer]
+  - generic [ref=e13]:
+    - generic [ref=e16]:
+      - heading "Lâminas" [level=1] [ref=e17]:
+        - generic [ref=e18]: Lâminas
+      - generic [ref=e21] [cursor=pointer]: Snapshot
+    - generic [ref=e24]:
+      - heading "Ativos" [level=1] [ref=e25]:
+        - generic [ref=e26]: Ativos
+      - generic [ref=e27]: Ordenar
+    - generic [ref=e31]:
+      - heading "Análises complementares" [level=1] [ref=e32]:
+        - generic [ref=e33]: Análises complementares
+      - generic [ref=e34]: Lâmina Atual
+      - generic [ref=e35] [cursor=pointer]: Proventos
+      - generic [ref=e36] [cursor=pointer]: Indicadores Séries
+      - generic [ref=e37] [cursor=pointer]: Demonstrações Financeiras
+      - generic [ref=e38] [cursor=pointer]: Acionistas
+      - generic [ref=e39] [cursor=pointer]: Gestores
+      - generic [ref=e40] [cursor=pointer]: Documentos
+      - generic [ref=e41] [cursor=pointer]: Documentos
+      - generic [ref=e42] [cursor=pointer]: Carteira
+      - generic [ref=e43] [cursor=pointer]: Carteira Consolidada
+      - generic [ref=e44] [cursor=pointer]: Gráfico
+      - generic [ref=e45] [cursor=pointer]: Todas as Informações
+    - generic [ref=e48]:
+      - heading "Criar Ativo" [level=1] [ref=e49]:
+        - generic [ref=e50]: Criar Ativo
+      - generic [ref=e51]: Criar CDB, LCI, COE, Índice e Ativo Sintético
+  - generic [ref=e57]: 2005 -2026 | QUANTUM | Todos direitos reservados. Proibida reprodução parcial ou total sem autorização da QUANTUM. Termos e condições.
+  - generic [ref=e58]:
+    - generic [ref=e59]: Baixar todas as lâminas
+    - generic [ref=e61]:
+      - text: "Data base:"
+      - link "OK" [ref=e62] [cursor=pointer]:
+        - /url: "#"

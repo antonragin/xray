@@ -1,0 +1,16 @@
+[     981ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ https://www.quantumaxis.com.br/webaxis/login.jsp:0
+[    8526ms] [LOG] evento change @ https://www.quantumaxis.com.br/webaxis/resources/login/js/vm/logarVM.js?q=00253f5:0
+[    8527ms] [LOG] alterou login @ https://www.quantumaxis.com.br/webaxis/resources/login/js/vm/logarVM.js?q=00253f5:0
+[   11527ms] [LOG] evento change @ https://www.quantumaxis.com.br/webaxis/resources/login/js/vm/logarVM.js?q=00253f5:0
+[   14120ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://www.quantumaxis.com.br/resources/comum/css/bootstrap/js/5.0.1/bootstrap.bundle.min.js:0
+[   14121ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://www.quantumaxis.com.br/resources/comum/css/bootstrap/icons/1.5.0/bootstrap-icons.css:0
+[   14122ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://www.quantumaxis.com.br/resources/comum/css/bootstrap/css/5.0.1/bootstrap.min.css:0
+[   14136ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://www.quantumaxis.com.br/resources/comum/css/modalBenchmark.css:0
+[   14178ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ https://www.quantumaxis.com.br/webaxis/:0
+[   14178ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ https://www.quantumaxis.com.br/webaxis/:0
+[   14178ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ https://www.quantumaxis.com.br/webaxis/:0
+[   18477ms] [LOG] Conexao estabelecida com sucesso. Utilizando transporte websocket @ https://www.quantumaxis.com.br/webaxis/resources/comum/js/util/QuantumSocket.js?q=00253f5:0
+[   18697ms] [LOG] recebeu token @ https://www.quantumaxis.com.br/webaxis/resources/menu/js//principalView.js?q=00253f5:0
+[   20835ms] [WARNING] Hotjar not launching due to suspicious userAgent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/146.0.0.0 Safari/537.36 @ https://static.hotjar.com/c/hotjar-2075835.js?sv=6:2
+[   20983ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://www.quantumaxis.com.br/webaxis/images//botao_ok.gif:0
+[  138698ms] [LOG] recebeu token @ https://www.quantumaxis.com.br/webaxis/resources/menu/js//principalView.js?q=00253f5:0
